@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "tsx watch src/functions/analyze-meal.ts",
+    "dev": "node --env-file=.env --import tsx --watch src/functions/analyze-meal.ts",
     "deploy": "npm run build && serverless deploy",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",

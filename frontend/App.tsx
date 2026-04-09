@@ -172,6 +172,7 @@ export default function App() {
   const [imageAsset, setImageAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [analysis, setAnalysis] = useState<MealAnalysisSummary | null>(null);
   const [nutritionView, setNutritionView] = useState<"camera" | "history">("camera");
+  const [cameraReturnTab, setCameraReturnTab] = useState<AppTab>("home");
   const [statsView, setStatsView] = useState<StatsView>("food");
   const [selectedStatsDate, setSelectedStatsDate] = useState(() => getLocalDateKey(new Date()));
   const [statsMonthPickerExpanded, setStatsMonthPickerExpanded] = useState(false);
@@ -362,7 +363,7 @@ export default function App() {
         : theme.danger;
   const homeHeroGradient: readonly [string, string, string] =
     visualMode === "light"
-      ? ["#0F1513", "#163129", "#0F1E19"]
+      ? ["#FFFDF8", "#F6EFE4", "#EEE4D6"]
       : ["#07110F", "#0F221D", "#17352C"];
   const homePanelColor = visualMode === "light" ? "#FBF8F1" : "#0F1513";
   const homePanelColorAlt = visualMode === "light" ? "#F2ECE1" : "#121B18";
@@ -371,6 +372,48 @@ export default function App() {
   const homeSoftText = visualMode === "light" ? "#A3988B" : "#587067";
   const homeStrongText = visualMode === "light" ? "#17130F" : "#F5FBF8";
   const homeAnchorText = formatCircadianTime(circadianPlan.nextAnchor, circadianPlan.city.timeZone);
+  const homeHeroAuraPrimaryColor = visualMode === "light" ? "rgba(0, 200, 151, 0.12)" : "rgba(118, 239, 229, 0.14)";
+  const homeHeroAuraSecondaryColor = visualMode === "light" ? "rgba(232, 255, 84, 0.10)" : "rgba(232, 255, 84, 0.11)";
+  const homeHeroPillDarkColor = visualMode === "light" ? "rgba(23, 19, 15, 0.04)" : "rgba(255,255,255,0.08)";
+  const homeHeroPillGlassColor = visualMode === "light" ? "rgba(23, 19, 15, 0.06)" : "rgba(255,255,255,0.12)";
+  const homeHeroPillTextColor = visualMode === "light" ? "#2A241F" : "#F4FBF8";
+  const homeHeroEyebrowColor = visualMode === "light" ? "#897E71" : "#8FACA1";
+  const homeHeroTitleColor = visualMode === "light" ? "#1A1511" : "#FCFFFD";
+  const homeHeroSummaryColor = visualMode === "light" ? "#6F655B" : "rgba(245, 251, 248, 0.74)";
+  const homeFloatingBadgeColor = visualMode === "light" ? "rgba(23, 19, 15, 0.06)" : "rgba(255,255,255,0.08)";
+  const homeFloatingValueColor = visualMode === "light" ? "#17130F" : "#F8FFFC";
+  const homeFloatingLabelColor = visualMode === "light" ? "#8C8174" : "#88A89B";
+  const homeHeroScoreLabelColor = visualMode === "light" ? "#8C8174" : "#96B4AA";
+  const homeHeroScoreValueColor = visualMode === "light" ? "#17130F" : "#FFFFFF";
+  const homeHeroScoreCaptionColor = visualMode === "light" ? "#6F655B" : "#CDE0D7";
+  const homeHeroDividerColor = visualMode === "light" ? "rgba(23, 19, 15, 0.08)" : "rgba(255,255,255,0.10)";
+  const homeHeroMiniValueColor = visualMode === "light" ? "#17130F" : "#FFFFFF";
+  const homeHeroMiniLabelColor = visualMode === "light" ? "#8C8174" : "#8BA79C";
+  const profileHeroGradient: readonly [string, string, string] =
+    visualMode === "light"
+      ? ["#FFFDF8", "#F6EFE4", "#EEE4D6"]
+      : ["#050D0B", "#10211B", "#18332A"];
+  const profilePanelColor = visualMode === "light" ? "#FBF8F1" : "#0F1513";
+  const profilePanelAlt = visualMode === "light" ? "#F2ECE1" : "#121C18";
+  const profilePanelStroke = visualMode === "light" ? "#E8DED0" : "#1E2A25";
+  const profileTextStrong = visualMode === "light" ? "#17130F" : "#F5FBF8";
+  const profileTextMuted = visualMode === "light" ? "#786F65" : "#8AA199";
+  const profileTextSoft = visualMode === "light" ? "#A3988B" : "#5C7369";
+  const profileHeroGlowColor = visualMode === "light" ? "rgba(0, 200, 151, 0.12)" : "rgba(118,239,229,0.16)";
+  const profileHeroPillGlassColor = visualMode === "light" ? "rgba(23, 19, 15, 0.06)" : "rgba(255,255,255,0.12)";
+  const profileHeroPillDarkColor = visualMode === "light" ? "rgba(23, 19, 15, 0.04)" : "rgba(255,255,255,0.08)";
+  const profileHeroPillTextColor = visualMode === "light" ? "#2A241F" : "#F4FBF8";
+  const profileHeroAvatarColor = visualMode === "light" ? "rgba(23, 19, 15, 0.06)" : "rgba(255,255,255,0.12)";
+  const profileHeroAvatarTextColor = visualMode === "light" ? "#17130F" : "#FFFFFF";
+  const profileHeroTitleColor = visualMode === "light" ? "#1A1511" : "#FCFFFD";
+  const profileHeroSubtitleColor = visualMode === "light" ? "#6F655B" : "rgba(245, 251, 248, 0.74)";
+  const profileHeroStatValueColor = visualMode === "light" ? "#17130F" : "#FFFFFF";
+  const profileHeroStatLabelColor = visualMode === "light" ? "#8C8174" : "#8BA79C";
+  const profileHeroDividerColor = visualMode === "light" ? "rgba(23, 19, 15, 0.08)" : "rgba(255,255,255,0.10)";
+  const profileInitial = (fullName.trim() || email.trim() || "B").slice(0, 1).toUpperCase();
+  const profileCompletion = [fullName.trim(), email.trim(), userId].filter(Boolean).length / 3;
+  const profileCompletionValue = Math.round(profileCompletion * 100);
+  const profileStatusText = userId ? "Perfil conectado" : "Perfil listo para conectar";
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -563,6 +606,32 @@ export default function App() {
     setLocationStatus(
       `Referencia manual activa: ${city.name}, ${city.country}. Calculamos tus ventanas con su luz solar.`,
     );
+  }
+
+  function openCameraScreen(originTab: AppTab = activeTab) {
+    setCameraReturnTab(originTab);
+    setNutritionView("camera");
+    setActiveTab("nutrition");
+  }
+
+  function closeCameraScreen() {
+    setNutritionView("history");
+
+    if (cameraReturnTab === "nutrition") {
+      setActiveTab("nutrition");
+      return;
+    }
+
+    setActiveTab(cameraReturnTab);
+  }
+
+  function handleBottomTabChange(nextTab: AppTab) {
+    if (nextTab === "nutrition") {
+      openCameraScreen(activeTab);
+      return;
+    }
+
+    setActiveTab(nextTab);
   }
 
   const pickImage = async () => {
@@ -758,7 +827,7 @@ export default function App() {
             userId={userId}
             theme={theme}
             mode={wellnessCardMode}
-            onOpenCamera={() => setNutritionView("camera")}
+            onOpenCamera={() => openCameraScreen("nutrition")}
           />
         );
       case "tips":
@@ -831,7 +900,7 @@ export default function App() {
         </Animated.View>
       </Animated.ScrollView>
 
-      <BottomNav activeTab={activeTab} pulseScale={pulseScale} onChangeTab={setActiveTab} theme={theme} />
+      <BottomNav activeTab={activeTab} pulseScale={pulseScale} onChangeTab={handleBottomTabChange} theme={theme} />
     </SafeAreaView>
   );
 
@@ -864,6 +933,7 @@ export default function App() {
               pointerEvents="none"
               style={[
                 styles.homeHeroAuraPrimary,
+                { backgroundColor: homeHeroAuraPrimaryColor },
                 {
                   transform: [
                     {
@@ -886,6 +956,7 @@ export default function App() {
               pointerEvents="none"
               style={[
                 styles.homeHeroAuraSecondary,
+                { backgroundColor: homeHeroAuraSecondaryColor },
                 {
                   transform: [
                     {
@@ -900,26 +971,27 @@ export default function App() {
             />
 
             <View style={styles.homeHeroTopRow}>
-              <View style={[styles.homeHeroPill, styles.homeHeroPillDark]}>
-                <Text style={styles.homeHeroPillText}>Resumen premium de hoy</Text>
+              <View style={[styles.homeHeroPill, { backgroundColor: homeHeroPillDarkColor }]}>
+                <Text style={[styles.homeHeroPillText, { color: homeHeroPillTextColor }]}>Resumen premium de hoy</Text>
               </View>
-              <View style={[styles.homeHeroPill, styles.homeHeroPillGlass]}>
-                <Text style={styles.homeHeroPillText}>{homeAnchorText}</Text>
+              <View style={[styles.homeHeroPill, { backgroundColor: homeHeroPillGlassColor }]}>
+                <Text style={[styles.homeHeroPillText, { color: homeHeroPillTextColor }]}>{homeAnchorText}</Text>
               </View>
             </View>
 
             <View style={styles.homeHeroHeadingBlock}>
-              <Text style={styles.homeHeroEyebrow}>Tu cuerpo hoy</Text>
-              <Text style={styles.homeHeroTitle}>
+              <Text style={[styles.homeHeroEyebrow, { color: homeHeroEyebrowColor }]}>Tu cuerpo hoy</Text>
+              <Text style={[styles.homeHeroTitle, { color: homeHeroTitleColor }]}>
                 Todo lo importante, claro y en un solo lugar.
               </Text>
-              <Text style={styles.homeHeroSummary}>{dailyRecommendation.summary}</Text>
+              <Text style={[styles.homeHeroSummary, { color: homeHeroSummaryColor }]}>{dailyRecommendation.summary}</Text>
             </View>
 
             <Animated.View
               style={[
                 styles.homeFloatingBadge,
                 styles.homeFloatingBadgeLeft,
+                { backgroundColor: homeFloatingBadgeColor },
                 {
                   transform: [
                     {
@@ -932,14 +1004,15 @@ export default function App() {
                 },
               ]}
             >
-              <Text style={styles.homeFloatingValue}>{wearableSnapshot.steps.toLocaleString()}</Text>
-              <Text style={styles.homeFloatingLabel}>pasos</Text>
+              <Text style={[styles.homeFloatingValue, { color: homeFloatingValueColor }]}>{wearableSnapshot.steps.toLocaleString()}</Text>
+              <Text style={[styles.homeFloatingLabel, { color: homeFloatingLabelColor }]}>pasos</Text>
             </Animated.View>
 
             <Animated.View
               style={[
                 styles.homeFloatingBadge,
                 styles.homeFloatingBadgeRight,
+                { backgroundColor: homeFloatingBadgeColor },
                 {
                   transform: [
                     {
@@ -952,27 +1025,27 @@ export default function App() {
                 },
               ]}
             >
-              <Text style={styles.homeFloatingValue}>{wearableSnapshot.sleep.totalHours.toFixed(1)} h</Text>
-              <Text style={styles.homeFloatingLabel}>sueno</Text>
+              <Text style={[styles.homeFloatingValue, { color: homeFloatingValueColor }]}>{wearableSnapshot.sleep.totalHours.toFixed(1)} h</Text>
+              <Text style={[styles.homeFloatingLabel, { color: homeFloatingLabelColor }]}>sueno</Text>
             </Animated.View>
 
             <View style={styles.homeHeroBottomRow}>
               <View style={styles.homeHeroScoreBlock}>
-                <Text style={styles.homeHeroScoreLabel}>Recovery score</Text>
-                <Text style={styles.homeHeroScoreValue}>{recoverySnapshot.score}</Text>
-                <Text style={styles.homeHeroScoreCaption}>{recoverySnapshot.label}</Text>
+                <Text style={[styles.homeHeroScoreLabel, { color: homeHeroScoreLabelColor }]}>Recovery score</Text>
+                <Text style={[styles.homeHeroScoreValue, { color: homeHeroScoreValueColor }]}>{recoverySnapshot.score}</Text>
+                <Text style={[styles.homeHeroScoreCaption, { color: homeHeroScoreCaptionColor }]}>{recoverySnapshot.label}</Text>
               </View>
 
-              <View style={styles.homeHeroDivider} />
+              <View style={[styles.homeHeroDivider, { backgroundColor: homeHeroDividerColor }]} />
 
               <View style={styles.homeHeroMiniStats}>
                 <View style={styles.homeHeroMiniStat}>
-                  <Text style={styles.homeHeroMiniValue}>{homeTodayCalories || 0}</Text>
-                  <Text style={styles.homeHeroMiniLabel}>kcal hoy</Text>
+                  <Text style={[styles.homeHeroMiniValue, { color: homeHeroMiniValueColor }]}>{homeTodayCalories || 0}</Text>
+                  <Text style={[styles.homeHeroMiniLabel, { color: homeHeroMiniLabelColor }]}>kcal hoy</Text>
                 </View>
                 <View style={styles.homeHeroMiniStat}>
-                  <Text style={styles.homeHeroMiniValue}>{homeTodayMealsCount}</Text>
-                  <Text style={styles.homeHeroMiniLabel}>comidas</Text>
+                  <Text style={[styles.homeHeroMiniValue, { color: homeHeroMiniValueColor }]}>{homeTodayMealsCount}</Text>
+                  <Text style={[styles.homeHeroMiniLabel, { color: homeHeroMiniLabelColor }]}>comidas</Text>
                 </View>
               </View>
             </View>
@@ -1160,10 +1233,7 @@ export default function App() {
             </Pressable>
             <Pressable
               style={[styles.homeActionButtonSecondary, { backgroundColor: homePanelColorAlt }]}
-              onPress={() => {
-                setNutritionView("camera");
-                setActiveTab("nutrition");
-              }}
+              onPress={() => openCameraScreen("home")}
             >
               <Text style={[styles.homeActionButtonSecondaryText, { color: homeStrongText }]}>
                 Escanear comida
@@ -1692,6 +1762,13 @@ export default function App() {
     return (
       <View style={styles.cameraOnlyRoot}>
         <StatusBar hidden />
+        <Pressable
+          style={styles.cameraBackButton}
+          onPress={closeCameraScreen}
+        >
+          <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+        </Pressable>
+
         {cameraPermission?.granted ? (
           imageAsset && scannerMode === "food" ? (
             <Pressable style={styles.cameraOnlyPreview} onPress={() => setImageAsset(null)}>
@@ -1795,7 +1872,10 @@ export default function App() {
 
         <Pressable
           style={styles.cameraHistoryButton}
-          onPress={() => setNutritionView("history")}
+          onPress={() => {
+            setNutritionView("history");
+            setActiveTab("nutrition");
+          }}
         >
           <Ionicons name="time-outline" size={22} color="#FFFFFF" />
         </Pressable>
@@ -1959,71 +2039,231 @@ export default function App() {
 
   function renderProfileScreen() {
     return (
-      <View style={styles.screen}>
-        <FitnessCard theme={theme}>
-          <CardEyebrow theme={theme}>Perfil</CardEyebrow>
-          <CardTitle large theme={theme}>Cuenta para historial y sincronizacion</CardTitle>
+      <View style={styles.profileScreen}>
+        <Animated.View
+          style={[
+            {
+              opacity: mainScrollY.interpolate({
+                inputRange: [0, 80],
+                outputRange: [1, 0.94],
+                extrapolate: "clamp",
+              }),
+              transform: [
+                {
+                  translateY: ambientPulse.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -8],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={profileHeroGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.profileHeroCard}
+          >
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.profileHeroGlow,
+                { backgroundColor: profileHeroGlowColor },
+                {
+                  transform: [
+                    {
+                      translateX: ambientPulse.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-8, 16],
+                      }),
+                    },
+                    {
+                      scale: ambientPulse.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.94, 1.08],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
 
-          <View style={[styles.themeToggleCard, { backgroundColor: theme.cardMuted, borderColor: theme.stroke }]}>
-            <View style={styles.themeToggleTextBlock}>
-              <Text style={[styles.themeToggleTitle, { color: theme.text }]}>Modo claro</Text>
-              <Text style={[styles.themeToggleText, { color: theme.muted }]}>
-                Cambia toda la interfaz entre el estilo fitness oscuro y una version clara.
+            <View style={styles.profileHeroTopRow}>
+              <View style={[styles.profileHeroPill, { backgroundColor: profileHeroPillGlassColor }]}>
+                <Text style={[styles.profileHeroPillText, { color: profileHeroPillTextColor }]}>Perfil premium</Text>
+              </View>
+              <View style={[styles.profileHeroPill, { backgroundColor: profileHeroPillDarkColor }]}>
+                <Text style={[styles.profileHeroPillText, { color: profileHeroPillTextColor }]}>{profileStatusText}</Text>
+              </View>
+            </View>
+
+            <View style={styles.profileHeroIdentityRow}>
+              <View style={[styles.profileAvatarHero, { backgroundColor: profileHeroAvatarColor }]}>
+                <Text style={[styles.profileAvatarHeroText, { color: profileHeroAvatarTextColor }]}>{profileInitial}</Text>
+              </View>
+
+              <View style={styles.profileHeroIdentityText}>
+                <Text style={[styles.profileHeroTitle, { color: profileHeroTitleColor }]}>
+                  {fullName.trim() || "Tu espacio Bioma"}
+                </Text>
+                <Text style={[styles.profileHeroSubtitle, { color: profileHeroSubtitleColor }]}>
+                  {email.trim() || "Conecta tu cuenta para desbloquear historial, sincronizacion y continuidad."}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.profileHeroStatsRow}>
+              <View style={styles.profileHeroStat}>
+                <Text style={[styles.profileHeroStatValue, { color: profileHeroStatValueColor }]}>{profileCompletionValue}%</Text>
+                <Text style={[styles.profileHeroStatLabel, { color: profileHeroStatLabelColor }]}>perfil listo</Text>
+              </View>
+              <View style={[styles.profileHeroDivider, { backgroundColor: profileHeroDividerColor }]} />
+              <View style={styles.profileHeroStat}>
+                <Text style={[styles.profileHeroStatValue, { color: profileHeroStatValueColor }]}>{userId ? "Activa" : "Pendiente"}</Text>
+                <Text style={[styles.profileHeroStatLabel, { color: profileHeroStatLabelColor }]}>sincronizacion</Text>
+              </View>
+              <View style={[styles.profileHeroDivider, { backgroundColor: profileHeroDividerColor }]} />
+              <View style={styles.profileHeroStat}>
+                <Text style={[styles.profileHeroStatValue, { color: profileHeroStatValueColor }]}>{visualMode === "light" ? "Claro" : "Oscuro"}</Text>
+                <Text style={[styles.profileHeroStatLabel, { color: profileHeroStatLabelColor }]}>modo visual</Text>
+              </View>
+            </View>
+          </LinearGradient>
+        </Animated.View>
+
+        <Animated.View
+          style={{
+            opacity: mainScrollY.interpolate({
+              inputRange: [40, 180],
+              outputRange: [0.74, 1],
+              extrapolate: "clamp",
+            }),
+            transform: [
+              {
+                translateY: mainScrollY.interpolate({
+                  inputRange: [40, 180],
+                  outputRange: [28, 0],
+                  extrapolate: "clamp",
+                }),
+              },
+            ],
+          }}
+        >
+          <LinearGradient
+            colors={visualMode === "light" ? ["#FFFFFF", "#F6F0E7"] : ["#111917", "#0D1412"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.profileAccountCard, { borderColor: profilePanelStroke }]}
+          >
+            <View style={styles.profileSectionHeader}>
+              <Text style={[styles.profileSectionEyebrow, { color: theme.accent }]}>CUENTA</Text>
+              <Text style={[styles.profileSectionTitle, { color: profileTextStrong }]}>
+                Identidad, tema y conexion en una sola vista.
+              </Text>
+              <Text style={[styles.profileSectionText, { color: profileTextMuted }]}>
+                Todo esta ordenado para que la app se sienta personal, consistente y lista para crecer contigo.
               </Text>
             </View>
-            <Pressable
-              style={[
-                styles.themeSwitch,
-                { backgroundColor: visualMode === "light" ? theme.accent : theme.stroke },
-              ]}
-              onPress={() => setVisualMode((current) => (current === "light" ? "dark" : "light"))}
-            >
-              <View
+
+            <View style={[styles.profileThemeCard, { backgroundColor: profilePanelAlt, borderColor: profilePanelStroke }]}>
+              <View style={styles.themeToggleTextBlock}>
+                <Text style={[styles.themeToggleTitle, { color: profileTextStrong }]}>Modo claro</Text>
+                <Text style={[styles.themeToggleText, { color: profileTextMuted }]}>
+                  Cambia toda la interfaz entre el estilo fitness oscuro y una version clara.
+                </Text>
+              </View>
+              <Pressable
                 style={[
-                  styles.themeSwitchKnob,
-                  visualMode === "light" && styles.themeSwitchKnobActive,
+                  styles.themeSwitch,
+                  { backgroundColor: visualMode === "light" ? theme.accent : theme.stroke },
                 ]}
-              />
-            </Pressable>
+                onPress={() => setVisualMode((current) => (current === "light" ? "dark" : "light"))}
+              >
+                <View
+                  style={[
+                    styles.themeSwitchKnob,
+                    visualMode === "light" && styles.themeSwitchKnobActive,
+                  ]}
+                />
+              </Pressable>
+            </View>
+
+            <View style={styles.profileFieldsStack}>
+              <View style={[styles.profileFieldShell, { backgroundColor: profilePanelAlt, borderColor: profilePanelStroke }]}>
+                <Text style={[styles.profileFieldLabel, { color: profileTextSoft }]}>Nombre</Text>
+                <TextInput
+                  value={fullName}
+                  onChangeText={setFullName}
+                  placeholder="Nombre completo"
+                  placeholderTextColor={profileTextSoft}
+                  style={[styles.profileFieldInput, { color: profileTextStrong }]}
+                />
+              </View>
+              <View style={[styles.profileFieldShell, { backgroundColor: profilePanelAlt, borderColor: profilePanelStroke }]}>
+                <Text style={[styles.profileFieldLabel, { color: profileTextSoft }]}>Correo</Text>
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="correo@bioma.app"
+                  placeholderTextColor={profileTextSoft}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  style={[styles.profileFieldInput, { color: profileTextStrong }]}
+                />
+              </View>
+            </View>
+
+            <View style={styles.profileActionBlock}>
+              <Pressable
+                style={[
+                  styles.profilePrimaryButton,
+                  { backgroundColor: theme.accent },
+                  bootstrapLoading && styles.buttonDisabled,
+                ]}
+                onPress={connectProfile}
+                disabled={bootstrapLoading}
+              >
+                {bootstrapLoading ? (
+                  <ActivityIndicator color={visualMode === "light" ? "#FFFFFF" : "#07110E"} />
+                ) : (
+                  <Text style={[styles.profilePrimaryButtonText, { color: visualMode === "light" ? "#FFFFFF" : "#07110E" }]}>
+                    {userId ? "Actualizar perfil" : "Conectar perfil"}
+                  </Text>
+                )}
+              </Pressable>
+
+              <View style={[styles.profileStatusStrip, { backgroundColor: profilePanelAlt }]}>
+                <Text style={[styles.profileStatusStripText, { color: profileTextMuted }]}>
+                  {userId ? `Perfil listo. ID de usuario: ${userId}` : "Aun no hay perfil enlazado."}
+                </Text>
+              </View>
+            </View>
+          </LinearGradient>
+        </Animated.View>
+
+        <Animated.View
+          style={{
+            opacity: mainScrollY.interpolate({
+              inputRange: [140, 320],
+              outputRange: [0.56, 1],
+              extrapolate: "clamp",
+            }),
+            transform: [
+              {
+                translateY: mainScrollY.interpolate({
+                  inputRange: [140, 320],
+                  outputRange: [36, 0],
+                  extrapolate: "clamp",
+                }),
+              },
+            ],
+          }}
+        >
+          <View style={[styles.profileDeviceWrap, { backgroundColor: profilePanelColor, borderColor: profilePanelStroke }]}>
+            <HealthProviderStatusCard provider={mockHealthProvider} mode={wellnessCardMode} theme={theme} />
           </View>
-
-          <TextInput
-            value={fullName}
-            onChangeText={setFullName}
-            placeholder="Nombre completo"
-            placeholderTextColor="#717171"
-            style={[styles.input, { backgroundColor: theme.cardMuted, borderColor: theme.stroke, color: theme.text }]}
-          />
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="correo@bioma.app"
-            placeholderTextColor="#717171"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            style={[styles.input, { backgroundColor: theme.cardMuted, borderColor: theme.stroke, color: theme.text }]}
-          />
-
-          <Pressable
-            style={[styles.secondaryButton, { backgroundColor: theme.cardMuted }, bootstrapLoading && styles.buttonDisabled]}
-            onPress={connectProfile}
-            disabled={bootstrapLoading}
-          >
-            {bootstrapLoading ? (
-              <ActivityIndicator color={theme.text} />
-            ) : (
-              <Text style={[styles.secondaryButtonText, { color: theme.text }]}>
-                {userId ? "Actualizar perfil" : "Conectar perfil"}
-              </Text>
-            )}
-          </Pressable>
-
-          <Text style={[styles.helperText, { color: theme.muted }]}>
-            {userId ? `Perfil listo. ID de usuario: ${userId}` : "Aun no hay perfil enlazado."}
-          </Text>
-        </FitnessCard>
-
-        <HealthProviderStatusCard provider={mockHealthProvider} mode={wellnessCardMode} theme={theme} />
+        </Animated.View>
       </View>
     );
   }
@@ -2033,6 +2273,18 @@ const styles = StyleSheet.create({
   cameraOnlyRoot: {
     flex: 1,
     backgroundColor: "#000000",
+  },
+  cameraBackButton: {
+    position: "absolute",
+    top: 56,
+    left: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 20,
   },
   cameraHistoryButton: {
     position: "absolute",
@@ -2532,6 +2784,194 @@ const styles = StyleSheet.create({
     fontFamily: "Manrope_700Bold",
     fontSize: 20,
     lineHeight: 24,
+  },
+  profileScreen: {
+    gap: 18,
+  },
+  profileHeroCard: {
+    borderRadius: 34,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 20,
+    overflow: "hidden",
+  },
+  profileHeroGlow: {
+    position: "absolute",
+    top: -40,
+    right: -6,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: "rgba(118,239,229,0.16)",
+  },
+  profileHeroTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  profileHeroPill: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  profileHeroPillGlass: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+  profileHeroPillDark: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  profileHeroPillText: {
+    color: "#F4FBF8",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  profileHeroIdentityRow: {
+    marginTop: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  profileAvatarHero: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileAvatarHeroText: {
+    color: "#FFFFFF",
+    fontFamily: "Manrope_800ExtraBold",
+    fontSize: 34,
+  },
+  profileHeroIdentityText: {
+    flex: 1,
+    gap: 6,
+  },
+  profileHeroTitle: {
+    color: "#FCFFFD",
+    fontFamily: "Manrope_800ExtraBold",
+    fontSize: 30,
+    lineHeight: 34,
+  },
+  profileHeroSubtitle: {
+    color: "rgba(245, 251, 248, 0.74)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  profileHeroStatsRow: {
+    marginTop: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  profileHeroStat: {
+    flex: 1,
+    gap: 4,
+  },
+  profileHeroStatValue: {
+    color: "#FFFFFF",
+    fontFamily: "Manrope_700Bold",
+    fontSize: 22,
+  },
+  profileHeroStatLabel: {
+    color: "#8BA79C",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  profileHeroDivider: {
+    width: 1,
+    alignSelf: "stretch",
+    backgroundColor: "rgba(255,255,255,0.10)",
+  },
+  profileAccountCard: {
+    borderRadius: 30,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    gap: 18,
+  },
+  profileSectionHeader: {
+    gap: 10,
+  },
+  profileSectionEyebrow: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  profileSectionTitle: {
+    fontFamily: "Manrope_800ExtraBold",
+    fontSize: 28,
+    lineHeight: 32,
+  },
+  profileSectionText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  profileThemeCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 14,
+  },
+  profileFieldsStack: {
+    gap: 12,
+  },
+  profileFieldShell: {
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 6,
+  },
+  profileFieldLabel: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  profileFieldInput: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 16,
+    paddingVertical: 0,
+  },
+  profileActionBlock: {
+    gap: 12,
+  },
+  profilePrimaryButton: {
+    minHeight: 54,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+  },
+  profilePrimaryButtonText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+  },
+  profileStatusStrip: {
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  profileStatusStripText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  profileDeviceWrap: {
+    borderRadius: 28,
+    borderWidth: 1,
+    padding: 10,
   },
   twoColumn: {
     flexDirection: "row",
