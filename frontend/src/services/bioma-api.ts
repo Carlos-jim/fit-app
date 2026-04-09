@@ -8,7 +8,7 @@ import type {
 
 export interface AnalyzeMealPayload {
   userId: string;
-  s3Key: string;
+  path: string;
   bucket?: string;
   mealLabel?: string;
   notes?: string;
@@ -47,7 +47,7 @@ class BiomaApi {
     return response.data;
   }
 
-  async uploadImageToS3(
+  async uploadImageToStorage(
     uploadUrl: string,
     imageUri: string,
     headers: Record<string, string>,
@@ -62,7 +62,7 @@ class BiomaApi {
     });
 
     if (!response.ok) {
-      throw new Error(`S3 upload failed with status ${response.status}.`);
+      throw new Error(`Storage upload failed with status ${response.status}.`);
     }
   }
 

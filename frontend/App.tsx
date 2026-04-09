@@ -171,7 +171,7 @@ export default function App() {
   const [userId, setUserId] = useState<string | null>(null);
   const [imageAsset, setImageAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [analysis, setAnalysis] = useState<MealAnalysisSummary | null>(null);
-  const [nutritionView, setNutritionView] = useState<"camera" | "history">("camera");
+  const [nutritionView, setNutritionView] = useState<"camera" | "history" | "text">("camera");
   const [cameraReturnTab, setCameraReturnTab] = useState<AppTab>("home");
   const [statsView, setStatsView] = useState<StatsView>("food");
   const [selectedStatsDate, setSelectedStatsDate] = useState(() => getLocalDateKey(new Date()));
@@ -190,12 +190,14 @@ export default function App() {
   const heroScale = useRef(new Animated.Value(0.96)).current;
   const pulseScale = useRef(new Animated.Value(1)).current;
   const ambientPulse = useRef(new Animated.Value(0)).current;
+  const nutritionQuickMenuAnim = useRef(new Animated.Value(0)).current;
   const mainScrollY = useRef(new Animated.Value(0)).current;
   const statsScrollX = useRef(new Animated.Value(0)).current;
   const statsMealsExpandAnim = useRef(new Animated.Value(0)).current;
   const statsPagerRef = useRef<ScrollView | null>(null);
   const cameraRef = useRef<CameraView | null>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [nutritionQuickMenuOpen, setNutritionQuickMenuOpen] = useState(false);
 
   const circadianPlan = useMemo(
     () => createCircadianPlan(circadianCity, now),
@@ -508,10 +510,19 @@ export default function App() {
   }, [ambientPulse]);
 
   useEffect(() => {
-    if (activeTab === "nutrition" && !cameraPermission?.granted) {
+    if (activeTab === "nutrition" && nutritionView === "camera" && !cameraPermission?.granted) {
       void requestCameraPermission();
     }
-  }, [activeTab, cameraPermission?.granted, requestCameraPermission]);
+  }, [activeTab, cameraPermission?.granted, nutritionView, requestCameraPermission]);
+
+  useEffect(() => {
+    Animated.spring(nutritionQuickMenuAnim, {
+      toValue: nutritionQuickMenuOpen ? 1 : 0,
+      friction: 8,
+      tension: 96,
+      useNativeDriver: true,
+    }).start();
+  }, [nutritionQuickMenuAnim, nutritionQuickMenuOpen]);
 
   useEffect(() => {
     Animated.parallel([
@@ -615,6 +626,7 @@ export default function App() {
   }
 
   function closeCameraScreen() {
+    setNutritionQuickMenuOpen(false);
     setNutritionView("history");
 
     if (cameraReturnTab === "nutrition") {
@@ -626,12 +638,42 @@ export default function App() {
   }
 
   function handleBottomTabChange(nextTab: AppTab) {
+    setNutritionQuickMenuOpen(false);
+
     if (nextTab === "nutrition") {
-      openCameraScreen(activeTab);
+      setNutritionView("history");
+      setActiveTab("nutrition");
       return;
     }
 
     setActiveTab(nextTab);
+  }
+
+  function toggleNutritionQuickMenu() {
+    setNutritionQuickMenuOpen((current) => !current);
+  }
+
+  function openPhotoNutritionFlow(originTab: AppTab = activeTab) {
+    setNutritionQuickMenuOpen(false);
+    setMealMode("photo");
+    setScannerMode("food");
+    setBarcodeResult(null);
+    setAnalysis(null);
+    setStatusMessage("Captura o sube una foto para analizar tu comida.");
+    openCameraScreen(originTab);
+  }
+
+  function openTextNutritionFlow(originTab: AppTab = activeTab) {
+    setNutritionQuickMenuOpen(false);
+    setCameraReturnTab(originTab);
+    setMealMode("text");
+    setScannerMode("food");
+    setBarcodeResult(null);
+    setImageAsset(null);
+    setAnalysis(null);
+    setNutritionView("text");
+    setActiveTab("nutrition");
+    setStatusMessage("Describe tu comida y deja que la IA estime porciones y macros.");
   }
 
   const pickImage = async () => {
@@ -776,13 +818,13 @@ export default function App() {
           contentType: imageAsset.mimeType ?? "image/jpeg",
         });
 
-        setStatusMessage("Subiendo imagen a S3...");
-        await biomaApi.uploadImageToS3(upload.uploadUrl, imageAsset.uri, upload.requiredHeaders);
+        setStatusMessage("Subiendo imagen al storage...");
+        await biomaApi.uploadImageToStorage(upload.uploadUrl, imageAsset.uri, upload.requiredHeaders);
 
         setStatusMessage("Analizando comida por vision...");
         const result = await biomaApi.analyzeMealImage({
           userId: resolvedUserId,
-          s3Key: upload.key,
+          path: upload.path,
           bucket: upload.bucket,
           mealLabel: mealLabel.trim() || undefined,
           notes: mealDescription.trim() || undefined,
@@ -844,6 +886,10 @@ export default function App() {
     return renderCameraOnlyScreen();
   }
 
+  if (activeTab === "nutrition" && nutritionView === "text") {
+    return renderTextOnlyScreen();
+  }
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={visualMode === "light" ? "dark-content" : "light-content"} />
@@ -900,7 +946,104 @@ export default function App() {
         </Animated.View>
       </Animated.ScrollView>
 
-      <BottomNav activeTab={activeTab} pulseScale={pulseScale} onChangeTab={handleBottomTabChange} theme={theme} />
+      {nutritionQuickMenuOpen ? (
+        <Pressable style={styles.nutritionQuickMenuBackdrop} onPress={() => setNutritionQuickMenuOpen(false)} />
+      ) : null}
+
+      <Animated.View
+        pointerEvents={nutritionQuickMenuOpen ? "auto" : "none"}
+        style={[
+          styles.nutritionQuickMenu,
+          {
+            opacity: nutritionQuickMenuAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 1],
+            }),
+            transform: [
+              {
+                translateY: nutritionQuickMenuAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [18, 0],
+                }),
+              },
+              {
+                scale: nutritionQuickMenuAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.92, 1],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={visualMode === "light" ? ["#FFFFFF", "#F4EFE7"] : ["#151E1A", "#0A1210"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.nutritionQuickMenuShell, { borderColor: theme.stroke }]}
+        >
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.nutritionQuickMenuGlow,
+              {
+                backgroundColor: visualMode === "light" ? "rgba(0, 200, 151, 0.14)" : "rgba(118, 239, 229, 0.16)",
+                opacity: nutritionQuickMenuAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 1],
+                }),
+              },
+            ]}
+          />
+          <Text style={[styles.nutritionQuickMenuEyebrow, { color: theme.accent }]}>Acceso rapido IA</Text>
+          <Text style={[styles.nutritionQuickMenuTitle, { color: theme.text }]}>Elige como quieres registrar tu comida</Text>
+
+          <View style={styles.nutritionQuickMenuActions}>
+            <Pressable onPress={() => openPhotoNutritionFlow(activeTab)} style={styles.nutritionQuickMenuActionWrap}>
+              <LinearGradient
+                colors={visualMode === "light" ? ["#0DD9A2", "#00B98A"] : ["#0ED7A0", "#068F6E"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.nutritionQuickMenuAction}
+              >
+                <View style={styles.nutritionQuickMenuIconBadge}>
+                  <Ionicons name="camera-outline" size={20} color="#FFFFFF" />
+                </View>
+                <View style={styles.nutritionQuickMenuActionTextBlock}>
+                  <Text style={styles.nutritionQuickMenuActionTitle}>Foto</Text>
+                  <Text style={styles.nutritionQuickMenuActionText}>Captura o sube una imagen</Text>
+                </View>
+              </LinearGradient>
+            </Pressable>
+
+            <Pressable onPress={() => openTextNutritionFlow(activeTab)} style={styles.nutritionQuickMenuActionWrap}>
+              <LinearGradient
+                colors={visualMode === "light" ? ["#151515", "#2F2A24"] : ["#1D2522", "#121917"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.nutritionQuickMenuAction}
+              >
+                <View style={[styles.nutritionQuickMenuIconBadge, styles.nutritionQuickMenuIconBadgeMuted]}>
+                  <Ionicons name="document-text-outline" size={20} color={theme.accent} />
+                </View>
+                <View style={styles.nutritionQuickMenuActionTextBlock}>
+                  <Text style={styles.nutritionQuickMenuActionTitle}>Texto</Text>
+                  <Text style={styles.nutritionQuickMenuActionText}>Describe ingredientes y porcion</Text>
+                </View>
+              </LinearGradient>
+            </Pressable>
+          </View>
+        </LinearGradient>
+      </Animated.View>
+
+      <BottomNav
+        activeTab={activeTab}
+        pulseScale={pulseScale}
+        onChangeTab={handleBottomTabChange}
+        onNutritionPress={toggleNutritionQuickMenu}
+        nutritionMenuOpen={nutritionQuickMenuOpen}
+        theme={theme}
+      />
     </SafeAreaView>
   );
 
@@ -1883,6 +2026,166 @@ export default function App() {
     );
   }
 
+  function renderTextOnlyScreen() {
+    const quickLabels = ["Desayuno", "Almuerzo", "Cena"];
+    const suggestions = [
+      "Arepa con queso, huevos y cafe.",
+      "Pollo a la plancha con arroz y ensalada.",
+      "Yogur griego con cambur y avena.",
+    ];
+
+    return (
+      <SafeAreaView style={[styles.textModeRoot, { backgroundColor: theme.background }]}>
+        <StatusBar barStyle={visualMode === "light" ? "dark-content" : "light-content"} />
+        <ScrollView
+          contentContainerStyle={styles.textModeContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <LinearGradient
+            colors={visualMode === "light" ? ["#FFFFFF", "#F6EFE5", "#F2E7DA"] : ["#0C1412", "#131C19", "#0A100E"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.textModeHero, { borderColor: theme.stroke }]}
+          >
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.textModeHeroGlow,
+                {
+                  backgroundColor: visualMode === "light" ? "rgba(0, 200, 151, 0.14)" : "rgba(118, 239, 229, 0.14)",
+                  transform: [
+                    {
+                      translateY: ambientPulse.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, -10],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
+
+            <View style={styles.textModeTopRow}>
+              <Pressable
+                style={[styles.textModeBackButton, { backgroundColor: visualMode === "light" ? "rgba(23, 19, 15, 0.06)" : "rgba(255,255,255,0.10)" }]}
+                onPress={closeCameraScreen}
+              >
+                <Ionicons name="arrow-back" size={20} color={theme.text} />
+              </Pressable>
+              <View style={[styles.textModeBadge, { backgroundColor: visualMode === "light" ? "rgba(23, 19, 15, 0.05)" : "rgba(255,255,255,0.09)" }]}>
+                <Ionicons name="sparkles-outline" size={14} color={theme.accent} />
+                <Text style={[styles.textModeBadgeText, { color: theme.text }]}>Entrada premium</Text>
+              </View>
+            </View>
+
+            <Text style={[styles.textModeEyebrow, { color: theme.accent }]}>Nutricion IA</Text>
+            <Text style={[styles.textModeTitle, { color: theme.text }]}>Describe tu comida y te devolvemos macros estimados.</Text>
+            <Text style={[styles.textModeSubtitle, { color: theme.muted }]}>
+              Ideal cuando no quieres tomar una foto o ya sabes exactamente lo que comiste.
+            </Text>
+          </LinearGradient>
+
+          <View style={[styles.textModeFormCard, { backgroundColor: theme.card, borderColor: theme.stroke }]}>
+            <View style={styles.textModeSectionHeader}>
+              <Text style={[styles.textModeSectionTitle, { color: theme.text }]}>Tipo de comida</Text>
+              <Text style={[styles.textModeSectionHint, { color: theme.muted }]}>Ayuda a mejorar el contexto</Text>
+            </View>
+
+            <View style={styles.textModeChipRow}>
+              {quickLabels.map((label) => {
+                const active = mealLabel.trim().toLowerCase() === label.toLowerCase();
+
+                return (
+                  <Pressable
+                    key={label}
+                    style={[
+                      styles.textModeChip,
+                      {
+                        backgroundColor: active ? theme.accent : theme.cardMuted,
+                        borderColor: active ? theme.accent : theme.stroke,
+                      },
+                    ]}
+                    onPress={() => setMealLabel(label)}
+                  >
+                    <Text style={[styles.textModeChipText, { color: active ? theme.background : theme.text }]}>{label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.textModeFieldBlock}>
+              <Text style={[styles.textModeFieldLabel, { color: theme.muted }]}>Titulo</Text>
+              <TextInput
+                value={mealLabel}
+                onChangeText={setMealLabel}
+                placeholder="Ej. Almuerzo post-entreno"
+                placeholderTextColor={theme.muted}
+                style={[styles.textModeInput, { color: theme.text, borderColor: theme.stroke, backgroundColor: theme.cardMuted }]}
+              />
+            </View>
+
+            <View style={styles.textModeFieldBlock}>
+              <View style={styles.textModeSectionHeader}>
+                <Text style={[styles.textModeFieldLabel, { color: theme.muted }]}>Descripcion</Text>
+                <Text style={[styles.textModeSectionHint, { color: theme.muted }]}>Ingredientes, porcion y preparacion</Text>
+              </View>
+              <TextInput
+                value={mealDescription}
+                onChangeText={setMealDescription}
+                placeholder="Ej. Dos arepas medianas con queso blanco y dos huevos revueltos."
+                placeholderTextColor={theme.muted}
+                multiline
+                textAlignVertical="top"
+                style={[styles.textModeTextarea, { color: theme.text, borderColor: theme.stroke, backgroundColor: theme.cardMuted }]}
+              />
+            </View>
+
+            <View style={styles.textModeSuggestionRow}>
+              {suggestions.map((suggestion) => (
+                <Pressable
+                  key={suggestion}
+                  style={[styles.textModeSuggestionChip, { backgroundColor: theme.cardMuted, borderColor: theme.stroke }]}
+                  onPress={() => setMealDescription(suggestion)}
+                >
+                  <Ionicons name="flash-outline" size={14} color={theme.accent} />
+                  <Text style={[styles.textModeSuggestionText, { color: theme.text }]} numberOfLines={2}>
+                    {suggestion}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Pressable
+              style={[
+                styles.textModePrimaryButton,
+                { backgroundColor: theme.accent },
+                (loading || mealDescription.trim().length < 5) && styles.buttonDisabled,
+              ]}
+              onPress={analyzeCurrentMeal}
+              disabled={loading || mealDescription.trim().length < 5}
+            >
+              {loading ? (
+                <ActivityIndicator color={theme.background} />
+              ) : (
+                <>
+                  <Ionicons name="sparkles" size={18} color={theme.background} />
+                  <Text style={[styles.textModePrimaryButtonText, { color: theme.background }]}>Analizar con IA</Text>
+                </>
+              )}
+            </Pressable>
+
+            <Text style={[styles.textModeHelper, { color: theme.muted }]}>
+              {statusMessage ?? "Describe con naturalidad. La IA estima ingredientes, porciones y macros."}
+            </Text>
+          </View>
+
+          {analysis ? <MacroResultCard analysis={analysis} mode={wellnessCardMode} /> : null}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   function renderNutritionScreen() {
     return (
       <View style={styles.screen}>
@@ -2428,6 +2731,252 @@ const styles = StyleSheet.create({
   },
   cameraOnlyTabTextActive: {
     color: "#000000",
+  },
+  nutritionQuickMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.16)",
+    zIndex: 15,
+  },
+  nutritionQuickMenu: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    bottom: 108,
+    zIndex: 18,
+  },
+  nutritionQuickMenuShell: {
+    borderRadius: 30,
+    borderWidth: 1,
+    padding: 18,
+    overflow: "hidden",
+    gap: 14,
+    shadowColor: "#000000",
+    shadowOpacity: 0.28,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 22,
+  },
+  nutritionQuickMenuGlow: {
+    position: "absolute",
+    top: -34,
+    right: -16,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+  },
+  nutritionQuickMenuEyebrow: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 1.1,
+  },
+  nutritionQuickMenuTitle: {
+    maxWidth: "88%",
+    fontFamily: "Manrope_800ExtraBold",
+    fontSize: 24,
+    lineHeight: 30,
+  },
+  nutritionQuickMenuActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  nutritionQuickMenuActionWrap: {
+    flex: 1,
+  },
+  nutritionQuickMenuAction: {
+    minHeight: 108,
+    borderRadius: 24,
+    padding: 14,
+    justifyContent: "space-between",
+  },
+  nutritionQuickMenuIconBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.20)",
+  },
+  nutritionQuickMenuIconBadgeMuted: {
+    backgroundColor: "rgba(255, 255, 255, 0.10)",
+  },
+  nutritionQuickMenuActionTextBlock: {
+    gap: 4,
+  },
+  nutritionQuickMenuActionTitle: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 18,
+  },
+  nutritionQuickMenuActionText: {
+    color: "rgba(255,255,255,0.78)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  textModeRoot: {
+    flex: 1,
+  },
+  textModeContent: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 140,
+    gap: 18,
+  },
+  textModeHero: {
+    borderRadius: 32,
+    borderWidth: 1,
+    overflow: "hidden",
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 22,
+    gap: 12,
+  },
+  textModeHeroGlow: {
+    position: "absolute",
+    right: -30,
+    top: -40,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+  },
+  textModeTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  textModeBackButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  textModeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  textModeBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+  },
+  textModeEyebrow: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 1.1,
+  },
+  textModeTitle: {
+    maxWidth: "90%",
+    fontFamily: "Manrope_800ExtraBold",
+    fontSize: 30,
+    lineHeight: 36,
+  },
+  textModeSubtitle: {
+    maxWidth: "92%",
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  textModeFormCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    padding: 18,
+    gap: 16,
+  },
+  textModeSectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+  },
+  textModeSectionTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+  },
+  textModeSectionHint: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  textModeChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  textModeChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  textModeChipText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+  },
+  textModeFieldBlock: {
+    gap: 8,
+  },
+  textModeFieldLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  textModeInput: {
+    minHeight: 52,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    fontFamily: "Inter_500Medium",
+    fontSize: 15,
+  },
+  textModeTextarea: {
+    minHeight: 150,
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    fontFamily: "Inter_500Medium",
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  textModeSuggestionRow: {
+    gap: 10,
+  },
+  textModeSuggestionChip: {
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "flex-start",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  textModeSuggestionText: {
+    flex: 1,
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  textModePrimaryButton: {
+    minHeight: 56,
+    borderRadius: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  textModePrimaryButtonText: {
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 15,
+  },
+  textModeHelper: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    lineHeight: 20,
   },
   safeArea: {
     flex: 1,
@@ -3496,25 +4045,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     textAlign: "center",
-  },
-  textModeCard: {
-    padding: 18,
-    borderRadius: 22,
-    backgroundColor: "#0D0D0D",
-    borderWidth: 1,
-    borderColor: "#262626",
-  },
-  textModeTitle: {
-    color: fitnessColors.text,
-    fontFamily: "Inter_700Bold",
-    fontSize: 16,
-  },
-  textModeText: {
-    marginTop: 8,
-    color: fitnessColors.muted,
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    lineHeight: 20,
   },
   primaryButton: {
     alignItems: "center",

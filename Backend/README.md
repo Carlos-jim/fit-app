@@ -1,17 +1,27 @@
 # Bioma Backend
 
-Backend en Node.js + TypeScript para AWS Lambda, Prisma, S3 y analisis nutricional con Gemini.
+Backend en Node.js + TypeScript con Express, Prisma, Gemini y Supabase Storage.
 
-## Flujo implementado
+## Arquitectura
+
+- `Expo` en frontend
+- `Express` como API HTTP
+- `Prisma` para la base de datos PostgreSQL
+- `Supabase Postgres` como base recomendada para `DATABASE_URL`
+- `Supabase Storage` para fotos de comidas
+- `Gemini` para analisis de texto e imagen
+
+## Endpoints
 
 1. `POST /users/bootstrap`
 2. `POST /uploads/meal-image-url`
-3. `PUT` directo a S3 con URL firmada
+3. `PUT` directo a Supabase Storage con URL firmada
 4. `POST /logs/analyze-meal-image`
 5. `POST /logs/analyze-meal-text`
-6. Persistencia del resultado en `Log`
+6. `GET /logs?userId=...`
+7. `GET /health`
 
-## Requests principales
+## Ejemplos
 
 ```json
 {
@@ -31,8 +41,8 @@ Backend en Node.js + TypeScript para AWS Lambda, Prisma, S3 y analisis nutricion
 ```json
 {
   "userId": "ck_user_123",
-  "s3Key": "uploads/meals/ck_user_123/2026-04-05-uuid.jpg",
-  "bucket": "bioma-user-uploads",
+  "path": "uploads/meals/ck_user_123/2026-04-05-uuid.jpg",
+  "bucket": "meal-images",
   "mealLabel": "Almuerzo",
   "notes": "Arepa con queso y dos huevos",
   "consumedAt": "2026-04-05T12:30:00.000Z"
@@ -53,12 +63,14 @@ Backend en Node.js + TypeScript para AWS Lambda, Prisma, S3 y analisis nutricion
 Usa `.env.example` como base.
 
 ```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/bioma
+DATABASE_URL=postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres?schema=public
 GEMINI_API_KEY=tu_api_key
-GEMINI_MODEL=gemini-2.5-flash-preview-09-2025
-S3_UPLOAD_BUCKET=bioma-user-uploads
-AWS_REGION=us-east-1
-S3_SIGNED_URL_TTL_SECONDS=900
+GEMINI_MODEL=gemini-2.5-flash-lite
+SUPABASE_URL=https://[project-ref].supabase.co
+SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key
+SUPABASE_STORAGE_BUCKET=meal-images
+STORAGE_SIGNED_UPLOAD_TTL_SECONDS=7200
+PORT=3000
 ```
 
 ## Comandos
@@ -67,13 +79,36 @@ S3_SIGNED_URL_TTL_SECONDS=900
 npm install
 npm run prisma:generate
 npm run prisma:validate
+npm run dev
 npm run build
-npm run deploy
+npm run start
 ```
+
+## Desarrollo local
+
+Para levantar la API local:
+
+```bash
+npm run dev
+```
+
+La API queda en:
+
+```bash
+http://localhost:3000
+```
+
+Para el frontend usa una URL accesible desde el dispositivo:
+
+```bash
+EXPO_PUBLIC_API_BASE_URL=http://TU_IP_LOCAL:3000
+```
+
+Si pruebas desde telefono fisico o emulador, evita `localhost` y usa la IP local de tu PC.
 
 ## Notas
 
-- El flujo movil ya no depende de una imagen cargada manualmente: la app puede pedir URL firmada y subir a S3.
-- El `userId` sigue entrando por body para el MVP. En produccion conviene resolverlo con Cognito authorizer.
-- El bucket S3 debe permitir `PUT` con `Content-Type` en su CORS si vas a usar cliente web.
-- El analisis de foto y texto usa `gemini-2.5-flash-preview-09-2025` con salida JSON estructurada validada por Zod en backend.
+- Prisma sigue siendo la capa de acceso a datos. La migracion a Supabase no cambia tu flujo de Prisma ni tus modelos.
+- El storage usa URLs firmadas de Supabase para subir fotos desde la app sin pasar el binario por el backend.
+- Para mostrar previews de fotos en el historial, conviene que el bucket de comidas sea publico en Supabase Storage.
+- El analisis de foto y texto usa Gemini con salida JSON estructurada validada por Zod en backend.

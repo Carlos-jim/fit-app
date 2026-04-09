@@ -273,6 +273,8 @@ export function BottomNav(props: {
   activeTab: AppTab;
   pulseScale: Animated.Value;
   onChangeTab: (tab: AppTab) => void;
+  onNutritionPress: () => void;
+  nutritionMenuOpen?: boolean;
   theme?: FitnessTheme;
 }) {
   const theme = props.theme ?? fitnessColors;
@@ -295,17 +297,28 @@ export function BottomNav(props: {
             <Pressable
               key={item.tab}
               style={styles.navItem}
-              onPress={() => props.onChangeTab(item.tab)}
+              onPress={() => {
+                if (isCenter) {
+                  props.onNutritionPress();
+                  return;
+                }
+
+                props.onChangeTab(item.tab);
+              }}
             >
               {isCenter ? (
                 <Animated.View
                   style={[
                     styles.navCenterButton,
                     { backgroundColor: theme.accent },
-                    { transform: [{ scale: active ? props.pulseScale : 1 }] },
+                    { transform: [{ scale: active || props.nutritionMenuOpen ? props.pulseScale : 1 }] },
                   ]}
                 >
-                  <Ionicons name={item.icon} size={34} color="#FFFFFF" />
+                  <Ionicons
+                    name={props.nutritionMenuOpen ? "close" : item.icon}
+                    size={34}
+                    color="#FFFFFF"
+                  />
                 </Animated.View>
               ) : (
                 <>

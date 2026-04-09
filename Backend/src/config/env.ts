@@ -3,14 +3,20 @@ import { z } from "zod";
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   GEMINI_API_KEY: z.string().min(1, "GEMINI_API_KEY is required"),
-  GEMINI_MODEL: z.string().min(1).default("gemini-2.5-flash-preview-09-2025"),
-  S3_UPLOAD_BUCKET: z.string().min(1, "S3_UPLOAD_BUCKET is required"),
-  AWS_REGION: z.string().min(1).default("us-east-1"),
-  S3_SIGNED_URL_TTL_SECONDS: z
+  GEMINI_MODEL: z.string().min(1).default("gemini-2.5-flash-lite"),
+  SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
+  SUPABASE_STORAGE_BUCKET: z.string().min(1, "SUPABASE_STORAGE_BUCKET is required"),
+  STORAGE_SIGNED_UPLOAD_TTL_SECONDS: z
     .string()
     .optional()
-    .transform((value) => (value ? Number(value) : 900))
-    .pipe(z.number().int().positive().max(3600)),
+    .transform((value) => (value ? Number(value) : 7200))
+    .pipe(z.number().int().positive().max(7200)),
+  PORT: z
+    .string()
+    .optional()
+    .transform((value) => (value ? Number(value) : 3000))
+    .pipe(z.number().int().positive().max(65535)),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

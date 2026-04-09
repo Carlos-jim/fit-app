@@ -7,6 +7,7 @@ export interface BootstrapUserResponse {
 export interface UploadMealImageResponse {
   uploadUrl: string;
   bucket: string;
+  path: string;
   key: string;
   fileUrl: string;
   expiresInSeconds: number;

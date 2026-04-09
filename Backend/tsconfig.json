@@ -13,8 +13,7 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "types": [
-      "node",
-      "aws-lambda"
+      "node"
     ]
   },
   "include": [
