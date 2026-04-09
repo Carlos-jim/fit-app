@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Bioma",
+    "slug": "bioma",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#120F0A"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#120F0A"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Bioma usa tu ubicacion para calcular la salida y puesta del sol de tu ciudad y ajustar tus habitos circadianos.",
+          "locationAlwaysAndWhenInUsePermission": "Bioma usa tu ubicacion para sincronizar tus habitos con la luz solar local."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Bioma usa la camara para escanear comidas y codigos de barra."
+        }
+      ]
+    ]
+  }
+}

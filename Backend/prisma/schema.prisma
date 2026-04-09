@@ -1,0 +1,66 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LogType {
+  MEAL_ANALYSIS
+}
+
+enum LogSource {
+  IMAGE
+  TEXT
+}
+
+enum AnalysisConfidence {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  fullName  String?
+  logs      Log[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Log {
+  id                    String             @id @default(cuid())
+  userId                String
+  type                  LogType            @default(MEAL_ANALYSIS)
+  source                LogSource          @default(IMAGE)
+  title                 String?
+  notes                 String?
+  imageBucket           String?
+  imageKey              String?
+  imageUrl              String?
+  consumedAt            DateTime?
+  estimatedServingGrams Float?
+  calories              Float
+  proteinGrams          Float
+  carbsGrams            Float
+  fatGrams              Float
+  fiberGrams            Float?
+  sugarGrams            Float?
+  sodiumMg              Float?
+  confidence            AnalysisConfidence
+  aiModel               String
+  ingredients           Json
+  warnings              Json?
+  rawAnalysis           Json
+  openaiResponseId      String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([type, createdAt(sort: Desc)])
+}

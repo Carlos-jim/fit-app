@@ -1,0 +1,33 @@
+{
+  "name": "bioma-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AWS Lambda backend for Bioma nutrition analysis.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/functions/analyze-meal.ts",
+    "deploy": "npm run build && serverless deploy",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:validate": "prisma validate"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.894.0",
+    "@aws-sdk/s3-request-presigner": "^3.916.0",
+    "@prisma/client": "^6.6.0",
+    "openai": "^6.4.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.149",
+    "@types/node": "^22.14.0",
+    "prisma": "^6.6.0",
+    "serverless": "^4.19.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  }
+}
