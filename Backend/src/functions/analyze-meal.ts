@@ -54,7 +54,6 @@ export async function handler(
       imageUrl: imageAsset.publicUrl,
       analysis: analysisResult.parsed,
       aiModel: analysisResult.model,
-      openaiResponseId: analysisResult.responseId,
     });
 
     return jsonResponse(201, {

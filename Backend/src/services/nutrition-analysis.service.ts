@@ -1,9 +1,4 @@
-import OpenAI from "openai";
-import type {
-  ResponseInput,
-  ResponseInputImage,
-  ResponseInputText,
-} from "openai/resources/responses/responses";
+import { GoogleGenAI } from "@google/genai";
 
 import { env } from "../config/env.js";
 import {
@@ -13,10 +8,23 @@ import {
 } from "../contracts/nutrition-analysis.js";
 import { AppError } from "../lib/app-error.js";
 
-const openai = new OpenAI({
-  apiKey: env.OPENAI_API_KEY,
-  timeout: 45_000,
+const geminiClient = new GoogleGenAI({
+  apiKey: env.GEMINI_API_KEY,
+  httpOptions: {
+    timeout: 45_000,
+  },
 });
+
+const SYSTEM_PROMPT = [
+  "You are the nutrition-analysis engine for a mobile health app used in Venezuela.",
+  "Estimate foods, ingredients, serving sizes, and nutrition conservatively.",
+  "Never pretend certainty when the meal is partially visible, mixed, fried, covered, or ambiguous.",
+  "Return only valid JSON that matches the provided schema.",
+  "Use numeric values only for nutrient fields, always in grams and mg where applicable.",
+  "Make totals internally consistent with the listed items as closely as possible.",
+  "If the image or text is too ambiguous, lower confidence and add warnings instead of inventing details.",
+  "Favor common Latin American and Venezuelan preparations when the meal context suggests them.",
+].join(" ");
 
 export interface AnalyzeNutritionInput {
   imageDataUrl?: string;
@@ -27,7 +35,6 @@ export interface AnalyzeNutritionInput {
 
 export interface AnalyzeNutritionResult {
   parsed: NutritionAnalysis;
-  responseId: string | null;
   model: string;
 }
 
@@ -40,10 +47,12 @@ export class NutritionAnalysisService {
       });
     }
 
+    const imagePart = this.parseImageDataUrl(input.imageDataUrl);
+
     return this.runAnalysis({
       prompt: this.buildImagePrompt(input),
-      imageDataUrl: input.imageDataUrl,
-      errorMessage: "Failed to analyze meal image with OpenAI.",
+      imagePart,
+      errorMessage: "Failed to analyze meal image with Gemini.",
     });
   }
 
@@ -57,46 +66,65 @@ export class NutritionAnalysisService {
 
     return this.runAnalysis({
       prompt: this.buildTextPrompt(input),
-      errorMessage: "Failed to analyze meal text with OpenAI.",
+      errorMessage: "Failed to analyze meal text with Gemini.",
     });
   }
 
   private async runAnalysis(params: {
     prompt: string;
-    imageDataUrl?: string;
+    imagePart?: { mimeType: string; data: string };
     errorMessage: string;
   }): Promise<AnalyzeNutritionResult> {
     try {
-      const response = await openai.responses.create({
-        model: env.OPENAI_MODEL,
-        input: this.buildInput(params),
-        text: {
-          format: {
-            type: "json_schema",
-            name: "nutrition_analysis",
-            strict: true,
-            schema: nutritionAnalysisJsonSchema,
+      const response = await geminiClient.models.generateContent({
+        model: env.GEMINI_MODEL,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: params.prompt,
+              },
+              ...(params.imagePart
+                ? [
+                    {
+                      inlineData: {
+                        mimeType: params.imagePart.mimeType,
+                        data: params.imagePart.data,
+                      },
+                    },
+                  ]
+                : []),
+            ],
           },
+        ],
+        config: {
+          systemInstruction: SYSTEM_PROMPT,
+          responseMimeType: "application/json",
+          responseJsonSchema: nutritionAnalysisJsonSchema,
+          temperature: 0.2,
+          topP: 0.9,
+          maxOutputTokens: 2048,
         },
       });
 
-      const rawOutput = response.output_text?.trim();
+      const rawOutput = response.text?.trim();
 
       if (!rawOutput) {
-        throw new AppError("OpenAI returned an empty response.", {
+        throw new AppError("Gemini returned an empty response.", {
           statusCode: 502,
-          code: "OPENAI_EMPTY_RESPONSE",
+          code: "GEMINI_EMPTY_RESPONSE",
         });
       }
 
       let parsedJson: unknown;
 
       try {
-        parsedJson = JSON.parse(rawOutput);
+        parsedJson = JSON.parse(this.stripCodeFences(rawOutput));
       } catch (error) {
-        throw new AppError("OpenAI returned invalid JSON.", {
+        throw new AppError("Gemini returned invalid JSON.", {
           statusCode: 502,
-          code: "OPENAI_INVALID_JSON",
+          code: "GEMINI_INVALID_JSON",
           cause: error,
         });
       }
@@ -104,17 +132,16 @@ export class NutritionAnalysisService {
       const parsed = nutritionAnalysisSchema.safeParse(parsedJson);
 
       if (!parsed.success) {
-        throw new AppError("OpenAI response did not match the nutrition schema.", {
+        throw new AppError("Gemini response did not match the nutrition schema.", {
           statusCode: 502,
-          code: "OPENAI_SCHEMA_MISMATCH",
+          code: "GEMINI_SCHEMA_MISMATCH",
           cause: parsed.error.flatten(),
         });
       }
 
       return {
         parsed: parsed.data,
-        responseId: response.id ?? null,
-        model: response.model ?? env.OPENAI_MODEL,
+        model: response.modelVersion ?? env.GEMINI_MODEL,
       };
     } catch (error) {
       if (error instanceof AppError) {
@@ -123,75 +150,48 @@ export class NutritionAnalysisService {
 
       throw new AppError(params.errorMessage, {
         statusCode: 502,
-        code: "OPENAI_REQUEST_FAILED",
+        code: "GEMINI_REQUEST_FAILED",
         cause: error,
       });
     }
   }
 
-  private buildInput(params: {
-    prompt: string;
-    imageDataUrl?: string;
-  }): ResponseInput {
-    const input: ResponseInput = [
-      {
-        role: "system",
-        content: [
-          {
-            type: "input_text",
-            text:
-              "You are a nutrition analyst for a mobile health app. " +
-              "Estimate ingredients, serving size, and macros conservatively. " +
-              "Return only structured JSON that matches the provided schema. " +
-              "If uncertainty is high, reflect it in confidence and warnings.",
-          },
-        ],
-      },
-      {
-        role: "user",
-        content: this.buildUserContent(params),
-      },
-    ];
+  private parseImageDataUrl(dataUrl: string): { mimeType: string; data: string } {
+    const match = /^data:(?<mimeType>[-\w.+/]+);base64,(?<data>[A-Za-z0-9+/=]+)$/u.exec(dataUrl);
 
-    return input;
-  }
-
-  private buildUserContent(params: {
-    prompt: string;
-    imageDataUrl?: string;
-  }) {
-    const content: Array<ResponseInputText | ResponseInputImage> = [
-      {
-        type: "input_text",
-        text: params.prompt,
-      },
-    ];
-
-    if (params.imageDataUrl) {
-      content.push({
-        type: "input_image",
-        image_url: params.imageDataUrl,
-        detail: "high",
+    if (!match?.groups?.mimeType || !match.groups.data) {
+      throw new AppError("Invalid image payload for Gemini analysis.", {
+        statusCode: 400,
+        code: "INVALID_IMAGE_DATA",
       });
     }
 
-    return content;
+    return {
+      mimeType: match.groups.mimeType,
+      data: match.groups.data,
+    };
+  }
+
+  private stripCodeFences(value: string): string {
+    return value.replace(/^```json\s*/u, "").replace(/\s*```$/u, "");
   }
 
   private buildImagePrompt(input: AnalyzeNutritionInput): string {
     const promptLines = [
-      "Analyze this meal image for a nutrition tracking app in Venezuela.",
-      "Estimate the meal composition and return calories and macronutrients.",
+      "Analyze this meal photo for nutrition tracking.",
+      "Identify the likely foods in the image and estimate realistic serving sizes.",
+      "Return calories and macronutrients for the whole meal and for each item.",
+      "If beverages, sauces, oils, dressings, cheese, breading, or side items may be present, account for them conservatively.",
+      "When the portion cannot be measured exactly, provide the most plausible estimate and explain uncertainty through confidence and warnings.",
       "Use grams and mg as units.",
-      "Avoid pretending certainty when the image is ambiguous.",
     ];
 
     if (input.mealLabel) {
-      promptLines.push(`Meal label: ${input.mealLabel}`);
+      promptLines.push(`Meal label from user: ${input.mealLabel}`);
     }
 
     if (input.notes) {
-      promptLines.push(`User notes: ${input.notes}`);
+      promptLines.push(`User notes about the photo: ${input.notes}`);
     }
 
     return promptLines.join("\n");
@@ -199,15 +199,16 @@ export class NutritionAnalysisService {
 
   private buildTextPrompt(input: AnalyzeNutritionInput): string {
     const promptLines = [
-      "Analyze this natural-language meal description for a nutrition tracking app in Venezuela.",
-      "Infer likely ingredients, estimated serving sizes, calories, and macronutrients.",
-      "Use conservative estimates and mention uncertainty through confidence and warnings.",
+      "Analyze this natural-language meal description for nutrition tracking.",
+      "Infer the most likely ingredients, cooking method, and portion sizes conservatively.",
+      "Return calories and macronutrients for the whole meal and for each item.",
       "Use grams and mg as units.",
+      "Reflect uncertainty through confidence and warnings instead of inventing precision.",
       `Meal description: ${input.description?.trim() ?? ""}`,
     ];
 
     if (input.mealLabel) {
-      promptLines.push(`Meal label: ${input.mealLabel}`);
+      promptLines.push(`Meal label from user: ${input.mealLabel}`);
     }
 
     return promptLines.join("\n");

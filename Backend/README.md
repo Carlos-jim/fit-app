@@ -1,6 +1,6 @@
 # Bioma Backend
 
-Backend en Node.js + TypeScript para AWS Lambda, Prisma, S3 y analisis nutricional con OpenAI.
+Backend en Node.js + TypeScript para AWS Lambda, Prisma, S3 y analisis nutricional con Gemini.
 
 ## Flujo implementado
 
@@ -52,6 +52,15 @@ Backend en Node.js + TypeScript para AWS Lambda, Prisma, S3 y analisis nutricion
 
 Usa `.env.example` como base.
 
+```bash
+DATABASE_URL=postgresql://user:password@localhost:5432/bioma
+GEMINI_API_KEY=tu_api_key
+GEMINI_MODEL=gemini-2.5-flash-preview-09-2025
+S3_UPLOAD_BUCKET=bioma-user-uploads
+AWS_REGION=us-east-1
+S3_SIGNED_URL_TTL_SECONDS=900
+```
+
 ## Comandos
 
 ```bash
@@ -67,3 +76,4 @@ npm run deploy
 - El flujo movil ya no depende de una imagen cargada manualmente: la app puede pedir URL firmada y subir a S3.
 - El `userId` sigue entrando por body para el MVP. En produccion conviene resolverlo con Cognito authorizer.
 - El bucket S3 debe permitir `PUT` con `Content-Type` en su CORS si vas a usar cliente web.
+- El analisis de foto y texto usa `gemini-2.5-flash-preview-09-2025` con salida JSON estructurada validada por Zod en backend.

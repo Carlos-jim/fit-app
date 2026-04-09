@@ -39,7 +39,6 @@ export interface CreateMealLogParams {
   imageUrl?: string;
   analysis: NutritionAnalysis;
   aiModel: string;
-  openaiResponseId: string | null;
 }
 
 export class LogRepository {
@@ -87,7 +86,6 @@ export class LogRepository {
       ingredients: params.analysis.items,
       warnings: params.analysis.warnings,
       rawAnalysis: params.analysis,
-      openaiResponseId: params.openaiResponseId ?? undefined,
     };
 
     return this.db.log.create({

@@ -43,7 +43,6 @@ export async function handler(
       consumedAt: request.consumedAt,
       analysis: analysisResult.parsed,
       aiModel: analysisResult.model,
-      openaiResponseId: analysisResult.responseId,
     });
 
     return jsonResponse(201, {

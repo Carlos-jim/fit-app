@@ -18,8 +18,8 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.894.0",
     "@aws-sdk/s3-request-presigner": "^3.916.0",
+    "@google/genai": "^1.49.0",
     "@prisma/client": "^6.6.0",
-    "openai": "^6.4.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
