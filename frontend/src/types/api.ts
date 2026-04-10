@@ -44,3 +44,22 @@ export interface MealLog extends MealAnalysisSummary {
   sugarGrams?: number | null;
   sodiumMg?: number | null;
 }
+
+export interface SuggestedMeal {
+  title: string;
+  description: string;
+  estimatedCalories: number;
+  estimatedProteinGrams: number;
+  estimatedCarbsGrams: number;
+  estimatedFatGrams: number;
+  benefits: string[];
+}
+
+export interface MealSuggestionResponse {
+  isHealthy: boolean;
+  healthScore: number;
+  analysis: string;
+  positiveAspects: string[];
+  concerns: string[];
+  suggestion: SuggestedMeal;
+}

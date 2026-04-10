@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -66,7 +72,10 @@ import {
   formatCircadianTime,
   type CircadianCity,
 } from "./src/services/circadian-engine";
-import { createDailyRecommendation, createRecoverySnapshot } from "./src/services/recovery-engine";
+import {
+  createDailyRecommendation,
+  createRecoverySnapshot,
+} from "./src/services/recovery-engine";
 import { mockHealthProvider } from "./src/services/wearables/mock-health-provider";
 import type { MealAnalysisSummary, MealLog } from "./src/types/api";
 
@@ -86,7 +95,15 @@ const statsTabs: StatsTabItem[] = [
   { key: "food", label: "Comida", icon: "restaurant-outline" },
   { key: "steps", label: "Pasos", icon: "footsteps-outline" },
 ];
-const weekdayLabels = ["DOM", "LUN", "MAR", "MIE", "JUE", "VIE", "SAB"] as const;
+const weekdayLabels = [
+  "DOM",
+  "LUN",
+  "MAR",
+  "MIE",
+  "JUE",
+  "VIE",
+  "SAB",
+] as const;
 const monthLabels = [
   "Enero",
   "Febrero",
@@ -153,7 +170,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>("home");
   const [visualMode, setVisualMode] = useState<VisualMode>("dark");
   const [now, setNow] = useState(() => new Date());
-  const [circadianCity, setCircadianCity] = useState<CircadianCity>(CIRCADIAN_CITIES[2]);
+  const [circadianCity, setCircadianCity] = useState<CircadianCity>(
+    CIRCADIAN_CITIES[2],
+  );
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationStatus, setLocationStatus] = useState(
     "Usando Porlamar como referencia inicial. Activa ubicacion para ajustar la luz solar local.",
@@ -166,16 +185,23 @@ export default function App() {
   );
   const [mealMode, setMealMode] = useState<MealInputMode>("photo");
   const [scannerMode, setScannerMode] = useState<ScannerMode>("food");
-  const [barcodeResult, setBarcodeResult] = useState<BarcodeScanningResult | null>(null);
+  const [barcodeResult, setBarcodeResult] =
+    useState<BarcodeScanningResult | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const [imageAsset, setImageAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [imageAsset, setImageAsset] =
+    useState<ImagePicker.ImagePickerAsset | null>(null);
   const [analysis, setAnalysis] = useState<MealAnalysisSummary | null>(null);
-  const [nutritionView, setNutritionView] = useState<"camera" | "history" | "text">("camera");
+  const [nutritionView, setNutritionView] = useState<
+    "camera" | "history" | "text"
+  >("camera");
   const [cameraReturnTab, setCameraReturnTab] = useState<AppTab>("home");
   const [statsView, setStatsView] = useState<StatsView>("food");
-  const [selectedStatsDate, setSelectedStatsDate] = useState(() => getLocalDateKey(new Date()));
-  const [statsMonthPickerExpanded, setStatsMonthPickerExpanded] = useState(false);
+  const [selectedStatsDate, setSelectedStatsDate] = useState(() =>
+    getLocalDateKey(new Date()),
+  );
+  const [statsMonthPickerExpanded, setStatsMonthPickerExpanded] =
+    useState(false);
   const [statsPagerLocked, setStatsPagerLocked] = useState(false);
   const [statsMealsExpanded, setStatsMealsExpanded] = useState(false);
   const [statsMealLogs, setStatsMealLogs] = useState<MealLog[]>([]);
@@ -198,12 +224,15 @@ export default function App() {
   const cameraRef = useRef<CameraView | null>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [nutritionQuickMenuOpen, setNutritionQuickMenuOpen] = useState(false);
+  const [initialMealForDetail, setInitialMealForDetail] =
+    useState<MealLog | null>(null);
 
   const circadianPlan = useMemo(
     () => createCircadianPlan(circadianCity, now),
     [circadianCity, now],
   );
-  const theme: FitnessTheme = visualMode === "light" ? fitnessLightColors : fitnessColors;
+  const theme: FitnessTheme =
+    visualMode === "light" ? fitnessLightColors : fitnessColors;
   const wellnessCardMode = visualMode === "light" ? "day" : "night";
   const loading = bootstrapLoading || analysisLoading;
   const statsPageWidth = Math.max(windowWidth - 40, 1);
@@ -215,13 +244,13 @@ export default function App() {
   const foodTextStrong = visualMode === "light" ? theme.text : "#F4FBF7";
   const foodTextMuted = visualMode === "light" ? "#8B8175" : "#7FA295";
   const foodTextSoft = visualMode === "light" ? "#B0A494" : "#557266";
-  const foodGradient: readonly [string, string, string] = (
+  const foodGradient: readonly [string, string, string] =
     visualMode === "light"
       ? ["#FFFDF8", "#F8F2E8", "#FFF8EE"]
-      : ["#07100D", "#0D1815", "#101D19"]
-  );
+      : ["#07100D", "#0D1815", "#101D19"];
   const foodCalendarMutedTone = visualMode === "light" ? "#BBAF9F" : "#5E786B";
-  const foodCalendarAccentTone = visualMode === "light" ? theme.accent : theme.mint;
+  const foodCalendarAccentTone =
+    visualMode === "light" ? theme.accent : theme.mint;
   const todayKey = getLocalDateKey(now);
   const selectedStatsDateValue = useMemo(
     () => new Date(`${selectedStatsDate}T12:00:00`),
@@ -234,9 +263,12 @@ export default function App() {
     month: "long",
     year: "2-digit",
   });
-  const selectedDateWeekday = selectedStatsDateValue.toLocaleDateString("es-ES", {
-    weekday: "long",
-  });
+  const selectedDateWeekday = selectedStatsDateValue.toLocaleDateString(
+    "es-ES",
+    {
+      weekday: "long",
+    },
+  );
   const statsMealsByDate = useMemo(() => {
     const map = new Map<string, MealLog[]>();
 
@@ -269,13 +301,21 @@ export default function App() {
       ingredients: analysis.ingredients,
       createdAt: analysis.createdAt,
     };
-  }, [analysis, imageAsset?.uri, mealDescription, mealLabel, selectedStatsDate, todayKey]);
+  }, [
+    analysis,
+    imageAsset?.uri,
+    mealDescription,
+    mealLabel,
+    selectedStatsDate,
+    todayKey,
+  ]);
   const selectedDateMeals = useMemo(() => {
     const meals = statsMealsByDate.get(selectedStatsDate) ?? [];
 
     if (meals.length > 0) {
       return [...meals].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
     }
 
@@ -289,13 +329,22 @@ export default function App() {
     selectedDateMeals.reduce((sum, meal) => sum + meal.calories, 0) || 0,
   );
   const selectedCarbs = Math.round(
-    selectedDateMeals.reduce((sum, meal) => sum + ("carbsGrams" in meal ? meal.carbsGrams : 0), 0) || 0,
+    selectedDateMeals.reduce(
+      (sum, meal) => sum + ("carbsGrams" in meal ? meal.carbsGrams : 0),
+      0,
+    ) || 0,
   );
   const selectedProtein = Math.round(
-    selectedDateMeals.reduce((sum, meal) => sum + ("proteinGrams" in meal ? meal.proteinGrams : 0), 0) || 0,
+    selectedDateMeals.reduce(
+      (sum, meal) => sum + ("proteinGrams" in meal ? meal.proteinGrams : 0),
+      0,
+    ) || 0,
   );
   const selectedFat = Math.round(
-    selectedDateMeals.reduce((sum, meal) => sum + ("fatGrams" in meal ? meal.fatGrams : 0), 0) || 0,
+    selectedDateMeals.reduce(
+      (sum, meal) => sum + ("fatGrams" in meal ? meal.fatGrams : 0),
+      0,
+    ) || 0,
   );
   const selectedWeekMeals = useMemo(() => {
     const startOfWeek = getStartOfWeek(selectedStatsDateValue);
@@ -304,8 +353,13 @@ export default function App() {
       const date = addDays(startOfWeek, index);
       const dateKey = getLocalDateKey(date);
       const meals = statsMealsByDate.get(dateKey) ?? [];
-      const fallbackCalories = dateKey === todayKey && meals.length === 0 ? Math.round(analysis?.calories ?? 0) : 0;
-      const totalCalories = Math.round(meals.reduce((sum, meal) => sum + meal.calories, 0) + fallbackCalories);
+      const fallbackCalories =
+        dateKey === todayKey && meals.length === 0
+          ? Math.round(analysis?.calories ?? 0)
+          : 0;
+      const totalCalories = Math.round(
+        meals.reduce((sum, meal) => sum + meal.calories, 0) + fallbackCalories,
+      );
 
       return {
         key: dateKey,
@@ -316,10 +370,16 @@ export default function App() {
         isToday: dateKey === todayKey,
       };
     });
-  }, [analysis?.calories, selectedStatsDate, selectedStatsDateValue, statsMealsByDate, todayKey]);
+  }, [
+    analysis?.calories,
+    selectedStatsDate,
+    selectedStatsDateValue,
+    statsMealsByDate,
+    todayKey,
+  ]);
   const registeredMealsPreview = useMemo(
     () =>
-      selectedDateMeals.slice(0, 4).map((meal) => ({
+      selectedDateMeals.map((meal) => ({
         id: meal.id,
         imageUrl: meal.imageUrl,
         title: meal.title ?? "Comida registrada",
@@ -336,7 +396,10 @@ export default function App() {
     outputRange: [0, statsTabWidth],
     extrapolate: "clamp",
   });
-  const statsMealsContentHeight = Math.max(registeredMealsPreview.length * 92 + 20, 96);
+  const statsMealsContentHeight = Math.max(
+    registeredMealsPreview.length * 92 + 20,
+    96,
+  );
   const registeredMeals = selectedDateMeals.length;
   const homeTodayMeals = useMemo(() => {
     const meals = statsMealsByDate.get(todayKey) ?? [];
@@ -373,22 +436,47 @@ export default function App() {
   const homeMutedText = visualMode === "light" ? "#786F65" : "#8AA199";
   const homeSoftText = visualMode === "light" ? "#A3988B" : "#587067";
   const homeStrongText = visualMode === "light" ? "#17130F" : "#F5FBF8";
-  const homeAnchorText = formatCircadianTime(circadianPlan.nextAnchor, circadianPlan.city.timeZone);
-  const homeHeroAuraPrimaryColor = visualMode === "light" ? "rgba(0, 200, 151, 0.12)" : "rgba(118, 239, 229, 0.14)";
-  const homeHeroAuraSecondaryColor = visualMode === "light" ? "rgba(232, 255, 84, 0.10)" : "rgba(232, 255, 84, 0.11)";
-  const homeHeroPillDarkColor = visualMode === "light" ? "rgba(23, 19, 15, 0.04)" : "rgba(255,255,255,0.08)";
-  const homeHeroPillGlassColor = visualMode === "light" ? "rgba(23, 19, 15, 0.06)" : "rgba(255,255,255,0.12)";
+  const homeAnchorText = formatCircadianTime(
+    circadianPlan.nextAnchor,
+    circadianPlan.city.timeZone,
+  );
+  const homeHeroAuraPrimaryColor =
+    visualMode === "light"
+      ? "rgba(0, 200, 151, 0.12)"
+      : "rgba(118, 239, 229, 0.14)";
+  const homeHeroAuraSecondaryColor =
+    visualMode === "light"
+      ? "rgba(232, 255, 84, 0.10)"
+      : "rgba(232, 255, 84, 0.11)";
+  const homeHeroPillDarkColor =
+    visualMode === "light"
+      ? "rgba(23, 19, 15, 0.04)"
+      : "rgba(255,255,255,0.08)";
+  const homeHeroPillGlassColor =
+    visualMode === "light"
+      ? "rgba(23, 19, 15, 0.06)"
+      : "rgba(255,255,255,0.12)";
   const homeHeroPillTextColor = visualMode === "light" ? "#2A241F" : "#F4FBF8";
   const homeHeroEyebrowColor = visualMode === "light" ? "#897E71" : "#8FACA1";
   const homeHeroTitleColor = visualMode === "light" ? "#1A1511" : "#FCFFFD";
-  const homeHeroSummaryColor = visualMode === "light" ? "#6F655B" : "rgba(245, 251, 248, 0.74)";
-  const homeFloatingBadgeColor = visualMode === "light" ? "rgba(23, 19, 15, 0.06)" : "rgba(255,255,255,0.08)";
+  const homeHeroSummaryColor =
+    visualMode === "light" ? "#6F655B" : "rgba(245, 251, 248, 0.74)";
+  const homeFloatingBadgeColor =
+    visualMode === "light"
+      ? "rgba(23, 19, 15, 0.06)"
+      : "rgba(255,255,255,0.08)";
   const homeFloatingValueColor = visualMode === "light" ? "#17130F" : "#F8FFFC";
   const homeFloatingLabelColor = visualMode === "light" ? "#8C8174" : "#88A89B";
-  const homeHeroScoreLabelColor = visualMode === "light" ? "#8C8174" : "#96B4AA";
-  const homeHeroScoreValueColor = visualMode === "light" ? "#17130F" : "#FFFFFF";
-  const homeHeroScoreCaptionColor = visualMode === "light" ? "#6F655B" : "#CDE0D7";
-  const homeHeroDividerColor = visualMode === "light" ? "rgba(23, 19, 15, 0.08)" : "rgba(255,255,255,0.10)";
+  const homeHeroScoreLabelColor =
+    visualMode === "light" ? "#8C8174" : "#96B4AA";
+  const homeHeroScoreValueColor =
+    visualMode === "light" ? "#17130F" : "#FFFFFF";
+  const homeHeroScoreCaptionColor =
+    visualMode === "light" ? "#6F655B" : "#CDE0D7";
+  const homeHeroDividerColor =
+    visualMode === "light"
+      ? "rgba(23, 19, 15, 0.08)"
+      : "rgba(255,255,255,0.10)";
   const homeHeroMiniValueColor = visualMode === "light" ? "#17130F" : "#FFFFFF";
   const homeHeroMiniLabelColor = visualMode === "light" ? "#8C8174" : "#8BA79C";
   const profileHeroGradient: readonly [string, string, string] =
@@ -401,21 +489,46 @@ export default function App() {
   const profileTextStrong = visualMode === "light" ? "#17130F" : "#F5FBF8";
   const profileTextMuted = visualMode === "light" ? "#786F65" : "#8AA199";
   const profileTextSoft = visualMode === "light" ? "#A3988B" : "#5C7369";
-  const profileHeroGlowColor = visualMode === "light" ? "rgba(0, 200, 151, 0.12)" : "rgba(118,239,229,0.16)";
-  const profileHeroPillGlassColor = visualMode === "light" ? "rgba(23, 19, 15, 0.06)" : "rgba(255,255,255,0.12)";
-  const profileHeroPillDarkColor = visualMode === "light" ? "rgba(23, 19, 15, 0.04)" : "rgba(255,255,255,0.08)";
-  const profileHeroPillTextColor = visualMode === "light" ? "#2A241F" : "#F4FBF8";
-  const profileHeroAvatarColor = visualMode === "light" ? "rgba(23, 19, 15, 0.06)" : "rgba(255,255,255,0.12)";
-  const profileHeroAvatarTextColor = visualMode === "light" ? "#17130F" : "#FFFFFF";
+  const profileHeroGlowColor =
+    visualMode === "light"
+      ? "rgba(0, 200, 151, 0.12)"
+      : "rgba(118,239,229,0.16)";
+  const profileHeroPillGlassColor =
+    visualMode === "light"
+      ? "rgba(23, 19, 15, 0.06)"
+      : "rgba(255,255,255,0.12)";
+  const profileHeroPillDarkColor =
+    visualMode === "light"
+      ? "rgba(23, 19, 15, 0.04)"
+      : "rgba(255,255,255,0.08)";
+  const profileHeroPillTextColor =
+    visualMode === "light" ? "#2A241F" : "#F4FBF8";
+  const profileHeroAvatarColor =
+    visualMode === "light"
+      ? "rgba(23, 19, 15, 0.06)"
+      : "rgba(255,255,255,0.12)";
+  const profileHeroAvatarTextColor =
+    visualMode === "light" ? "#17130F" : "#FFFFFF";
   const profileHeroTitleColor = visualMode === "light" ? "#1A1511" : "#FCFFFD";
-  const profileHeroSubtitleColor = visualMode === "light" ? "#6F655B" : "rgba(245, 251, 248, 0.74)";
-  const profileHeroStatValueColor = visualMode === "light" ? "#17130F" : "#FFFFFF";
-  const profileHeroStatLabelColor = visualMode === "light" ? "#8C8174" : "#8BA79C";
-  const profileHeroDividerColor = visualMode === "light" ? "rgba(23, 19, 15, 0.08)" : "rgba(255,255,255,0.10)";
-  const profileInitial = (fullName.trim() || email.trim() || "B").slice(0, 1).toUpperCase();
-  const profileCompletion = [fullName.trim(), email.trim(), userId].filter(Boolean).length / 3;
+  const profileHeroSubtitleColor =
+    visualMode === "light" ? "#6F655B" : "rgba(245, 251, 248, 0.74)";
+  const profileHeroStatValueColor =
+    visualMode === "light" ? "#17130F" : "#FFFFFF";
+  const profileHeroStatLabelColor =
+    visualMode === "light" ? "#8C8174" : "#8BA79C";
+  const profileHeroDividerColor =
+    visualMode === "light"
+      ? "rgba(23, 19, 15, 0.08)"
+      : "rgba(255,255,255,0.10)";
+  const profileInitial = (fullName.trim() || email.trim() || "B")
+    .slice(0, 1)
+    .toUpperCase();
+  const profileCompletion =
+    [fullName.trim(), email.trim(), userId].filter(Boolean).length / 3;
   const profileCompletionValue = Math.round(profileCompletion * 100);
-  const profileStatusText = userId ? "Perfil conectado" : "Perfil listo para conectar";
+  const profileStatusText = userId
+    ? "Perfil conectado"
+    : "Perfil listo para conectar";
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -510,10 +623,19 @@ export default function App() {
   }, [ambientPulse]);
 
   useEffect(() => {
-    if (activeTab === "nutrition" && nutritionView === "camera" && !cameraPermission?.granted) {
+    if (
+      activeTab === "nutrition" &&
+      nutritionView === "camera" &&
+      !cameraPermission?.granted
+    ) {
       void requestCameraPermission();
     }
-  }, [activeTab, cameraPermission?.granted, nutritionView, requestCameraPermission]);
+  }, [
+    activeTab,
+    cameraPermission?.granted,
+    nutritionView,
+    requestCameraPermission,
+  ]);
 
   useEffect(() => {
     Animated.spring(nutritionQuickMenuAnim, {
@@ -673,7 +795,9 @@ export default function App() {
     setAnalysis(null);
     setNutritionView("text");
     setActiveTab("nutrition");
-    setStatusMessage("Describe tu comida y deja que la IA estime porciones y macros.");
+    setStatusMessage(
+      "Describe tu comida y deja que la IA estime porciones y macros.",
+    );
   }
 
   const pickImage = async () => {
@@ -706,7 +830,10 @@ export default function App() {
       const permission = await requestCameraPermission();
 
       if (!permission.granted) {
-        Alert.alert("Permiso requerido", "Bioma necesita acceso a la camara para escanear tu comida.");
+        Alert.alert(
+          "Permiso requerido",
+          "Bioma necesita acceso a la camara para escanear tu comida.",
+        );
         return;
       }
     }
@@ -751,7 +878,10 @@ export default function App() {
 
   const connectProfile = async (): Promise<string | null> => {
     if (!email.trim()) {
-      Alert.alert("Correo requerido", "Ingresa un correo para crear o recuperar el perfil.");
+      Alert.alert(
+        "Correo requerido",
+        "Ingresa un correo para crear o recuperar el perfil.",
+      );
       return null;
     }
 
@@ -765,10 +895,15 @@ export default function App() {
       });
 
       setUserId(profile.id);
-      setStatusMessage(`Perfil listo para ${profile.fullName ?? profile.email}.`);
+      setStatusMessage(
+        `Perfil listo para ${profile.fullName ?? profile.email}.`,
+      );
       return profile.id;
     } catch (error) {
-      const message = error instanceof Error ? error.message : "No se pudo conectar el perfil.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudo conectar el perfil.";
       Alert.alert("Error al conectar", message);
       setStatusMessage(message);
       return null;
@@ -819,7 +954,11 @@ export default function App() {
         });
 
         setStatusMessage("Subiendo imagen al storage...");
-        await biomaApi.uploadImageToStorage(upload.uploadUrl, imageAsset.uri, upload.requiredHeaders);
+        await biomaApi.uploadImageToStorage(
+          upload.uploadUrl,
+          imageAsset.uri,
+          upload.requiredHeaders,
+        );
 
         setStatusMessage("Analizando comida por vision...");
         const result = await biomaApi.analyzeMealImage({
@@ -851,7 +990,9 @@ export default function App() {
       setStatusMessage("Analisis completado y guardado en el historial.");
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "No se pudo completar el analisis.";
+        error instanceof Error
+          ? error.message
+          : "No se pudo completar el analisis.";
       Alert.alert("Error en el analisis", message);
       setStatusMessage(message);
     } finally {
@@ -870,6 +1011,8 @@ export default function App() {
             theme={theme}
             mode={wellnessCardMode}
             onOpenCamera={() => openCameraScreen("nutrition")}
+            initialMeal={initialMealForDetail}
+            onClearInitialMeal={() => setInitialMealForDetail(null)}
           />
         );
       case "tips":
@@ -891,8 +1034,12 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <StatusBar barStyle={visualMode === "light" ? "dark-content" : "light-content"} />
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: theme.background }]}
+    >
+      <StatusBar
+        barStyle={visualMode === "light" ? "dark-content" : "light-content"}
+      />
       <Animated.View
         pointerEvents="none"
         style={[
@@ -918,7 +1065,10 @@ export default function App() {
         ]}
       />
       <Animated.ScrollView
-        contentContainerStyle={[styles.content, { backgroundColor: theme.background }]}
+        contentContainerStyle={[
+          styles.content,
+          { backgroundColor: theme.background },
+        ]}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={Animated.event(
@@ -938,7 +1088,10 @@ export default function App() {
             styles.screenMotion,
             {
               opacity: screenOpacity,
-              transform: [{ translateY: screenTranslateY }, { scale: screenScale }],
+              transform: [
+                { translateY: screenTranslateY },
+                { scale: screenScale },
+              ],
             },
           ]}
         >
@@ -947,7 +1100,10 @@ export default function App() {
       </Animated.ScrollView>
 
       {nutritionQuickMenuOpen ? (
-        <Pressable style={styles.nutritionQuickMenuBackdrop} onPress={() => setNutritionQuickMenuOpen(false)} />
+        <Pressable
+          style={styles.nutritionQuickMenuBackdrop}
+          onPress={() => setNutritionQuickMenuOpen(false)}
+        />
       ) : null}
 
       <Animated.View
@@ -977,17 +1133,27 @@ export default function App() {
         ]}
       >
         <LinearGradient
-          colors={visualMode === "light" ? ["#FFFFFF", "#F4EFE7"] : ["#151E1A", "#0A1210"]}
+          colors={
+            visualMode === "light"
+              ? ["#FFFFFF", "#F4EFE7"]
+              : ["#151E1A", "#0A1210"]
+          }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.nutritionQuickMenuShell, { borderColor: theme.stroke }]}
+          style={[
+            styles.nutritionQuickMenuShell,
+            { borderColor: theme.stroke },
+          ]}
         >
           <Animated.View
             pointerEvents="none"
             style={[
               styles.nutritionQuickMenuGlow,
               {
-                backgroundColor: visualMode === "light" ? "rgba(0, 200, 151, 0.14)" : "rgba(118, 239, 229, 0.16)",
+                backgroundColor:
+                  visualMode === "light"
+                    ? "rgba(0, 200, 151, 0.14)"
+                    : "rgba(118, 239, 229, 0.16)",
                 opacity: nutritionQuickMenuAnim.interpolate({
                   inputRange: [0, 1],
                   outputRange: [0, 1],
@@ -995,13 +1161,26 @@ export default function App() {
               },
             ]}
           />
-          <Text style={[styles.nutritionQuickMenuEyebrow, { color: theme.accent }]}>Acceso rapido IA</Text>
-          <Text style={[styles.nutritionQuickMenuTitle, { color: theme.text }]}>Elige como quieres registrar tu comida</Text>
+          <Text
+            style={[styles.nutritionQuickMenuEyebrow, { color: theme.accent }]}
+          >
+            Acceso rapido IA
+          </Text>
+          <Text style={[styles.nutritionQuickMenuTitle, { color: theme.text }]}>
+            Elige como quieres registrar tu comida
+          </Text>
 
           <View style={styles.nutritionQuickMenuActions}>
-            <Pressable onPress={() => openPhotoNutritionFlow(activeTab)} style={styles.nutritionQuickMenuActionWrap}>
+            <Pressable
+              onPress={() => openPhotoNutritionFlow(activeTab)}
+              style={styles.nutritionQuickMenuActionWrap}
+            >
               <LinearGradient
-                colors={visualMode === "light" ? ["#0DD9A2", "#00B98A"] : ["#0ED7A0", "#068F6E"]}
+                colors={
+                  visualMode === "light"
+                    ? ["#0DD9A2", "#00B98A"]
+                    : ["#0ED7A0", "#068F6E"]
+                }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.nutritionQuickMenuAction}
@@ -1011,24 +1190,46 @@ export default function App() {
                 </View>
                 <View style={styles.nutritionQuickMenuActionTextBlock}>
                   <Text style={styles.nutritionQuickMenuActionTitle}>Foto</Text>
-                  <Text style={styles.nutritionQuickMenuActionText}>Captura o sube una imagen</Text>
+                  <Text style={styles.nutritionQuickMenuActionText}>
+                    Captura o sube una imagen
+                  </Text>
                 </View>
               </LinearGradient>
             </Pressable>
 
-            <Pressable onPress={() => openTextNutritionFlow(activeTab)} style={styles.nutritionQuickMenuActionWrap}>
+            <Pressable
+              onPress={() => openTextNutritionFlow(activeTab)}
+              style={styles.nutritionQuickMenuActionWrap}
+            >
               <LinearGradient
-                colors={visualMode === "light" ? ["#151515", "#2F2A24"] : ["#1D2522", "#121917"]}
+                colors={
+                  visualMode === "light"
+                    ? ["#151515", "#2F2A24"]
+                    : ["#1D2522", "#121917"]
+                }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.nutritionQuickMenuAction}
               >
-                <View style={[styles.nutritionQuickMenuIconBadge, styles.nutritionQuickMenuIconBadgeMuted]}>
-                  <Ionicons name="document-text-outline" size={20} color={theme.accent} />
+                <View
+                  style={[
+                    styles.nutritionQuickMenuIconBadge,
+                    styles.nutritionQuickMenuIconBadgeMuted,
+                  ]}
+                >
+                  <Ionicons
+                    name="document-text-outline"
+                    size={20}
+                    color={theme.accent}
+                  />
                 </View>
                 <View style={styles.nutritionQuickMenuActionTextBlock}>
-                  <Text style={styles.nutritionQuickMenuActionTitle}>Texto</Text>
-                  <Text style={styles.nutritionQuickMenuActionText}>Describe ingredientes y porcion</Text>
+                  <Text style={styles.nutritionQuickMenuActionTitle}>
+                    Texto
+                  </Text>
+                  <Text style={styles.nutritionQuickMenuActionText}>
+                    Describe tu comida
+                  </Text>
                 </View>
               </LinearGradient>
             </Pressable>
@@ -1114,20 +1315,60 @@ export default function App() {
             />
 
             <View style={styles.homeHeroTopRow}>
-              <View style={[styles.homeHeroPill, { backgroundColor: homeHeroPillDarkColor }]}>
-                <Text style={[styles.homeHeroPillText, { color: homeHeroPillTextColor }]}>Resumen premium de hoy</Text>
+              <View
+                style={[
+                  styles.homeHeroPill,
+                  { backgroundColor: homeHeroPillDarkColor },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.homeHeroPillText,
+                    { color: homeHeroPillTextColor },
+                  ]}
+                >
+                  Resumen premium de hoy
+                </Text>
               </View>
-              <View style={[styles.homeHeroPill, { backgroundColor: homeHeroPillGlassColor }]}>
-                <Text style={[styles.homeHeroPillText, { color: homeHeroPillTextColor }]}>{homeAnchorText}</Text>
+              <View
+                style={[
+                  styles.homeHeroPill,
+                  { backgroundColor: homeHeroPillGlassColor },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.homeHeroPillText,
+                    { color: homeHeroPillTextColor },
+                  ]}
+                >
+                  {homeAnchorText}
+                </Text>
               </View>
             </View>
 
             <View style={styles.homeHeroHeadingBlock}>
-              <Text style={[styles.homeHeroEyebrow, { color: homeHeroEyebrowColor }]}>Tu cuerpo hoy</Text>
-              <Text style={[styles.homeHeroTitle, { color: homeHeroTitleColor }]}>
+              <Text
+                style={[
+                  styles.homeHeroEyebrow,
+                  { color: homeHeroEyebrowColor },
+                ]}
+              >
+                Tu cuerpo hoy
+              </Text>
+              <Text
+                style={[styles.homeHeroTitle, { color: homeHeroTitleColor }]}
+              >
                 Todo lo importante, claro y en un solo lugar.
               </Text>
-              <Text style={[styles.homeHeroSummary, { color: homeHeroSummaryColor }]}>{dailyRecommendation.summary}</Text>
+              <Text
+                style={[
+                  styles.homeHeroSummary,
+                  { color: homeHeroSummaryColor },
+                ]}
+              >
+                {dailyRecommendation.summary}
+              </Text>
             </View>
 
             <Animated.View
@@ -1147,8 +1388,22 @@ export default function App() {
                 },
               ]}
             >
-              <Text style={[styles.homeFloatingValue, { color: homeFloatingValueColor }]}>{wearableSnapshot.steps.toLocaleString()}</Text>
-              <Text style={[styles.homeFloatingLabel, { color: homeFloatingLabelColor }]}>pasos</Text>
+              <Text
+                style={[
+                  styles.homeFloatingValue,
+                  { color: homeFloatingValueColor },
+                ]}
+              >
+                {wearableSnapshot.steps.toLocaleString()}
+              </Text>
+              <Text
+                style={[
+                  styles.homeFloatingLabel,
+                  { color: homeFloatingLabelColor },
+                ]}
+              >
+                pasos
+              </Text>
             </Animated.View>
 
             <Animated.View
@@ -1168,27 +1423,95 @@ export default function App() {
                 },
               ]}
             >
-              <Text style={[styles.homeFloatingValue, { color: homeFloatingValueColor }]}>{wearableSnapshot.sleep.totalHours.toFixed(1)} h</Text>
-              <Text style={[styles.homeFloatingLabel, { color: homeFloatingLabelColor }]}>sueno</Text>
+              <Text
+                style={[
+                  styles.homeFloatingValue,
+                  { color: homeFloatingValueColor },
+                ]}
+              >
+                {wearableSnapshot.sleep.totalHours.toFixed(1)} h
+              </Text>
+              <Text
+                style={[
+                  styles.homeFloatingLabel,
+                  { color: homeFloatingLabelColor },
+                ]}
+              >
+                sueno
+              </Text>
             </Animated.View>
 
             <View style={styles.homeHeroBottomRow}>
               <View style={styles.homeHeroScoreBlock}>
-                <Text style={[styles.homeHeroScoreLabel, { color: homeHeroScoreLabelColor }]}>Recovery score</Text>
-                <Text style={[styles.homeHeroScoreValue, { color: homeHeroScoreValueColor }]}>{recoverySnapshot.score}</Text>
-                <Text style={[styles.homeHeroScoreCaption, { color: homeHeroScoreCaptionColor }]}>{recoverySnapshot.label}</Text>
+                <Text
+                  style={[
+                    styles.homeHeroScoreLabel,
+                    { color: homeHeroScoreLabelColor },
+                  ]}
+                >
+                  Recovery score
+                </Text>
+                <Text
+                  style={[
+                    styles.homeHeroScoreValue,
+                    { color: homeHeroScoreValueColor },
+                  ]}
+                >
+                  {recoverySnapshot.score}
+                </Text>
+                <Text
+                  style={[
+                    styles.homeHeroScoreCaption,
+                    { color: homeHeroScoreCaptionColor },
+                  ]}
+                >
+                  {recoverySnapshot.label}
+                </Text>
               </View>
 
-              <View style={[styles.homeHeroDivider, { backgroundColor: homeHeroDividerColor }]} />
+              <View
+                style={[
+                  styles.homeHeroDivider,
+                  { backgroundColor: homeHeroDividerColor },
+                ]}
+              />
 
               <View style={styles.homeHeroMiniStats}>
                 <View style={styles.homeHeroMiniStat}>
-                  <Text style={[styles.homeHeroMiniValue, { color: homeHeroMiniValueColor }]}>{homeTodayCalories || 0}</Text>
-                  <Text style={[styles.homeHeroMiniLabel, { color: homeHeroMiniLabelColor }]}>kcal hoy</Text>
+                  <Text
+                    style={[
+                      styles.homeHeroMiniValue,
+                      { color: homeHeroMiniValueColor },
+                    ]}
+                  >
+                    {homeTodayCalories || 0}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.homeHeroMiniLabel,
+                      { color: homeHeroMiniLabelColor },
+                    ]}
+                  >
+                    kcal hoy
+                  </Text>
                 </View>
                 <View style={styles.homeHeroMiniStat}>
-                  <Text style={[styles.homeHeroMiniValue, { color: homeHeroMiniValueColor }]}>{homeTodayMealsCount}</Text>
-                  <Text style={[styles.homeHeroMiniLabel, { color: homeHeroMiniLabelColor }]}>comidas</Text>
+                  <Text
+                    style={[
+                      styles.homeHeroMiniValue,
+                      { color: homeHeroMiniValueColor },
+                    ]}
+                  >
+                    {homeTodayMealsCount}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.homeHeroMiniLabel,
+                      { color: homeHeroMiniLabelColor },
+                    ]}
+                  >
+                    comidas
+                  </Text>
                 </View>
               </View>
             </View>
@@ -1216,39 +1539,85 @@ export default function App() {
             },
           ]}
         >
-          <View style={[styles.homeMetricCard, { backgroundColor: homePanelColor, borderColor: homePanelStroke }]}>
+          <View
+            style={[
+              styles.homeMetricCard,
+              { backgroundColor: homePanelColor, borderColor: homePanelStroke },
+            ]}
+          >
             <View style={styles.homeMetricHeader}>
-              <Text style={[styles.homeMetricLabel, { color: homeMutedText }]}>Recuperacion</Text>
-              <View style={[styles.homeMetricDot, { backgroundColor: homeRecoveryAccent }]} />
+              <Text style={[styles.homeMetricLabel, { color: homeMutedText }]}>
+                Recuperacion
+              </Text>
+              <View
+                style={[
+                  styles.homeMetricDot,
+                  { backgroundColor: homeRecoveryAccent },
+                ]}
+              />
             </View>
-            <Text style={[styles.homeMetricValue, { color: homeStrongText }]}>{recoverySnapshot.score}</Text>
-            <Text style={[styles.homeMetricFoot, { color: homeMutedText }]}>{recoverySnapshot.label}</Text>
+            <Text style={[styles.homeMetricValue, { color: homeStrongText }]}>
+              {recoverySnapshot.score}
+            </Text>
+            <Text style={[styles.homeMetricFoot, { color: homeMutedText }]}>
+              {recoverySnapshot.label}
+            </Text>
           </View>
 
-          <View style={[styles.homeMetricCard, { backgroundColor: homePanelColor, borderColor: homePanelStroke }]}>
+          <View
+            style={[
+              styles.homeMetricCard,
+              { backgroundColor: homePanelColor, borderColor: homePanelStroke },
+            ]}
+          >
             <View style={styles.homeMetricHeader}>
-              <Text style={[styles.homeMetricLabel, { color: homeMutedText }]}>Pasos</Text>
-              <Text style={[styles.homeMetricHint, { color: homeSoftText }]}>meta {homeStepGoal.toLocaleString()}</Text>
+              <Text style={[styles.homeMetricLabel, { color: homeMutedText }]}>
+                Pasos
+              </Text>
+              <Text style={[styles.homeMetricHint, { color: homeSoftText }]}>
+                meta {homeStepGoal.toLocaleString()}
+              </Text>
             </View>
-            <Text style={[styles.homeMetricValueSmall, { color: homeStrongText }]}>
+            <Text
+              style={[styles.homeMetricValueSmall, { color: homeStrongText }]}
+            >
               {wearableSnapshot.steps.toLocaleString()}
             </Text>
-            <View style={[styles.homeMetricTrack, { backgroundColor: homePanelColorAlt }]}>
+            <View
+              style={[
+                styles.homeMetricTrack,
+                { backgroundColor: homePanelColorAlt },
+              ]}
+            >
               <View
                 style={[
                   styles.homeMetricFill,
-                  { width: `${homeStepProgress * 100}%`, backgroundColor: theme.accent },
+                  {
+                    width: `${homeStepProgress * 100}%`,
+                    backgroundColor: theme.accent,
+                  },
                 ]}
               />
             </View>
           </View>
 
-          <View style={[styles.homeMetricCard, { backgroundColor: homePanelColor, borderColor: homePanelStroke }]}>
+          <View
+            style={[
+              styles.homeMetricCard,
+              { backgroundColor: homePanelColor, borderColor: homePanelStroke },
+            ]}
+          >
             <View style={styles.homeMetricHeader}>
-              <Text style={[styles.homeMetricLabel, { color: homeMutedText }]}>Sueno</Text>
-              <Text style={[styles.homeMetricHint, { color: homeSoftText }]}>deep {wearableSnapshot.sleep.deepHours.toFixed(1)} h</Text>
+              <Text style={[styles.homeMetricLabel, { color: homeMutedText }]}>
+                Sueno
+              </Text>
+              <Text style={[styles.homeMetricHint, { color: homeSoftText }]}>
+                deep {wearableSnapshot.sleep.deepHours.toFixed(1)} h
+              </Text>
             </View>
-            <Text style={[styles.homeMetricValueSmall, { color: homeStrongText }]}>
+            <Text
+              style={[styles.homeMetricValueSmall, { color: homeStrongText }]}
+            >
               {wearableSnapshot.sleep.totalHours.toFixed(1)} h
             </Text>
             <Text style={[styles.homeMetricFoot, { color: homeMutedText }]}>
@@ -1256,15 +1625,28 @@ export default function App() {
             </Text>
           </View>
 
-          <View style={[styles.homeMetricCard, { backgroundColor: homePanelColor, borderColor: homePanelStroke }]}>
+          <View
+            style={[
+              styles.homeMetricCard,
+              { backgroundColor: homePanelColor, borderColor: homePanelStroke },
+            ]}
+          >
             <View style={styles.homeMetricHeader}>
-              <Text style={[styles.homeMetricLabel, { color: homeMutedText }]}>Cardio</Text>
-              <Text style={[styles.homeMetricHint, { color: homeSoftText }]}>HRV {wearableSnapshot.hrvMs} ms</Text>
+              <Text style={[styles.homeMetricLabel, { color: homeMutedText }]}>
+                Cardio
+              </Text>
+              <Text style={[styles.homeMetricHint, { color: homeSoftText }]}>
+                HRV {wearableSnapshot.hrvMs} ms
+              </Text>
             </View>
-            <Text style={[styles.homeMetricValueSmall, { color: homeStrongText }]}>
+            <Text
+              style={[styles.homeMetricValueSmall, { color: homeStrongText }]}
+            >
               {wearableSnapshot.vo2Max.toFixed(1)}
             </Text>
-            <Text style={[styles.homeMetricFoot, { color: homeMutedText }]}>VO2 max estimado</Text>
+            <Text style={[styles.homeMetricFoot, { color: homeMutedText }]}>
+              VO2 max estimado
+            </Text>
           </View>
         </Animated.View>
 
@@ -1300,89 +1682,141 @@ export default function App() {
           }}
         >
           <LinearGradient
-            colors={visualMode === "light" ? ["#FFFFFF", "#F6F1E8"] : ["#111917", "#0D1412"]}
+            colors={
+              visualMode === "light"
+                ? ["#FFFFFF", "#F6F1E8"]
+                : ["#111917", "#0D1412"]
+            }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[styles.homeStoryCard, { borderColor: homePanelStroke }]}
           >
-          <View style={styles.homeStoryHeader}>
-            <View>
-              <Text style={[styles.homeSectionEyebrow, { color: theme.accent }]}>PANORAMA</Text>
-              <Text style={[styles.homeStoryTitle, { color: homeStrongText }]}>Ritmo, energia y comida alineados.</Text>
-              <Text style={[styles.homeStoryText, { color: homeMutedText }]}>
-                Siguiente ancla circadiana a las {homeAnchorText} en {circadianPlan.city.name}. Hoy vas con {homeTodayCalories || 0} kcal y {homeTodayMealsCount} comidas registradas.
-              </Text>
+            <View style={styles.homeStoryHeader}>
+              <View>
+                <Text
+                  style={[styles.homeSectionEyebrow, { color: theme.accent }]}
+                >
+                  PANORAMA
+                </Text>
+                <Text
+                  style={[styles.homeStoryTitle, { color: homeStrongText }]}
+                >
+                  Ritmo, energia y comida alineados.
+                </Text>
+                <Text style={[styles.homeStoryText, { color: homeMutedText }]}>
+                  Siguiente ancla circadiana a las {homeAnchorText} en{" "}
+                  {circadianPlan.city.name}. Hoy vas con{" "}
+                  {homeTodayCalories || 0} kcal y {homeTodayMealsCount} comidas
+                  registradas.
+                </Text>
+              </View>
             </View>
-          </View>
 
-          <View style={styles.homeTrendRow}>
-            {weightTrend.map((value, index) => {
-              const height = 26 + value * 0.9;
-              const active = index === 4;
+            <View style={styles.homeTrendRow}>
+              {weightTrend.map((value, index) => {
+                const height = 26 + value * 0.9;
+                const active = index === 4;
 
-              return (
-                <View key={`${value}-${index}`} style={styles.homeTrendColumn}>
-                  <View style={[styles.homeTrendTrack, { backgroundColor: homePanelColorAlt }]}>
-                    <Animated.View
+                return (
+                  <View
+                    key={`${value}-${index}`}
+                    style={styles.homeTrendColumn}
+                  >
+                    <View
                       style={[
-                        styles.homeTrendFill,
-                        {
-                          height,
-                          backgroundColor: active ? theme.accent : visualMode === "light" ? "#CFC5B6" : "#28433A",
-                          opacity: mainScrollY.interpolate({
-                            inputRange: [100 + index * 10, 220 + index * 12],
-                            outputRange: [0.35, 1],
-                            extrapolate: "clamp",
-                          }),
-                          transform: [
-                            {
-                              translateY: Animated.add(
-                                mainScrollY.interpolate({
-                                  inputRange: [100 + index * 12, 240 + index * 16],
-                                  outputRange: [height * 0.42, 0],
+                        styles.homeTrendTrack,
+                        { backgroundColor: homePanelColorAlt },
+                      ]}
+                    >
+                      <Animated.View
+                        style={[
+                          styles.homeTrendFill,
+                          {
+                            height,
+                            backgroundColor: active
+                              ? theme.accent
+                              : visualMode === "light"
+                                ? "#CFC5B6"
+                                : "#28433A",
+                            opacity: mainScrollY.interpolate({
+                              inputRange: [100 + index * 10, 220 + index * 12],
+                              outputRange: [0.35, 1],
+                              extrapolate: "clamp",
+                            }),
+                            transform: [
+                              {
+                                translateY: Animated.add(
+                                  mainScrollY.interpolate({
+                                    inputRange: [
+                                      100 + index * 12,
+                                      240 + index * 16,
+                                    ],
+                                    outputRange: [height * 0.42, 0],
+                                    extrapolate: "clamp",
+                                  }),
+                                  ambientPulse.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [
+                                      0,
+                                      active ? -8 : -(4 + (index % 3)),
+                                    ],
+                                  }),
+                                ),
+                              },
+                              {
+                                scaleY: mainScrollY.interpolate({
+                                  inputRange: [
+                                    100 + index * 12,
+                                    240 + index * 16,
+                                  ],
+                                  outputRange: [0.42, 1],
                                   extrapolate: "clamp",
                                 }),
-                                ambientPulse.interpolate({
-                                  inputRange: [0, 1],
-                                  outputRange: [0, active ? -8 : -(4 + (index % 3))],
-                                }),
-                              ),
-                            },
-                            {
-                              scaleY: mainScrollY.interpolate({
-                                inputRange: [100 + index * 12, 240 + index * 16],
-                                outputRange: [0.42, 1],
-                                extrapolate: "clamp",
-                              }),
-                            },
-                          ],
-                        },
-                      ]}
-                    />
+                              },
+                            ],
+                          },
+                        ]}
+                      />
+                    </View>
                   </View>
-                </View>
-              );
-            })}
-          </View>
+                );
+              })}
+            </View>
 
-          <View style={styles.homeActionRow}>
-            <Pressable
-              style={[styles.homeActionButtonPrimary, { backgroundColor: theme.accent }]}
-              onPress={() => setActiveTab("stats")}
-            >
-              <Text style={[styles.homeActionButtonPrimaryText, { color: visualMode === "light" ? "#FFFFFF" : "#07110E" }]}>
-                Ver resumen
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.homeActionButtonSecondary, { backgroundColor: homePanelColorAlt }]}
-              onPress={() => openCameraScreen("home")}
-            >
-              <Text style={[styles.homeActionButtonSecondaryText, { color: homeStrongText }]}>
-                Escanear comida
-              </Text>
-            </Pressable>
-          </View>
+            <View style={styles.homeActionRow}>
+              <Pressable
+                style={[
+                  styles.homeActionButtonPrimary,
+                  { backgroundColor: theme.accent },
+                ]}
+                onPress={() => setActiveTab("stats")}
+              >
+                <Text
+                  style={[
+                    styles.homeActionButtonPrimaryText,
+                    { color: visualMode === "light" ? "#FFFFFF" : "#07110E" },
+                  ]}
+                >
+                  Ver resumen
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.homeActionButtonSecondary,
+                  { backgroundColor: homePanelColorAlt },
+                ]}
+                onPress={() => openCameraScreen("home")}
+              >
+                <Text
+                  style={[
+                    styles.homeActionButtonSecondaryText,
+                    { color: homeStrongText },
+                  ]}
+                >
+                  Escanear comida
+                </Text>
+              </Pressable>
+            </View>
           </LinearGradient>
         </Animated.View>
 
@@ -1407,20 +1841,61 @@ export default function App() {
             },
           ]}
         >
-          <View style={[styles.homeInsightCardLarge, { backgroundColor: homePanelColor, borderColor: homePanelStroke }]}>
-            <Text style={[styles.homeSectionEyebrow, { color: theme.accent }]}>AI COACH</Text>
-            <Text style={[styles.homeInsightTitle, { color: homeStrongText }]}>{dailyRecommendation.title}</Text>
-            <Text style={[styles.homeInsightText, { color: homeMutedText }]}>{dailyRecommendation.summary}</Text>
+          <View
+            style={[
+              styles.homeInsightCardLarge,
+              { backgroundColor: homePanelColor, borderColor: homePanelStroke },
+            ]}
+          >
+            <Text style={[styles.homeSectionEyebrow, { color: theme.accent }]}>
+              AI COACH
+            </Text>
+            <Text style={[styles.homeInsightTitle, { color: homeStrongText }]}>
+              {dailyRecommendation.title}
+            </Text>
+            <Text style={[styles.homeInsightText, { color: homeMutedText }]}>
+              {dailyRecommendation.summary}
+            </Text>
           </View>
 
           <View style={styles.homeMiniCardsRow}>
-            <View style={[styles.homeMiniCard, { backgroundColor: homePanelColor, borderColor: homePanelStroke }]}>
-              <Text style={[styles.homeMiniCardLabel, { color: homeMutedText }]}>Ciudad solar</Text>
-              <Text style={[styles.homeMiniCardValue, { color: homeStrongText }]}>{circadianPlan.city.name}</Text>
+            <View
+              style={[
+                styles.homeMiniCard,
+                {
+                  backgroundColor: homePanelColor,
+                  borderColor: homePanelStroke,
+                },
+              ]}
+            >
+              <Text
+                style={[styles.homeMiniCardLabel, { color: homeMutedText }]}
+              >
+                Ciudad solar
+              </Text>
+              <Text
+                style={[styles.homeMiniCardValue, { color: homeStrongText }]}
+              >
+                {circadianPlan.city.name}
+              </Text>
             </View>
-            <View style={[styles.homeMiniCard, { backgroundColor: homePanelColor, borderColor: homePanelStroke }]}>
-              <Text style={[styles.homeMiniCardLabel, { color: homeMutedText }]}>Fase actual</Text>
-              <Text style={[styles.homeMiniCardValue, { color: homeStrongText }]}>
+            <View
+              style={[
+                styles.homeMiniCard,
+                {
+                  backgroundColor: homePanelColor,
+                  borderColor: homePanelStroke,
+                },
+              ]}
+            >
+              <Text
+                style={[styles.homeMiniCardLabel, { color: homeMutedText }]}
+              >
+                Fase actual
+              </Text>
+              <Text
+                style={[styles.homeMiniCardValue, { color: homeStrongText }]}
+              >
                 {circadianPlan.phase === "day" ? "Dia" : "Noche"}
               </Text>
             </View>
@@ -1442,21 +1917,33 @@ export default function App() {
   function getStatsPageMotion(index: number) {
     return {
       opacity: statsScrollX.interpolate({
-        inputRange: [(index - 1) * statsPageWidth, index * statsPageWidth, (index + 1) * statsPageWidth],
+        inputRange: [
+          (index - 1) * statsPageWidth,
+          index * statsPageWidth,
+          (index + 1) * statsPageWidth,
+        ],
         outputRange: [0.72, 1, 0.72],
         extrapolate: "clamp",
       }),
       transform: [
         {
           translateY: statsScrollX.interpolate({
-            inputRange: [(index - 1) * statsPageWidth, index * statsPageWidth, (index + 1) * statsPageWidth],
+            inputRange: [
+              (index - 1) * statsPageWidth,
+              index * statsPageWidth,
+              (index + 1) * statsPageWidth,
+            ],
             outputRange: [20, 0, 20],
             extrapolate: "clamp",
           }),
         },
         {
           scale: statsScrollX.interpolate({
-            inputRange: [(index - 1) * statsPageWidth, index * statsPageWidth, (index + 1) * statsPageWidth],
+            inputRange: [
+              (index - 1) * statsPageWidth,
+              index * statsPageWidth,
+              (index + 1) * statsPageWidth,
+            ],
             outputRange: [0.97, 1, 0.97],
             extrapolate: "clamp",
           }),
@@ -1465,8 +1952,16 @@ export default function App() {
     };
   }
 
-  function updateSelectedStatsMonthYear(monthIndex: number, year: number, closePicker = false) {
-    const nextDate = clampDateToMonth(year, monthIndex, selectedStatsDayOfMonth);
+  function updateSelectedStatsMonthYear(
+    monthIndex: number,
+    year: number,
+    closePicker = false,
+  ) {
+    const nextDate = clampDateToMonth(
+      year,
+      monthIndex,
+      selectedStatsDayOfMonth,
+    );
     setSelectedStatsDate(getLocalDateKey(nextDate));
 
     if (closePicker) {
@@ -1474,11 +1969,20 @@ export default function App() {
     }
   }
 
-  function renderMacroPill(label: string, value: number, target: number, accent: string) {
+  function renderMacroPill(
+    label: string,
+    value: number,
+    target: number,
+    accent: string,
+  ) {
     return (
       <View key={label} style={styles.foodMacroItem}>
-        <Text style={[styles.foodMacroLabel, { color: foodTextMuted }]}>{label}</Text>
-        <View style={[styles.foodMacroTrack, { backgroundColor: foodRingTrack }]}>
+        <Text style={[styles.foodMacroLabel, { color: foodTextMuted }]}>
+          {label}
+        </Text>
+        <View
+          style={[styles.foodMacroTrack, { backgroundColor: foodRingTrack }]}
+        >
           <View
             style={[
               styles.foodMacroFill,
@@ -1490,7 +1994,10 @@ export default function App() {
           />
         </View>
         <Text style={[styles.foodMacroValue, { color: foodTextStrong }]}>
-          {value} <Text style={[styles.foodMacroTarget, { color: foodTextSoft }]}>/ {target} g</Text>
+          {value}{" "}
+          <Text style={[styles.foodMacroTarget, { color: foodTextSoft }]}>
+            / {target} g
+          </Text>
         </Text>
       </View>
     );
@@ -1502,9 +2009,7 @@ export default function App() {
         colors={foodGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[
-          styles.foodStatsCard,
-        ]}
+        style={[styles.foodStatsCard]}
       >
         <View style={styles.foodStatsHeaderRow}>
           <View style={styles.foodStatsHeaderSpacer} />
@@ -1515,7 +2020,8 @@ export default function App() {
           >
             <View style={styles.foodStatsMonthButton}>
               <Text style={[styles.foodStatsMonth, { color: foodTextStrong }]}>
-                {selectedDateTitle.charAt(0).toUpperCase() + selectedDateTitle.slice(1)}
+                {selectedDateTitle.charAt(0).toUpperCase() +
+                  selectedDateTitle.slice(1)}
               </Text>
               <Ionicons
                 name={statsMonthPickerExpanded ? "chevron-up" : "chevron-down"}
@@ -1524,7 +2030,8 @@ export default function App() {
               />
             </View>
             <Text style={[styles.foodStatsWeekday, { color: foodTextMuted }]}>
-              {selectedDateWeekday.charAt(0).toUpperCase() + selectedDateWeekday.slice(1)}
+              {selectedDateWeekday.charAt(0).toUpperCase() +
+                selectedDateWeekday.slice(1)}
             </Text>
           </Pressable>
 
@@ -1533,28 +2040,60 @@ export default function App() {
 
         {statsMonthPickerExpanded ? (
           <View
-            style={[styles.foodMonthPicker, { backgroundColor: foodSurfaceSecondary }]}
+            style={[
+              styles.foodMonthPicker,
+              { backgroundColor: foodSurfaceSecondary },
+            ]}
             onTouchStart={() => setStatsPagerLocked(true)}
             onTouchEnd={() => setStatsPagerLocked(false)}
             onTouchCancel={() => setStatsPagerLocked(false)}
           >
             <View style={styles.foodMonthPickerYearRow}>
               <Pressable
-                style={[styles.foodMonthPickerYearButton, { backgroundColor: foodSurfaceStrong }]}
-                onPress={() => updateSelectedStatsMonthYear(selectedStatsMonthIndex, selectedStatsYear - 1)}
+                style={[
+                  styles.foodMonthPickerYearButton,
+                  { backgroundColor: foodSurfaceStrong },
+                ]}
+                onPress={() =>
+                  updateSelectedStatsMonthYear(
+                    selectedStatsMonthIndex,
+                    selectedStatsYear - 1,
+                  )
+                }
               >
-                <Ionicons name="chevron-back" size={16} color={foodTextStrong} />
+                <Ionicons
+                  name="chevron-back"
+                  size={16}
+                  color={foodTextStrong}
+                />
               </Pressable>
 
-              <Text style={[styles.foodMonthPickerYearText, { color: foodTextStrong }]}>
+              <Text
+                style={[
+                  styles.foodMonthPickerYearText,
+                  { color: foodTextStrong },
+                ]}
+              >
                 {selectedStatsYear}
               </Text>
 
               <Pressable
-                style={[styles.foodMonthPickerYearButton, { backgroundColor: foodSurfaceStrong }]}
-                onPress={() => updateSelectedStatsMonthYear(selectedStatsMonthIndex, selectedStatsYear + 1)}
+                style={[
+                  styles.foodMonthPickerYearButton,
+                  { backgroundColor: foodSurfaceStrong },
+                ]}
+                onPress={() =>
+                  updateSelectedStatsMonthYear(
+                    selectedStatsMonthIndex,
+                    selectedStatsYear + 1,
+                  )
+                }
               >
-                <Ionicons name="chevron-forward" size={16} color={foodTextStrong} />
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={foodTextStrong}
+                />
               </Pressable>
             </View>
 
@@ -1567,14 +2106,30 @@ export default function App() {
                     key={monthLabel}
                     style={[
                       styles.foodMonthChip,
-                      { backgroundColor: active ? theme.accent : foodSurfaceStrong },
+                      {
+                        backgroundColor: active
+                          ? theme.accent
+                          : foodSurfaceStrong,
+                      },
                     ]}
-                    onPress={() => updateSelectedStatsMonthYear(monthIndex, selectedStatsYear, true)}
+                    onPress={() =>
+                      updateSelectedStatsMonthYear(
+                        monthIndex,
+                        selectedStatsYear,
+                        true,
+                      )
+                    }
                   >
                     <Text
                       style={[
                         styles.foodMonthChipText,
-                        { color: active ? (visualMode === "light" ? "#FFFFFF" : "#07110E") : foodTextStrong },
+                        {
+                          color: active
+                            ? visualMode === "light"
+                              ? "#FFFFFF"
+                              : "#07110E"
+                            : foodTextStrong,
+                        },
                       ]}
                     >
                       {monthLabel}
@@ -1627,7 +2182,14 @@ export default function App() {
               >
                 {item.day}
               </Text>
-              {item.isToday ? <View style={[styles.foodCalendarDot, { backgroundColor: foodCalendarAccentTone }]} /> : null}
+              {item.isToday ? (
+                <View
+                  style={[
+                    styles.foodCalendarDot,
+                    { backgroundColor: foodCalendarAccentTone },
+                  ]}
+                />
+              ) : null}
               <Text
                 style={[
                   styles.foodCalendarCalories,
@@ -1647,8 +2209,20 @@ export default function App() {
         </View>
 
         <View style={styles.foodRingShell}>
-          <View style={[styles.foodRingGlow, { backgroundColor: visualMode === "light" ? "rgba(0, 200, 151, 0.10)" : "rgba(118, 239, 229, 0.12)" }]} />
-          <View style={[styles.foodRingOuterTrack, { borderColor: foodRingTrack }]} />
+          <View
+            style={[
+              styles.foodRingGlow,
+              {
+                backgroundColor:
+                  visualMode === "light"
+                    ? "rgba(0, 200, 151, 0.10)"
+                    : "rgba(118, 239, 229, 0.12)",
+              },
+            ]}
+          />
+          <View
+            style={[styles.foodRingOuterTrack, { borderColor: foodRingTrack }]}
+          />
           <View
             style={[
               styles.foodRingOuterProgress,
@@ -1659,7 +2233,12 @@ export default function App() {
               },
             ]}
           />
-          <View style={[styles.foodRingInnerTrack, { borderColor: foodSurfaceSecondary }]} />
+          <View
+            style={[
+              styles.foodRingInnerTrack,
+              { borderColor: foodSurfaceSecondary },
+            ]}
+          />
           <View
             style={[
               styles.foodRingInnerProgress,
@@ -1671,10 +2250,22 @@ export default function App() {
             ]}
           />
 
-          <View style={[styles.foodRingCenter, { backgroundColor: foodSurfaceStrong }]}>
-            <Text style={[styles.foodRingGoal, { color: foodTextSoft }]}>OBJETIVO = 2100</Text>
-            <Text style={[styles.foodRingCalories, { color: foodTextStrong }]}>{selectedMealCalories.toLocaleString()}</Text>
-            <Text style={[styles.foodRingCaption, { color: foodTextMuted }]} numberOfLines={2}>
+          <View
+            style={[
+              styles.foodRingCenter,
+              { backgroundColor: foodSurfaceStrong },
+            ]}
+          >
+            <Text style={[styles.foodRingGoal, { color: foodTextSoft }]}>
+              OBJETIVO = 2100
+            </Text>
+            <Text style={[styles.foodRingCalories, { color: foodTextStrong }]}>
+              {selectedMealCalories.toLocaleString()}
+            </Text>
+            <Text
+              style={[styles.foodRingCaption, { color: foodTextMuted }]}
+              numberOfLines={2}
+            >
               CALORIAS CONSUMIDAS
             </Text>
           </View>
@@ -1688,11 +2279,22 @@ export default function App() {
 
         <View style={styles.foodFooterRow}>
           <Pressable
-            style={[styles.foodRegisteredPill, { backgroundColor: foodSurfaceSecondary }]}
+            style={[
+              styles.foodRegisteredPill,
+              { backgroundColor: foodSurfaceSecondary },
+            ]}
             onPress={() => setStatsMealsExpanded((current) => !current)}
           >
-            <Ionicons name="restaurant-outline" size={16} color={foodTextStrong} />
-            <Text style={[styles.foodRegisteredText, { color: foodTextStrong }]}>Registrado: {registeredMeals}</Text>
+            <Ionicons
+              name="restaurant-outline"
+              size={16}
+              color={foodTextStrong}
+            />
+            <Text
+              style={[styles.foodRegisteredText, { color: foodTextStrong }]}
+            >
+              Registrado: {registeredMeals}
+            </Text>
             <Ionicons
               name={statsMealsExpanded ? "chevron-up" : "chevron-down"}
               size={16}
@@ -1725,41 +2327,109 @@ export default function App() {
           {statsMealLogsLoading ? (
             <View style={styles.foodRegisteredLoading}>
               <ActivityIndicator color={theme.accent} />
-              <Text style={[styles.foodRegisteredEmptyText, { color: foodTextMuted }]}>
+              <Text
+                style={[
+                  styles.foodRegisteredEmptyText,
+                  { color: foodTextMuted },
+                ]}
+              >
                 Cargando comidas...
               </Text>
             </View>
           ) : registeredMealsPreview.length > 0 ? (
-            registeredMealsPreview.map((meal) => (
-              <View key={meal.id} style={[styles.foodRegisteredItem, { borderBottomColor: foodRingTrack }]}>
-                <View style={[styles.foodRegisteredThumb, { backgroundColor: foodSurfaceStrong }]}>
-                  {meal.imageUrl ? (
-                    <Image source={{ uri: meal.imageUrl }} style={styles.foodRegisteredThumbImage} />
-                  ) : (
-                    <Ionicons name="image-outline" size={18} color={foodTextSoft} />
-                  )}
-                </View>
+            registeredMealsPreview.map((meal) => {
+              const fullMeal = selectedDateMeals.find((m) => m.id === meal.id);
+              return (
+                <Pressable
+                  key={meal.id}
+                  style={[
+                    styles.foodRegisteredItem,
+                    { borderBottomColor: foodRingTrack },
+                  ]}
+                  onPress={() => {
+                    if (fullMeal) {
+                      setInitialMealForDetail(fullMeal as MealLog);
+                      setNutritionView("history");
+                      setActiveTab("nutrition");
+                    }
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.foodRegisteredThumb,
+                      { backgroundColor: foodSurfaceStrong },
+                    ]}
+                  >
+                    {meal.imageUrl ? (
+                      <Image
+                        source={{ uri: meal.imageUrl }}
+                        style={styles.foodRegisteredThumbImage}
+                      />
+                    ) : (
+                      <Ionicons
+                        name="image-outline"
+                        size={18}
+                        color={foodTextSoft}
+                      />
+                    )}
+                  </View>
 
-                <View style={styles.foodRegisteredInfo}>
-                  <Text style={[styles.foodRegisteredItemTitle, { color: foodTextStrong }]} numberOfLines={1}>
-                    {meal.title}
-                  </Text>
-                  <Text style={[styles.foodRegisteredItemText, { color: foodTextMuted }]} numberOfLines={2}>
-                    {meal.description}
-                  </Text>
-                </View>
+                  <View style={styles.foodRegisteredInfo}>
+                    <Text
+                      style={[
+                        styles.foodRegisteredItemTitle,
+                        { color: foodTextStrong },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {meal.title}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.foodRegisteredItemText,
+                        { color: foodTextMuted },
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {meal.description}
+                    </Text>
+                  </View>
 
-                <View style={styles.foodRegisteredCaloriesBlock}>
-                  <Text style={[styles.foodRegisteredCalories, { color: theme.accent }]}>
-                    {meal.calories}
-                  </Text>
-                  <Text style={[styles.foodRegisteredCaloriesUnit, { color: foodTextSoft }]}>kcal</Text>
-                </View>
-              </View>
-            ))
+                  <View style={styles.foodRegisteredCaloriesBlock}>
+                    <Text
+                      style={[
+                        styles.foodRegisteredCalories,
+                        { color: theme.accent },
+                      ]}
+                    >
+                      {meal.calories}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.foodRegisteredCaloriesUnit,
+                        { color: foodTextSoft },
+                      ]}
+                    >
+                      kcal
+                    </Text>
+                  </View>
+
+                  <Ionicons
+                    name="chevron-forward"
+                    size={14}
+                    color={foodTextMuted}
+                  />
+                </Pressable>
+              );
+            })
           ) : (
             <View style={styles.foodRegisteredLoading}>
-              <Text style={[styles.foodRegisteredEmptyText, { color: foodTextMuted }]}>
+              <Text
+                style={[
+                  styles.foodRegisteredEmptyText,
+                  { color: foodTextMuted },
+                ]}
+              >
                 Todavia no hay comidas registradas.
               </Text>
             </View>
@@ -1800,10 +2470,17 @@ export default function App() {
         end={{ x: 1, y: 1 }}
         style={styles.comingSoonCard}
       >
-        <View style={[styles.comingSoonIconWrap, { borderColor: `${config.accent}33` }]}>
+        <View
+          style={[
+            styles.comingSoonIconWrap,
+            { borderColor: `${config.accent}33` },
+          ]}
+        >
           <Ionicons name={config.icon} size={28} color={config.accent} />
         </View>
-        <Text style={[styles.comingSoonEyebrow, { color: config.accent }]}>{config.eyebrow}</Text>
+        <Text style={[styles.comingSoonEyebrow, { color: config.accent }]}>
+          {config.eyebrow}
+        </Text>
         <Text style={styles.comingSoonTitle}>Coming Soon</Text>
         <Text style={styles.comingSoonText}>{config.copy}</Text>
       </LinearGradient>
@@ -1813,7 +2490,9 @@ export default function App() {
   function renderStatsScreen() {
     return (
       <View style={styles.screen}>
-        <View style={[styles.statsTabBar, { backgroundColor: theme.cardMuted }]}>
+        <View
+          style={[styles.statsTabBar, { backgroundColor: theme.cardMuted }]}
+        >
           <Animated.View
             pointerEvents="none"
             style={[
@@ -1848,13 +2527,23 @@ export default function App() {
                 <Ionicons
                   name={tab.icon}
                   size={18}
-                  color={active ? (visualMode === "light" ? "#FFFFFF" : "#17130F") : theme.muted}
+                  color={
+                    active
+                      ? visualMode === "light"
+                        ? "#FFFFFF"
+                        : "#17130F"
+                      : theme.muted
+                  }
                 />
                 <Text
                   style={[
                     styles.statsTabLabel,
                     {
-                      color: active ? (visualMode === "light" ? "#FFFFFF" : "#17130F") : theme.muted,
+                      color: active
+                        ? visualMode === "light"
+                          ? "#FFFFFF"
+                          : "#17130F"
+                        : theme.muted,
                     },
                   ]}
                   numberOfLines={1}
@@ -1880,7 +2569,9 @@ export default function App() {
           snapToAlignment="start"
           snapToInterval={statsPageWidth}
           onMomentumScrollEnd={(event) => {
-            const index = Math.round(event.nativeEvent.contentOffset.x / statsPageWidth);
+            const index = Math.round(
+              event.nativeEvent.contentOffset.x / statsPageWidth,
+            );
             const nextView = statsTabs[index]?.key ?? "food";
             setStatsView(nextView);
           }}
@@ -1890,9 +2581,14 @@ export default function App() {
           )}
         >
           {statsTabs.map((tab, index) => (
-            <View key={tab.key} style={[styles.statsPage, { width: statsPageWidth }]}>
+            <View
+              key={tab.key}
+              style={[styles.statsPage, { width: statsPageWidth }]}
+            >
               <Animated.View style={getStatsPageMotion(index)}>
-                {tab.key === "food" ? renderFoodStatsPage() : renderComingSoonPage(tab.key)}
+                {tab.key === "food"
+                  ? renderFoodStatsPage()
+                  : renderComingSoonPage(tab.key)}
               </Animated.View>
             </View>
           ))}
@@ -1905,17 +2601,20 @@ export default function App() {
     return (
       <View style={styles.cameraOnlyRoot}>
         <StatusBar hidden />
-        <Pressable
-          style={styles.cameraBackButton}
-          onPress={closeCameraScreen}
-        >
+        <Pressable style={styles.cameraBackButton} onPress={closeCameraScreen}>
           <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
         </Pressable>
 
         {cameraPermission?.granted ? (
           imageAsset && scannerMode === "food" ? (
-            <Pressable style={styles.cameraOnlyPreview} onPress={() => setImageAsset(null)}>
-              <Image source={{ uri: imageAsset.uri }} style={styles.cameraOnlyPreview} />
+            <Pressable
+              style={styles.cameraOnlyPreview}
+              onPress={() => setImageAsset(null)}
+            >
+              <Image
+                source={{ uri: imageAsset.uri }}
+                style={styles.cameraOnlyPreview}
+              />
             </Pressable>
           ) : (
             <View style={styles.cameraOnlyPreview}>
@@ -1924,9 +2623,19 @@ export default function App() {
                 style={styles.cameraOnlyPreview}
                 facing="back"
                 barcodeScannerSettings={{
-                  barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "code128", "code39", "qr"],
+                  barcodeTypes: [
+                    "ean13",
+                    "ean8",
+                    "upc_a",
+                    "upc_e",
+                    "code128",
+                    "code39",
+                    "qr",
+                  ],
                 }}
-                onBarcodeScanned={scannerMode === "barcode" ? handleBarcodeScanned : undefined}
+                onBarcodeScanned={
+                  scannerMode === "barcode" ? handleBarcodeScanned : undefined
+                }
                 onCameraReady={() => setCameraReady(true)}
               />
             </View>
@@ -1937,15 +2646,33 @@ export default function App() {
 
         <View pointerEvents="none" style={styles.cameraOverlay}>
           <View style={[styles.cameraOverlayBlock, styles.cameraOverlayTop]} />
-          <View style={[styles.cameraOverlayBlock, styles.cameraOverlayBottom]} />
+          <View
+            style={[styles.cameraOverlayBlock, styles.cameraOverlayBottom]}
+          />
           <View style={[styles.cameraOverlayBlock, styles.cameraOverlayLeft]} />
-          <View style={[styles.cameraOverlayBlock, styles.cameraOverlayRight]} />
+          <View
+            style={[styles.cameraOverlayBlock, styles.cameraOverlayRight]}
+          />
 
           <View style={styles.cameraScanFrame}>
-            <View style={[styles.cameraScanCorner, styles.cameraScanCornerTopLeft]} />
-            <View style={[styles.cameraScanCorner, styles.cameraScanCornerTopRight]} />
-            <View style={[styles.cameraScanCorner, styles.cameraScanCornerBottomLeft]} />
-            <View style={[styles.cameraScanCorner, styles.cameraScanCornerBottomRight]} />
+            <View
+              style={[styles.cameraScanCorner, styles.cameraScanCornerTopLeft]}
+            />
+            <View
+              style={[styles.cameraScanCorner, styles.cameraScanCornerTopRight]}
+            />
+            <View
+              style={[
+                styles.cameraScanCorner,
+                styles.cameraScanCornerBottomLeft,
+              ]}
+            />
+            <View
+              style={[
+                styles.cameraScanCorner,
+                styles.cameraScanCornerBottomRight,
+              ]}
+            />
           </View>
         </View>
 
@@ -2035,15 +2762,23 @@ export default function App() {
     ];
 
     return (
-      <SafeAreaView style={[styles.textModeRoot, { backgroundColor: theme.background }]}>
-        <StatusBar barStyle={visualMode === "light" ? "dark-content" : "light-content"} />
+      <SafeAreaView
+        style={[styles.textModeRoot, { backgroundColor: theme.background }]}
+      >
+        <StatusBar
+          barStyle={visualMode === "light" ? "dark-content" : "light-content"}
+        />
         <ScrollView
           contentContainerStyle={styles.textModeContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
           <LinearGradient
-            colors={visualMode === "light" ? ["#FFFFFF", "#F6EFE5", "#F2E7DA"] : ["#0C1412", "#131C19", "#0A100E"]}
+            colors={
+              visualMode === "light"
+                ? ["#FFFFFF", "#F6EFE5", "#F2E7DA"]
+                : ["#0C1412", "#131C19", "#0A100E"]
+            }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[styles.textModeHero, { borderColor: theme.stroke }]}
@@ -2053,7 +2788,10 @@ export default function App() {
               style={[
                 styles.textModeHeroGlow,
                 {
-                  backgroundColor: visualMode === "light" ? "rgba(0, 200, 151, 0.14)" : "rgba(118, 239, 229, 0.14)",
+                  backgroundColor:
+                    visualMode === "light"
+                      ? "rgba(0, 200, 151, 0.14)"
+                      : "rgba(118, 239, 229, 0.14)",
                   transform: [
                     {
                       translateY: ambientPulse.interpolate({
@@ -2068,33 +2806,76 @@ export default function App() {
 
             <View style={styles.textModeTopRow}>
               <Pressable
-                style={[styles.textModeBackButton, { backgroundColor: visualMode === "light" ? "rgba(23, 19, 15, 0.06)" : "rgba(255,255,255,0.10)" }]}
+                style={[
+                  styles.textModeBackButton,
+                  {
+                    backgroundColor:
+                      visualMode === "light"
+                        ? "rgba(23, 19, 15, 0.06)"
+                        : "rgba(255,255,255,0.10)",
+                  },
+                ]}
                 onPress={closeCameraScreen}
               >
                 <Ionicons name="arrow-back" size={20} color={theme.text} />
               </Pressable>
-              <View style={[styles.textModeBadge, { backgroundColor: visualMode === "light" ? "rgba(23, 19, 15, 0.05)" : "rgba(255,255,255,0.09)" }]}>
-                <Ionicons name="sparkles-outline" size={14} color={theme.accent} />
-                <Text style={[styles.textModeBadgeText, { color: theme.text }]}>Entrada premium</Text>
+              <View
+                style={[
+                  styles.textModeBadge,
+                  {
+                    backgroundColor:
+                      visualMode === "light"
+                        ? "rgba(23, 19, 15, 0.05)"
+                        : "rgba(255,255,255,0.09)",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="sparkles-outline"
+                  size={14}
+                  color={theme.accent}
+                />
+                <Text style={[styles.textModeBadgeText, { color: theme.text }]}>
+                  Entrada premium
+                </Text>
               </View>
             </View>
 
-            <Text style={[styles.textModeEyebrow, { color: theme.accent }]}>Nutricion IA</Text>
-            <Text style={[styles.textModeTitle, { color: theme.text }]}>Describe tu comida y te devolvemos macros estimados.</Text>
+            <Text style={[styles.textModeEyebrow, { color: theme.accent }]}>
+              Nutricion
+            </Text>
+            <Text style={[styles.textModeTitle, { color: theme.text }]}>
+              Describe tu comida y te devolvemos macros estimados.
+            </Text>
             <Text style={[styles.textModeSubtitle, { color: theme.muted }]}>
-              Ideal cuando no quieres tomar una foto o ya sabes exactamente lo que comiste.
+              Ideal cuando no quieres tomar una foto o ya sabes exactamente lo
+              que comiste.
             </Text>
           </LinearGradient>
 
-          <View style={[styles.textModeFormCard, { backgroundColor: theme.card, borderColor: theme.stroke }]}>
+          <View
+            style={[
+              styles.textModeFormCard,
+              { backgroundColor: theme.card, borderColor: theme.stroke },
+            ]}
+          >
             <View style={styles.textModeSectionHeader}>
-              <Text style={[styles.textModeSectionTitle, { color: theme.text }]}>Tipo de comida</Text>
-              <Text style={[styles.textModeSectionHint, { color: theme.muted }]}>Ayuda a mejorar el contexto</Text>
+              <Text
+                style={[styles.textModeSectionTitle, { color: theme.text }]}
+              >
+                Tipo de comida
+              </Text>
+              <Text
+                style={[styles.textModeSectionHint, { color: theme.muted }]}
+              >
+                Ayuda a mejorar el contexto
+              </Text>
             </View>
 
             <View style={styles.textModeChipRow}>
               {quickLabels.map((label) => {
-                const active = mealLabel.trim().toLowerCase() === label.toLowerCase();
+                const active =
+                  mealLabel.trim().toLowerCase() === label.toLowerCase();
 
                 return (
                   <Pressable
@@ -2102,33 +2883,59 @@ export default function App() {
                     style={[
                       styles.textModeChip,
                       {
-                        backgroundColor: active ? theme.accent : theme.cardMuted,
+                        backgroundColor: active
+                          ? theme.accent
+                          : theme.cardMuted,
                         borderColor: active ? theme.accent : theme.stroke,
                       },
                     ]}
                     onPress={() => setMealLabel(label)}
                   >
-                    <Text style={[styles.textModeChipText, { color: active ? theme.background : theme.text }]}>{label}</Text>
+                    <Text
+                      style={[
+                        styles.textModeChipText,
+                        { color: active ? theme.background : theme.text },
+                      ]}
+                    >
+                      {label}
+                    </Text>
                   </Pressable>
                 );
               })}
             </View>
 
             <View style={styles.textModeFieldBlock}>
-              <Text style={[styles.textModeFieldLabel, { color: theme.muted }]}>Titulo</Text>
+              <Text style={[styles.textModeFieldLabel, { color: theme.muted }]}>
+                Titulo
+              </Text>
               <TextInput
                 value={mealLabel}
                 onChangeText={setMealLabel}
                 placeholder="Ej. Almuerzo post-entreno"
                 placeholderTextColor={theme.muted}
-                style={[styles.textModeInput, { color: theme.text, borderColor: theme.stroke, backgroundColor: theme.cardMuted }]}
+                style={[
+                  styles.textModeInput,
+                  {
+                    color: theme.text,
+                    borderColor: theme.stroke,
+                    backgroundColor: theme.cardMuted,
+                  },
+                ]}
               />
             </View>
 
             <View style={styles.textModeFieldBlock}>
               <View style={styles.textModeSectionHeader}>
-                <Text style={[styles.textModeFieldLabel, { color: theme.muted }]}>Descripcion</Text>
-                <Text style={[styles.textModeSectionHint, { color: theme.muted }]}>Ingredientes, porcion y preparacion</Text>
+                <Text
+                  style={[styles.textModeFieldLabel, { color: theme.muted }]}
+                >
+                  Descripcion
+                </Text>
+                <Text
+                  style={[styles.textModeSectionHint, { color: theme.muted }]}
+                >
+                  Ingredientes, porcion y preparacion
+                </Text>
               </View>
               <TextInput
                 value={mealDescription}
@@ -2137,7 +2944,14 @@ export default function App() {
                 placeholderTextColor={theme.muted}
                 multiline
                 textAlignVertical="top"
-                style={[styles.textModeTextarea, { color: theme.text, borderColor: theme.stroke, backgroundColor: theme.cardMuted }]}
+                style={[
+                  styles.textModeTextarea,
+                  {
+                    color: theme.text,
+                    borderColor: theme.stroke,
+                    backgroundColor: theme.cardMuted,
+                  },
+                ]}
               />
             </View>
 
@@ -2145,11 +2959,27 @@ export default function App() {
               {suggestions.map((suggestion) => (
                 <Pressable
                   key={suggestion}
-                  style={[styles.textModeSuggestionChip, { backgroundColor: theme.cardMuted, borderColor: theme.stroke }]}
+                  style={[
+                    styles.textModeSuggestionChip,
+                    {
+                      backgroundColor: theme.cardMuted,
+                      borderColor: theme.stroke,
+                    },
+                  ]}
                   onPress={() => setMealDescription(suggestion)}
                 >
-                  <Ionicons name="flash-outline" size={14} color={theme.accent} />
-                  <Text style={[styles.textModeSuggestionText, { color: theme.text }]} numberOfLines={2}>
+                  <Ionicons
+                    name="flash-outline"
+                    size={14}
+                    color={theme.accent}
+                  />
+                  <Text
+                    style={[
+                      styles.textModeSuggestionText,
+                      { color: theme.text },
+                    ]}
+                    numberOfLines={2}
+                  >
                     {suggestion}
                   </Text>
                 </Pressable>
@@ -2160,7 +2990,8 @@ export default function App() {
               style={[
                 styles.textModePrimaryButton,
                 { backgroundColor: theme.accent },
-                (loading || mealDescription.trim().length < 5) && styles.buttonDisabled,
+                (loading || mealDescription.trim().length < 5) &&
+                  styles.buttonDisabled,
               ]}
               onPress={analyzeCurrentMeal}
               disabled={loading || mealDescription.trim().length < 5}
@@ -2169,18 +3000,32 @@ export default function App() {
                 <ActivityIndicator color={theme.background} />
               ) : (
                 <>
-                  <Ionicons name="sparkles" size={18} color={theme.background} />
-                  <Text style={[styles.textModePrimaryButtonText, { color: theme.background }]}>Analizar con IA</Text>
+                  <Ionicons
+                    name="sparkles"
+                    size={18}
+                    color={theme.background}
+                  />
+                  <Text
+                    style={[
+                      styles.textModePrimaryButtonText,
+                      { color: theme.background },
+                    ]}
+                  >
+                    Analizar con IA
+                  </Text>
                 </>
               )}
             </Pressable>
 
             <Text style={[styles.textModeHelper, { color: theme.muted }]}>
-              {statusMessage ?? "Describe con naturalidad. La IA estima ingredientes, porciones y macros."}
+              {statusMessage ??
+                "Describe con naturalidad. La IA estima ingredientes, porciones y macros."}
             </Text>
           </View>
 
-          {analysis ? <MacroResultCard analysis={analysis} mode={wellnessCardMode} /> : null}
+          {analysis ? (
+            <MacroResultCard analysis={analysis} mode={wellnessCardMode} />
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     );
@@ -2189,83 +3034,151 @@ export default function App() {
   function renderNutritionScreen() {
     return (
       <View style={styles.screen}>
-        <View style={[styles.scannerShell, { backgroundColor: theme.card, borderColor: theme.stroke }]}>
+        <View
+          style={[
+            styles.scannerShell,
+            { backgroundColor: theme.card, borderColor: theme.stroke },
+          ]}
+        >
           <View style={styles.scannerHeader}>
             <View>
-              <Text style={[styles.scannerEyebrow, { color: theme.accent }]}>Nutricion IA</Text>
+              <Text style={[styles.scannerEyebrow, { color: theme.accent }]}>
+                Nutricion IA
+              </Text>
               <Text style={[styles.scannerTitle, { color: theme.text }]}>
-                {scannerMode === "food" ? "Escanea tu comida" : "Escanea un barcode"}
+                {scannerMode === "food"
+                  ? "Escanea tu comida"
+                  : "Escanea un barcode"}
               </Text>
             </View>
-            <View style={[styles.scannerModePill, { backgroundColor: theme.cardMuted }]}>
+            <View
+              style={[
+                styles.scannerModePill,
+                { backgroundColor: theme.cardMuted },
+              ]}
+            >
               <Text style={[styles.scannerModeText, { color: theme.muted }]}>
                 {scannerMode === "food" ? "Foto" : "Codigo"}
               </Text>
             </View>
           </View>
 
-          <View style={[styles.cameraFrame, { backgroundColor: theme.cardMuted }]}>
+          <View
+            style={[styles.cameraFrame, { backgroundColor: theme.cardMuted }]}
+          >
             {cameraPermission?.granted ? (
               imageAsset && scannerMode === "food" ? (
-                <Image source={{ uri: imageAsset.uri }} style={styles.cameraPreview} />
+                <Image
+                  source={{ uri: imageAsset.uri }}
+                  style={styles.cameraPreview}
+                />
               ) : (
                 <CameraView
                   ref={cameraRef}
                   style={styles.cameraPreview}
                   facing="back"
                   barcodeScannerSettings={{
-                    barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e", "code128", "code39", "qr"],
+                    barcodeTypes: [
+                      "ean13",
+                      "ean8",
+                      "upc_a",
+                      "upc_e",
+                      "code128",
+                      "code39",
+                      "qr",
+                    ],
                   }}
-                  onBarcodeScanned={scannerMode === "barcode" ? handleBarcodeScanned : undefined}
+                  onBarcodeScanned={
+                    scannerMode === "barcode" ? handleBarcodeScanned : undefined
+                  }
                   onCameraReady={() => setCameraReady(true)}
                 />
               )
             ) : (
               <View style={styles.cameraPermissionBox}>
-                <Text style={[styles.previewTitle, { color: theme.text }]}>Camara no activada</Text>
+                <Text style={[styles.previewTitle, { color: theme.text }]}>
+                  Camara no activada
+                </Text>
                 <Text style={[styles.previewText, { color: theme.muted }]}>
                   Activa la camara para escanear comida o codigos de barra.
                 </Text>
-                <Pressable style={[styles.primaryButton, styles.cameraPermissionButton]} onPress={requestCameraPermission}>
+                <Pressable
+                  style={[styles.primaryButton, styles.cameraPermissionButton]}
+                  onPress={requestCameraPermission}
+                >
                   <Text style={styles.primaryButtonText}>Activar camara</Text>
                 </Pressable>
               </View>
             )}
 
             {cameraPermission?.granted ? (
-              <View pointerEvents="none" style={[styles.scanGuide, { borderColor: theme.accent }]}>
-                <View style={[styles.scanDot, { backgroundColor: theme.accent }]} />
+              <View
+                pointerEvents="none"
+                style={[styles.scanGuide, { borderColor: theme.accent }]}
+              >
+                <View
+                  style={[styles.scanDot, { backgroundColor: theme.accent }]}
+                />
               </View>
             ) : null}
           </View>
 
-          <View style={[styles.scannerBottomSheet, { backgroundColor: theme.cardMuted, borderColor: theme.stroke }]}>
+          <View
+            style={[
+              styles.scannerBottomSheet,
+              { backgroundColor: theme.cardMuted, borderColor: theme.stroke },
+            ]}
+          >
             <View style={styles.scannerTabs}>
               <Pressable
                 style={[
                   styles.scannerTab,
-                  { backgroundColor: scannerMode === "food" ? theme.accent : theme.card },
+                  {
+                    backgroundColor:
+                      scannerMode === "food" ? theme.accent : theme.card,
+                  },
                 ]}
                 onPress={() => {
                   setScannerMode("food");
                   setBarcodeResult(null);
                 }}
               >
-                <Text style={[styles.scannerTabText, { color: scannerMode === "food" ? theme.background : theme.text }]}>
+                <Text
+                  style={[
+                    styles.scannerTabText,
+                    {
+                      color:
+                        scannerMode === "food" ? theme.background : theme.text,
+                    },
+                  ]}
+                >
                   Escaner comida
                 </Text>
               </Pressable>
               <Pressable
                 style={[
                   styles.scannerTab,
-                  { backgroundColor: scannerMode === "barcode" ? theme.accent : theme.card },
+                  {
+                    backgroundColor:
+                      scannerMode === "barcode" ? theme.accent : theme.card,
+                  },
                 ]}
                 onPress={() => {
                   setScannerMode("barcode");
                   setBarcodeResult(null);
                 }}
               >
-                <Text style={[styles.scannerTabText, { color: scannerMode === "barcode" ? theme.background : theme.text }]}>
+                <Text
+                  style={[
+                    styles.scannerTabText,
+                    {
+                      color:
+                        scannerMode === "barcode"
+                          ? theme.background
+                          : theme.text,
+                    },
+                  ]}
+                >
                   Escanear barcode
                 </Text>
               </Pressable>
@@ -2274,60 +3187,125 @@ export default function App() {
             {scannerMode === "food" ? (
               <>
                 <View style={styles.scannerActions}>
-                  <Pressable style={[styles.secondaryButton, styles.scannerActionButton, { backgroundColor: theme.card }]} onPress={pickImage}>
-                    <Text style={[styles.secondaryButtonText, { color: theme.text }]}>Galeria</Text>
-                  </Pressable>
-                  <Pressable style={[styles.captureButton, { backgroundColor: theme.accent }]} onPress={captureFoodPhoto}>
-                    <View style={[styles.captureButtonInner, { borderColor: theme.background }]} />
+                  <Pressable
+                    style={[
+                      styles.secondaryButton,
+                      styles.scannerActionButton,
+                      { backgroundColor: theme.card },
+                    ]}
+                    onPress={pickImage}
+                  >
+                    <Text
+                      style={[
+                        styles.secondaryButtonText,
+                        { color: theme.text },
+                      ]}
+                    >
+                      Galeria
+                    </Text>
                   </Pressable>
                   <Pressable
-                    style={[styles.secondaryButton, styles.scannerActionButton, { backgroundColor: theme.card }]}
+                    style={[
+                      styles.captureButton,
+                      { backgroundColor: theme.accent },
+                    ]}
+                    onPress={captureFoodPhoto}
+                  >
+                    <View
+                      style={[
+                        styles.captureButtonInner,
+                        { borderColor: theme.background },
+                      ]}
+                    />
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.secondaryButton,
+                      styles.scannerActionButton,
+                      { backgroundColor: theme.card },
+                    ]}
                     onPress={() => {
                       setImageAsset(null);
                       setAnalysis(null);
                       setStatusMessage("Camara lista para una nueva foto.");
                     }}
                   >
-                    <Text style={[styles.secondaryButtonText, { color: theme.text }]}>Repetir</Text>
+                    <Text
+                      style={[
+                        styles.secondaryButtonText,
+                        { color: theme.text },
+                      ]}
+                    >
+                      Repetir
+                    </Text>
                   </Pressable>
                 </View>
 
                 <Pressable
-                  style={[styles.primaryButton, (!imageAsset || loading) && styles.buttonDisabled]}
+                  style={[
+                    styles.primaryButton,
+                    (!imageAsset || loading) && styles.buttonDisabled,
+                  ]}
                   onPress={analyzeCurrentMeal}
                   disabled={!imageAsset || loading}
                 >
                   {loading ? (
                     <ActivityIndicator color={theme.background} />
                   ) : (
-                    <Text style={styles.primaryButtonText}>Analizar comida</Text>
+                    <Text style={styles.primaryButtonText}>
+                      Analizar comida
+                    </Text>
                   )}
                 </Pressable>
               </>
             ) : (
-              <View style={[styles.barcodeResultCard, { backgroundColor: theme.card, borderColor: theme.stroke }]}>
-                <Text style={[styles.barcodeLabel, { color: theme.muted }]}>Resultado del barcode</Text>
-                <Text style={[styles.barcodeValue, { color: theme.text }]} numberOfLines={2}>
-                  {barcodeResult?.data ?? "Apunta la camara hacia el codigo de barras."}
+              <View
+                style={[
+                  styles.barcodeResultCard,
+                  { backgroundColor: theme.card, borderColor: theme.stroke },
+                ]}
+              >
+                <Text style={[styles.barcodeLabel, { color: theme.muted }]}>
+                  Resultado del barcode
+                </Text>
+                <Text
+                  style={[styles.barcodeValue, { color: theme.text }]}
+                  numberOfLines={2}
+                >
+                  {barcodeResult?.data ??
+                    "Apunta la camara hacia el codigo de barras."}
                 </Text>
                 {barcodeResult ? (
                   <Pressable
-                    style={[styles.secondaryButton, { backgroundColor: theme.cardMuted }]}
+                    style={[
+                      styles.secondaryButton,
+                      { backgroundColor: theme.cardMuted },
+                    ]}
                     onPress={() => setBarcodeResult(null)}
                   >
-                    <Text style={[styles.secondaryButtonText, { color: theme.text }]}>Escanear otro</Text>
+                    <Text
+                      style={[
+                        styles.secondaryButtonText,
+                        { color: theme.text },
+                      ]}
+                    >
+                      Escanear otro
+                    </Text>
                   </Pressable>
                 ) : null}
               </View>
             )}
 
             <Text style={[styles.helperText, { color: theme.muted }]}>
-              {statusMessage ?? "Escanea, captura y analiza tu comida desde la camara."}
+              {statusMessage ??
+                "Escanea, captura y analiza tu comida desde la camara."}
             </Text>
           </View>
         </View>
 
-        {analysis ? <MacroResultCard analysis={analysis} mode={wellnessCardMode} /> : null}
+        {analysis ? (
+          <MacroResultCard analysis={analysis} mode={wellnessCardMode} />
+        ) : null}
       </View>
     );
   }
@@ -2393,43 +3371,142 @@ export default function App() {
             />
 
             <View style={styles.profileHeroTopRow}>
-              <View style={[styles.profileHeroPill, { backgroundColor: profileHeroPillGlassColor }]}>
-                <Text style={[styles.profileHeroPillText, { color: profileHeroPillTextColor }]}>Perfil premium</Text>
+              <View
+                style={[
+                  styles.profileHeroPill,
+                  { backgroundColor: profileHeroPillGlassColor },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.profileHeroPillText,
+                    { color: profileHeroPillTextColor },
+                  ]}
+                >
+                  Perfil premium
+                </Text>
               </View>
-              <View style={[styles.profileHeroPill, { backgroundColor: profileHeroPillDarkColor }]}>
-                <Text style={[styles.profileHeroPillText, { color: profileHeroPillTextColor }]}>{profileStatusText}</Text>
+              <View
+                style={[
+                  styles.profileHeroPill,
+                  { backgroundColor: profileHeroPillDarkColor },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.profileHeroPillText,
+                    { color: profileHeroPillTextColor },
+                  ]}
+                >
+                  {profileStatusText}
+                </Text>
               </View>
             </View>
 
             <View style={styles.profileHeroIdentityRow}>
-              <View style={[styles.profileAvatarHero, { backgroundColor: profileHeroAvatarColor }]}>
-                <Text style={[styles.profileAvatarHeroText, { color: profileHeroAvatarTextColor }]}>{profileInitial}</Text>
+              <View
+                style={[
+                  styles.profileAvatarHero,
+                  { backgroundColor: profileHeroAvatarColor },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.profileAvatarHeroText,
+                    { color: profileHeroAvatarTextColor },
+                  ]}
+                >
+                  {profileInitial}
+                </Text>
               </View>
 
               <View style={styles.profileHeroIdentityText}>
-                <Text style={[styles.profileHeroTitle, { color: profileHeroTitleColor }]}>
+                <Text
+                  style={[
+                    styles.profileHeroTitle,
+                    { color: profileHeroTitleColor },
+                  ]}
+                >
                   {fullName.trim() || "Tu espacio Bioma"}
                 </Text>
-                <Text style={[styles.profileHeroSubtitle, { color: profileHeroSubtitleColor }]}>
-                  {email.trim() || "Conecta tu cuenta para desbloquear historial, sincronizacion y continuidad."}
+                <Text
+                  style={[
+                    styles.profileHeroSubtitle,
+                    { color: profileHeroSubtitleColor },
+                  ]}
+                >
+                  {email.trim() ||
+                    "Conecta tu cuenta para desbloquear historial, sincronizacion y continuidad."}
                 </Text>
               </View>
             </View>
 
             <View style={styles.profileHeroStatsRow}>
               <View style={styles.profileHeroStat}>
-                <Text style={[styles.profileHeroStatValue, { color: profileHeroStatValueColor }]}>{profileCompletionValue}%</Text>
-                <Text style={[styles.profileHeroStatLabel, { color: profileHeroStatLabelColor }]}>perfil listo</Text>
+                <Text
+                  style={[
+                    styles.profileHeroStatValue,
+                    { color: profileHeroStatValueColor },
+                  ]}
+                >
+                  {profileCompletionValue}%
+                </Text>
+                <Text
+                  style={[
+                    styles.profileHeroStatLabel,
+                    { color: profileHeroStatLabelColor },
+                  ]}
+                >
+                  perfil listo
+                </Text>
               </View>
-              <View style={[styles.profileHeroDivider, { backgroundColor: profileHeroDividerColor }]} />
+              <View
+                style={[
+                  styles.profileHeroDivider,
+                  { backgroundColor: profileHeroDividerColor },
+                ]}
+              />
               <View style={styles.profileHeroStat}>
-                <Text style={[styles.profileHeroStatValue, { color: profileHeroStatValueColor }]}>{userId ? "Activa" : "Pendiente"}</Text>
-                <Text style={[styles.profileHeroStatLabel, { color: profileHeroStatLabelColor }]}>sincronizacion</Text>
+                <Text
+                  style={[
+                    styles.profileHeroStatValue,
+                    { color: profileHeroStatValueColor },
+                  ]}
+                >
+                  {userId ? "Activa" : "Pendiente"}
+                </Text>
+                <Text
+                  style={[
+                    styles.profileHeroStatLabel,
+                    { color: profileHeroStatLabelColor },
+                  ]}
+                >
+                  sincronizacion
+                </Text>
               </View>
-              <View style={[styles.profileHeroDivider, { backgroundColor: profileHeroDividerColor }]} />
+              <View
+                style={[
+                  styles.profileHeroDivider,
+                  { backgroundColor: profileHeroDividerColor },
+                ]}
+              />
               <View style={styles.profileHeroStat}>
-                <Text style={[styles.profileHeroStatValue, { color: profileHeroStatValueColor }]}>{visualMode === "light" ? "Claro" : "Oscuro"}</Text>
-                <Text style={[styles.profileHeroStatLabel, { color: profileHeroStatLabelColor }]}>modo visual</Text>
+                <Text
+                  style={[
+                    styles.profileHeroStatValue,
+                    { color: profileHeroStatValueColor },
+                  ]}
+                >
+                  {visualMode === "light" ? "Claro" : "Oscuro"}
+                </Text>
+                <Text
+                  style={[
+                    styles.profileHeroStatLabel,
+                    { color: profileHeroStatLabelColor },
+                  ]}
+                >
+                  modo visual
+                </Text>
               </View>
             </View>
           </LinearGradient>
@@ -2454,34 +3531,78 @@ export default function App() {
           }}
         >
           <LinearGradient
-            colors={visualMode === "light" ? ["#FFFFFF", "#F6F0E7"] : ["#111917", "#0D1412"]}
+            colors={
+              visualMode === "light"
+                ? ["#FFFFFF", "#F6F0E7"]
+                : ["#111917", "#0D1412"]
+            }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={[styles.profileAccountCard, { borderColor: profilePanelStroke }]}
+            style={[
+              styles.profileAccountCard,
+              { borderColor: profilePanelStroke },
+            ]}
           >
             <View style={styles.profileSectionHeader}>
-              <Text style={[styles.profileSectionEyebrow, { color: theme.accent }]}>CUENTA</Text>
-              <Text style={[styles.profileSectionTitle, { color: profileTextStrong }]}>
+              <Text
+                style={[styles.profileSectionEyebrow, { color: theme.accent }]}
+              >
+                CUENTA
+              </Text>
+              <Text
+                style={[
+                  styles.profileSectionTitle,
+                  { color: profileTextStrong },
+                ]}
+              >
                 Identidad, tema y conexion en una sola vista.
               </Text>
-              <Text style={[styles.profileSectionText, { color: profileTextMuted }]}>
-                Todo esta ordenado para que la app se sienta personal, consistente y lista para crecer contigo.
+              <Text
+                style={[styles.profileSectionText, { color: profileTextMuted }]}
+              >
+                Todo esta ordenado para que la app se sienta personal,
+                consistente y lista para crecer contigo.
               </Text>
             </View>
 
-            <View style={[styles.profileThemeCard, { backgroundColor: profilePanelAlt, borderColor: profilePanelStroke }]}>
+            <View
+              style={[
+                styles.profileThemeCard,
+                {
+                  backgroundColor: profilePanelAlt,
+                  borderColor: profilePanelStroke,
+                },
+              ]}
+            >
               <View style={styles.themeToggleTextBlock}>
-                <Text style={[styles.themeToggleTitle, { color: profileTextStrong }]}>Modo claro</Text>
-                <Text style={[styles.themeToggleText, { color: profileTextMuted }]}>
-                  Cambia toda la interfaz entre el estilo fitness oscuro y una version clara.
+                <Text
+                  style={[
+                    styles.themeToggleTitle,
+                    { color: profileTextStrong },
+                  ]}
+                >
+                  Modo claro
+                </Text>
+                <Text
+                  style={[styles.themeToggleText, { color: profileTextMuted }]}
+                >
+                  Cambia toda la interfaz entre el estilo fitness oscuro y una
+                  version clara.
                 </Text>
               </View>
               <Pressable
                 style={[
                   styles.themeSwitch,
-                  { backgroundColor: visualMode === "light" ? theme.accent : theme.stroke },
+                  {
+                    backgroundColor:
+                      visualMode === "light" ? theme.accent : theme.stroke,
+                  },
                 ]}
-                onPress={() => setVisualMode((current) => (current === "light" ? "dark" : "light"))}
+                onPress={() =>
+                  setVisualMode((current) =>
+                    current === "light" ? "dark" : "light",
+                  )
+                }
               >
                 <View
                   style={[
@@ -2493,18 +3614,45 @@ export default function App() {
             </View>
 
             <View style={styles.profileFieldsStack}>
-              <View style={[styles.profileFieldShell, { backgroundColor: profilePanelAlt, borderColor: profilePanelStroke }]}>
-                <Text style={[styles.profileFieldLabel, { color: profileTextSoft }]}>Nombre</Text>
+              <View
+                style={[
+                  styles.profileFieldShell,
+                  {
+                    backgroundColor: profilePanelAlt,
+                    borderColor: profilePanelStroke,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.profileFieldLabel, { color: profileTextSoft }]}
+                >
+                  Nombre
+                </Text>
                 <TextInput
                   value={fullName}
                   onChangeText={setFullName}
                   placeholder="Nombre completo"
                   placeholderTextColor={profileTextSoft}
-                  style={[styles.profileFieldInput, { color: profileTextStrong }]}
+                  style={[
+                    styles.profileFieldInput,
+                    { color: profileTextStrong },
+                  ]}
                 />
               </View>
-              <View style={[styles.profileFieldShell, { backgroundColor: profilePanelAlt, borderColor: profilePanelStroke }]}>
-                <Text style={[styles.profileFieldLabel, { color: profileTextSoft }]}>Correo</Text>
+              <View
+                style={[
+                  styles.profileFieldShell,
+                  {
+                    backgroundColor: profilePanelAlt,
+                    borderColor: profilePanelStroke,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.profileFieldLabel, { color: profileTextSoft }]}
+                >
+                  Correo
+                </Text>
                 <TextInput
                   value={email}
                   onChangeText={setEmail}
@@ -2512,7 +3660,10 @@ export default function App() {
                   placeholderTextColor={profileTextSoft}
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  style={[styles.profileFieldInput, { color: profileTextStrong }]}
+                  style={[
+                    styles.profileFieldInput,
+                    { color: profileTextStrong },
+                  ]}
                 />
               </View>
             </View>
@@ -2528,17 +3679,36 @@ export default function App() {
                 disabled={bootstrapLoading}
               >
                 {bootstrapLoading ? (
-                  <ActivityIndicator color={visualMode === "light" ? "#FFFFFF" : "#07110E"} />
+                  <ActivityIndicator
+                    color={visualMode === "light" ? "#FFFFFF" : "#07110E"}
+                  />
                 ) : (
-                  <Text style={[styles.profilePrimaryButtonText, { color: visualMode === "light" ? "#FFFFFF" : "#07110E" }]}>
+                  <Text
+                    style={[
+                      styles.profilePrimaryButtonText,
+                      { color: visualMode === "light" ? "#FFFFFF" : "#07110E" },
+                    ]}
+                  >
                     {userId ? "Actualizar perfil" : "Conectar perfil"}
                   </Text>
                 )}
               </Pressable>
 
-              <View style={[styles.profileStatusStrip, { backgroundColor: profilePanelAlt }]}>
-                <Text style={[styles.profileStatusStripText, { color: profileTextMuted }]}>
-                  {userId ? `Perfil listo. ID de usuario: ${userId}` : "Aun no hay perfil enlazado."}
+              <View
+                style={[
+                  styles.profileStatusStrip,
+                  { backgroundColor: profilePanelAlt },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.profileStatusStripText,
+                    { color: profileTextMuted },
+                  ]}
+                >
+                  {userId
+                    ? `Perfil listo. ID de usuario: ${userId}`
+                    : "Aun no hay perfil enlazado."}
                 </Text>
               </View>
             </View>
@@ -2563,8 +3733,20 @@ export default function App() {
             ],
           }}
         >
-          <View style={[styles.profileDeviceWrap, { backgroundColor: profilePanelColor, borderColor: profilePanelStroke }]}>
-            <HealthProviderStatusCard provider={mockHealthProvider} mode={wellnessCardMode} theme={theme} />
+          <View
+            style={[
+              styles.profileDeviceWrap,
+              {
+                backgroundColor: profilePanelColor,
+                borderColor: profilePanelStroke,
+              },
+            ]}
+          >
+            <HealthProviderStatusCard
+              provider={mockHealthProvider}
+              mode={wellnessCardMode}
+              theme={theme}
+            />
           </View>
         </Animated.View>
       </View>

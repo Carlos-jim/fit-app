@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Image,
   Pressable,
   ScrollView,
@@ -11,7 +13,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 
 import { biomaApi } from "../services/bioma-api";
-import type { MealLog } from "../types/api";
+import type { MealLog, MealSuggestionResponse } from "../types/api";
 import type { FitnessTheme } from "./fitness-ui";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -34,6 +36,8 @@ interface Props {
   theme: FitnessTheme;
   mode: "day" | "night";
   onOpenCamera: () => void;
+  initialMeal?: MealLog | null;
+  onClearInitialMeal?: () => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -72,13 +76,40 @@ function formatTime(iso: string): string {
   });
 }
 
+function getHealthScoreColor(score: number): string {
+  if (score >= 7) return "#34D399";
+  if (score >= 4) return "#FBBF24";
+  return "#F87171";
+}
+
+function getHealthScoreLabel(score: number): string {
+  if (score >= 8) return "Excelente";
+  if (score >= 7) return "Saludable";
+  if (score >= 5) return "Moderado";
+  if (score >= 3) return "Mejorable";
+  return "Poco saludable";
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function MealHistoryScreen({ userId, theme, mode, onOpenCamera }: Props) {
-  const [nav, setNav] = useState<NavState>({ view: "days" });
+export function MealHistoryScreen({ userId, theme, mode, onOpenCamera, initialMeal, onClearInitialMeal }: Props) {
+  const [nav, setNav] = useState<NavState>(() => {
+    if (initialMeal) {
+      const dateKey = getLocalDateKey(initialMeal.createdAt);
+      return { view: "mealDetail", meal: initialMeal, dayLabel: formatDateLabel(dateKey) };
+    }
+    return { view: "days" };
+  });
   const [logs, setLogs] = useState<MealLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialMeal) {
+      const dateKey = getLocalDateKey(initialMeal.createdAt);
+      setNav({ view: "mealDetail", meal: initialMeal, dayLabel: formatDateLabel(dateKey) });
+    }
+  }, [initialMeal]);
 
   useEffect(() => {
     if (userId) {
@@ -155,14 +186,22 @@ export function MealHistoryScreen({ userId, theme, mode, onOpenCamera }: Props) 
       dayLabel={nav.dayLabel}
       theme={theme}
       mode={mode}
-      onBack={() =>
-        setNav({
-          view: "dayMeals",
-          date: getLocalDateKey(nav.meal.createdAt),
-          label: nav.dayLabel,
-          meals: logs.filter((l) => getLocalDateKey(l.createdAt) === getLocalDateKey(nav.meal.createdAt)),
-        })
-      }
+      onBack={() => {
+        onClearInitialMeal?.();
+        const dateKey = getLocalDateKey(nav.meal.createdAt);
+        const dayMeals = logs.filter((l) => getLocalDateKey(l.createdAt) === dateKey);
+
+        if (dayMeals.length > 0) {
+          setNav({
+            view: "dayMeals",
+            date: dateKey,
+            label: nav.dayLabel,
+            meals: dayMeals,
+          });
+        } else {
+          setNav({ view: "days" });
+        }
+      }}
     />
   );
 }
@@ -334,6 +373,77 @@ function MealDetailView(props: {
   const { meal, theme } = props;
   const palette = props.mode === "night" ? nightPalette : dayPalette;
 
+  const [suggestion, setSuggestion] = useState<MealSuggestionResponse | null>(null);
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [suggestionExpanded, setSuggestionExpanded] = useState(false);
+
+  const pulseAnim = useState(() => new Animated.Value(0))[0];
+  const expandAnim = useState(() => new Animated.Value(0))[0];
+
+  useEffect(() => {
+    void loadSuggestion();
+  }, [meal.id]);
+
+  useEffect(() => {
+    if (suggestionLoading) {
+      const animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1200,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0,
+            duration: 1200,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
+      );
+      animation.start();
+      return () => animation.stop();
+    }
+  }, [suggestionLoading, pulseAnim]);
+
+  useEffect(() => {
+    Animated.spring(expandAnim, {
+      toValue: suggestionExpanded ? 1 : 0,
+      friction: 8,
+      tension: 96,
+      useNativeDriver: true,
+    }).start();
+  }, [suggestionExpanded, expandAnim]);
+
+  async function loadSuggestion() {
+    setSuggestionLoading(true);
+    setSuggestionError(null);
+
+    try {
+      const result = await biomaApi.suggestMeal({
+        mealTitle: meal.title ?? "Comida analizada",
+        calories: meal.calories,
+        proteinGrams: meal.proteinGrams,
+        carbsGrams: meal.carbsGrams,
+        fatGrams: meal.fatGrams,
+        fiberGrams: meal.fiberGrams,
+        sugarGrams: meal.sugarGrams,
+        sodiumMg: meal.sodiumMg,
+        ingredients: meal.ingredients,
+      });
+
+      setSuggestion(result);
+    } catch (e) {
+      setSuggestionError(
+        e instanceof Error ? e.message : "No se pudo obtener una sugerencia.",
+      );
+    } finally {
+      setSuggestionLoading(false);
+    }
+  }
+
   return (
     <View style={styles.screen}>
       <Pressable style={styles.backRow} onPress={props.onBack}>
@@ -424,6 +534,234 @@ function MealDetailView(props: {
           ))}
         </View>
       )}
+
+      {/* ─── AI Suggestion Section ───────────────────────────────────────── */}
+      <View style={[styles.suggestionSection, { backgroundColor: theme.card, borderColor: theme.stroke }]}>
+        <View style={styles.suggestionHeader}>
+          <View style={[styles.suggestionIconWrap, { backgroundColor: `${theme.accent}18` }]}>
+            <Ionicons name="sparkles" size={18} color={theme.accent} />
+          </View>
+          <View style={styles.suggestionHeaderText}>
+            <Text style={[styles.suggestionEyebrow, { color: theme.accent }]}>ANALISIS IA</Text>
+            <Text style={[styles.suggestionHeaderTitle, { color: theme.text }]}>
+              Evaluacion nutricional
+            </Text>
+          </View>
+        </View>
+
+        {suggestionLoading ? (
+          <View style={styles.suggestionLoadingWrap}>
+            <Animated.View
+              style={[
+                styles.suggestionLoadingGlow,
+                {
+                  backgroundColor: theme.accent,
+                  opacity: pulseAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.15, 0.35],
+                  }),
+                  transform: [
+                    {
+                      scale: pulseAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.95, 1.05],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
+            <ActivityIndicator color={theme.accent} size="small" />
+            <Text style={[styles.suggestionLoadingText, { color: theme.muted }]}>
+              Analizando con IA...
+            </Text>
+          </View>
+        ) : suggestionError ? (
+          <View style={styles.suggestionErrorWrap}>
+            <Ionicons name="warning-outline" size={20} color="#F87171" />
+            <Text style={[styles.suggestionErrorText, { color: theme.muted }]}>
+              {suggestionError}
+            </Text>
+            <Pressable
+              style={[styles.suggestionRetryButton, { backgroundColor: theme.accent }]}
+              onPress={loadSuggestion}
+            >
+              <Text style={[styles.suggestionRetryText, { color: theme.background }]}>
+                Reintentar
+              </Text>
+            </Pressable>
+          </View>
+        ) : suggestion ? (
+          <View style={styles.suggestionContent}>
+            {/* Health Score */}
+            <View style={styles.healthScoreRow}>
+              <View
+                style={[
+                  styles.healthScoreCircle,
+                  {
+                    borderColor: getHealthScoreColor(suggestion.healthScore),
+                    backgroundColor: `${getHealthScoreColor(suggestion.healthScore)}15`,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.healthScoreValue,
+                    { color: getHealthScoreColor(suggestion.healthScore) },
+                  ]}
+                >
+                  {suggestion.healthScore.toFixed(1)}
+                </Text>
+              </View>
+              <View style={styles.healthScoreInfo}>
+                <Text style={[styles.healthScoreLabel, { color: theme.text }]}>
+                  {getHealthScoreLabel(suggestion.healthScore)}
+                </Text>
+                <Text style={[styles.healthScoreCaption, { color: theme.muted }]}>
+                  {suggestion.isHealthy
+                    ? "Esta comida es una buena eleccion"
+                    : "Se detectaron areas de mejora"}
+                </Text>
+              </View>
+            </View>
+
+            {/* Analysis text */}
+            <Text style={[styles.suggestionAnalysis, { color: theme.text }]}>
+              {suggestion.analysis}
+            </Text>
+
+            {/* Positive Aspects */}
+            {suggestion.positiveAspects.length > 0 && (
+              <View style={styles.aspectListWrap}>
+                <View style={styles.aspectLabelRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#34D399" />
+                  <Text style={[styles.aspectLabelText, { color: "#34D399" }]}>
+                    Aspectos positivos
+                  </Text>
+                </View>
+                {suggestion.positiveAspects.map((aspect, i) => (
+                  <View key={i} style={styles.aspectItem}>
+                    <View style={[styles.aspectDot, { backgroundColor: "#34D399" }]} />
+                    <Text style={[styles.aspectText, { color: theme.text }]}>{aspect}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Concerns */}
+            {suggestion.concerns.length > 0 && (
+              <View style={styles.aspectListWrap}>
+                <View style={styles.aspectLabelRow}>
+                  <Ionicons name="alert-circle" size={16} color="#FBBF24" />
+                  <Text style={[styles.aspectLabelText, { color: "#FBBF24" }]}>
+                    Areas de mejora
+                  </Text>
+                </View>
+                {suggestion.concerns.map((concern, i) => (
+                  <View key={i} style={styles.aspectItem}>
+                    <View style={[styles.aspectDot, { backgroundColor: "#FBBF24" }]} />
+                    <Text style={[styles.aspectText, { color: theme.text }]}>{concern}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Suggested Alternative Meal */}
+            <Pressable
+              style={[
+                styles.alternativeCard,
+                {
+                  backgroundColor: theme.cardMuted,
+                  borderColor: `${theme.accent}30`,
+                },
+              ]}
+              onPress={() => setSuggestionExpanded((current) => !current)}
+            >
+              <View style={styles.alternativeHeader}>
+                <View style={[styles.alternativeIconBadge, { backgroundColor: `${theme.accent}20` }]}>
+                  <Ionicons name="leaf" size={18} color={theme.accent} />
+                </View>
+                <View style={styles.alternativeHeaderText}>
+                  <Text style={[styles.alternativeEyebrow, { color: theme.accent }]}>
+                    ALTERNATIVA SUGERIDA
+                  </Text>
+                  <Text style={[styles.alternativeTitle, { color: theme.text }]}>
+                    {suggestion.suggestion.title}
+                  </Text>
+                </View>
+                <Animated.View
+                  style={{
+                    transform: [
+                      {
+                        rotate: expandAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ["0deg", "180deg"],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <Ionicons name="chevron-down" size={18} color={theme.muted} />
+                </Animated.View>
+              </View>
+
+              {suggestionExpanded && (
+                <View style={styles.alternativeBody}>
+                  <Text style={[styles.alternativeDescription, { color: theme.muted }]}>
+                    {suggestion.suggestion.description}
+                  </Text>
+
+                  {/* Mini macro comparison */}
+                  <View style={styles.alternativeMacroRow}>
+                    <MiniMacro
+                      label="Cal"
+                      value={Math.round(suggestion.suggestion.estimatedCalories)}
+                      unit="kcal"
+                      accent={theme.accent}
+                      theme={theme}
+                    />
+                    <MiniMacro
+                      label="Prot"
+                      value={Math.round(suggestion.suggestion.estimatedProteinGrams)}
+                      unit="g"
+                      accent="#76EFE5"
+                      theme={theme}
+                    />
+                    <MiniMacro
+                      label="Carbs"
+                      value={Math.round(suggestion.suggestion.estimatedCarbsGrams)}
+                      unit="g"
+                      accent="#E8FF54"
+                      theme={theme}
+                    />
+                    <MiniMacro
+                      label="Grasa"
+                      value={Math.round(suggestion.suggestion.estimatedFatGrams)}
+                      unit="g"
+                      accent="#FF9A5C"
+                      theme={theme}
+                    />
+                  </View>
+
+                  {/* Benefits */}
+                  {suggestion.suggestion.benefits.length > 0 && (
+                    <View style={styles.benefitsWrap}>
+                      {suggestion.suggestion.benefits.map((benefit, i) => (
+                        <View key={i} style={styles.benefitItem}>
+                          <Ionicons name="star" size={12} color={theme.accent} />
+                          <Text style={[styles.benefitText, { color: theme.text }]}>
+                            {benefit}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -445,6 +783,26 @@ function MacroBox(props: {
       <Text style={[styles.macroValue, { color: theme.text }]}>
         {props.value}{" "}
         <Text style={[styles.macroUnit, { color: theme.muted }]}>{props.unit}</Text>
+      </Text>
+    </View>
+  );
+}
+
+// ─── Mini Macro (for suggestion comparison) ──────────────────────────────────
+
+function MiniMacro(props: {
+  label: string;
+  value: number;
+  unit: string;
+  accent: string;
+  theme: FitnessTheme;
+}) {
+  return (
+    <View style={styles.miniMacroItem}>
+      <View style={[styles.miniMacroDot, { backgroundColor: props.accent }]} />
+      <Text style={[styles.miniMacroValue, { color: props.theme.text }]}>{props.value}</Text>
+      <Text style={[styles.miniMacroLabel, { color: props.theme.muted }]}>
+        {props.label}
       </Text>
     </View>
   );
@@ -748,5 +1106,238 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 14,
     lineHeight: 20,
+  },
+
+  // ─── AI Suggestion Styles ─────────────────────────────────────────────
+  suggestionSection: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 18,
+    gap: 16,
+    overflow: "hidden",
+  },
+  suggestionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  suggestionIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  suggestionHeaderText: {
+    flex: 1,
+    gap: 2,
+  },
+  suggestionEyebrow: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: 1.2,
+  },
+  suggestionHeaderTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+  },
+  suggestionLoadingWrap: {
+    alignItems: "center",
+    paddingVertical: 24,
+    gap: 10,
+    overflow: "hidden",
+  },
+  suggestionLoadingGlow: {
+    position: "absolute",
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    top: "50%",
+    left: "50%",
+    marginTop: -60,
+    marginLeft: -60,
+  },
+  suggestionLoadingText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+  },
+  suggestionErrorWrap: {
+    alignItems: "center",
+    paddingVertical: 16,
+    gap: 8,
+  },
+  suggestionErrorText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    textAlign: "center",
+  },
+  suggestionRetryButton: {
+    marginTop: 4,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  suggestionRetryText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  suggestionContent: {
+    gap: 16,
+  },
+
+  // Health score
+  healthScoreRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  healthScoreCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  healthScoreValue: {
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 18,
+  },
+  healthScoreInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  healthScoreLabel: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+  },
+  healthScoreCaption: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+  },
+
+  // Analysis text
+  suggestionAnalysis: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+
+  // Aspects
+  aspectListWrap: {
+    gap: 8,
+  },
+  aspectLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  aspectLabelText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+  },
+  aspectItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    paddingLeft: 4,
+  },
+  aspectDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 6,
+  },
+  aspectText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 19,
+    flex: 1,
+  },
+
+  // Alternative card
+  alternativeCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 16,
+    gap: 14,
+  },
+  alternativeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  alternativeIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  alternativeHeaderText: {
+    flex: 1,
+    gap: 2,
+  },
+  alternativeEyebrow: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: 1.1,
+  },
+  alternativeTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+  },
+  alternativeBody: {
+    gap: 12,
+  },
+  alternativeDescription: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  alternativeMacroRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+
+  // Mini macro
+  miniMacroItem: {
+    alignItems: "center",
+    gap: 3,
+    flex: 1,
+  },
+  miniMacroDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  miniMacroValue: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+  },
+  miniMacroLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  // Benefits
+  benefitsWrap: {
+    gap: 6,
+  },
+  benefitItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+  },
+  benefitText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 19,
+    flex: 1,
   },
 });

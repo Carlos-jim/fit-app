@@ -6,6 +6,12 @@ import {
   nutritionAnalysisSchema,
   type NutritionAnalysis,
 } from "../contracts/nutrition-analysis.js";
+import {
+  mealSuggestionJsonSchema,
+  mealSuggestionSchema,
+  type MealSuggestion,
+  type SuggestMealRequest,
+} from "../contracts/suggest-meal-request.js";
 import { AppError } from "../lib/app-error.js";
 
 const geminiClient = new GoogleGenAI({
@@ -28,6 +34,19 @@ const SYSTEM_PROMPT = [
   "If the image or text is too ambiguous, lower confidence and add warnings instead of inventing details.",
   "Favor common Latin American and Venezuelan preparations when the meal context suggests them.",
 ].join(" ");
+
+const SUGGESTION_SYSTEM_PROMPT = [
+  "You are a friendly and knowledgeable nutritionist AI assistant for a mobile health app used in Venezuela and Latin America.",
+  "Your job is to evaluate a meal's healthiness and suggest a healthier alternative when appropriate.",
+  "Respond in Spanish (Latin American).",
+  "Always be encouraging, constructive, and respectful. Never shame the user for their food choices.",
+  "When evaluating healthiness, consider: caloric balance, macronutrient ratios, processed ingredients, fiber content, sugar, sodium, and cooking methods.",
+  "A healthScore of 0-3 is unhealthy, 4-6 is moderate, 7-10 is healthy.",
+  "Even for healthy meals, still provide a suggestion that could complement or slightly improve the meal.",
+  "The suggestion should be a realistic, accessible meal in Latin America (not exotic or expensive ingredients).",
+  "Return only valid JSON that matches the provided schema.",
+].join(" ");
+
 
 export interface AnalyzeNutritionInput {
   imageDataUrl?: string;
@@ -70,6 +89,109 @@ export class NutritionAnalysisService {
     return this.runAnalysis({
       prompt: this.buildTextPrompt(input),
       errorMessage: "Failed to analyze meal text with Gemini.",
+    });
+  }
+
+  async suggestMealAlternative(input: SuggestMealRequest): Promise<MealSuggestion> {
+    const prompt = this.buildSuggestionPrompt(input);
+
+    const candidateModels = Array.from(
+      new Set([
+        env.GEMINI_MODEL,
+        FALLBACK_GEMINI_MODEL,
+        SECONDARY_FALLBACK_GEMINI_MODEL,
+      ]),
+    );
+
+    let lastError: unknown;
+
+    for (const modelName of candidateModels) {
+      try {
+        const maxAttempts = modelName === SECONDARY_FALLBACK_GEMINI_MODEL ? 1 : 2;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+          try {
+            const response = await geminiClient.models.generateContent({
+              model: modelName,
+              contents: [
+                {
+                  role: "user",
+                  parts: [{ text: prompt }],
+                },
+              ],
+              config: {
+                systemInstruction: SUGGESTION_SYSTEM_PROMPT,
+                responseMimeType: "application/json",
+                responseJsonSchema: mealSuggestionJsonSchema,
+                temperature: 0.4,
+                topP: 0.9,
+                maxOutputTokens: 2048,
+              },
+            });
+
+            const rawOutput = response.text?.trim();
+
+            if (!rawOutput) {
+              throw new AppError("Gemini returned an empty response for suggestion.", {
+                statusCode: 502,
+                code: "GEMINI_EMPTY_RESPONSE",
+              });
+            }
+
+            let parsedJson: unknown;
+
+            try {
+              parsedJson = JSON.parse(this.stripCodeFences(rawOutput));
+            } catch (error) {
+              throw new AppError("Gemini returned invalid JSON for suggestion.", {
+                statusCode: 502,
+                code: "GEMINI_INVALID_JSON",
+                cause: error,
+              });
+            }
+
+            const parsed = mealSuggestionSchema.safeParse(parsedJson);
+
+            if (!parsed.success) {
+              throw new AppError("Gemini suggestion response did not match schema.", {
+                statusCode: 502,
+                code: "GEMINI_SCHEMA_MISMATCH",
+                cause: parsed.error.flatten(),
+              });
+            }
+
+            return parsed.data;
+          } catch (error) {
+            if (error instanceof AppError) {
+              throw error;
+            }
+
+            if (!this.shouldRetrySameModel(error, attempt, maxAttempts)) {
+              throw error;
+            }
+
+            await this.delay(800 * attempt);
+          }
+        }
+
+        throw new Error(`Gemini suggestion attempts exhausted for model ${modelName}.`);
+      } catch (error) {
+        if (error instanceof AppError) {
+          throw error;
+        }
+
+        lastError = error;
+
+        if (!this.shouldRetryWithFallback(error, modelName)) {
+          break;
+        }
+      }
+    }
+
+    throw new AppError("Failed to generate meal suggestion with Gemini.", {
+      statusCode: 502,
+      code: "GEMINI_REQUEST_FAILED",
+      cause: lastError,
     });
   }
 
@@ -305,4 +427,47 @@ export class NutritionAnalysisService {
 
     return promptLines.join("\n");
   }
+
+  private buildSuggestionPrompt(input: SuggestMealRequest): string {
+    const lines = [
+      `El usuario registró una comida llamada: "${input.mealTitle}".`,
+      `Macronutrientes totales:`,
+      `- Calorías: ${Math.round(input.calories)} kcal`,
+      `- Proteína: ${Math.round(input.proteinGrams)} g`,
+      `- Carbohidratos: ${Math.round(input.carbsGrams)} g`,
+      `- Grasas: ${Math.round(input.fatGrams)} g`,
+    ];
+
+    if (input.fiberGrams != null) {
+      lines.push(`- Fibra: ${Math.round(input.fiberGrams)} g`);
+    }
+
+    if (input.sugarGrams != null) {
+      lines.push(`- Azúcar: ${Math.round(input.sugarGrams)} g`);
+    }
+
+    if (input.sodiumMg != null) {
+      lines.push(`- Sodio: ${Math.round(input.sodiumMg)} mg`);
+    }
+
+    if (input.ingredients.length > 0) {
+      lines.push(`\nIngredientes detectados:`);
+
+      for (const ing of input.ingredients) {
+        lines.push(
+          `- ${ing.name}: ~${Math.round(ing.estimatedGrams)}g (${Math.round(ing.calories)} kcal, P:${Math.round(ing.proteinGrams)}g, C:${Math.round(ing.carbsGrams)}g, G:${Math.round(ing.fatGrams)}g)`,
+        );
+      }
+    }
+
+    lines.push(
+      `\nEvalúa qué tan saludable es esta comida en una escala de 0 a 10.`,
+      `Identifica aspectos positivos y preocupaciones nutricionales.`,
+      `Sugiere una alternativa más saludable que sea accesible en Latinoamérica, con macronutrientes estimados.`,
+      `Si la comida ya es muy saludable, sugiere un complemento o acompañamiento que la mejore.`,
+    );
+
+    return lines.join("\n");
+  }
 }
+

@@ -43,7 +43,7 @@ export function FitnessHeader(props: {
   const titleByTab: Record<AppTab, string> = {
     home: `Hola, ${props.fullName.trim() || "Bioma"}`,
     stats: "Estadisticas",
-    nutrition: "Nutricion IA",
+    nutrition: "Nutricion",
     tips: "Tips",
     profile: "Perfil",
   };
@@ -51,7 +51,9 @@ export function FitnessHeader(props: {
   return (
     <View style={styles.header}>
       <View>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>{titleByTab[props.activeTab]}</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          {titleByTab[props.activeTab]}
+        </Text>
       </View>
       <Pressable style={styles.avatar} onPress={props.onOpenProfile}>
         <View style={[styles.avatarBody, { backgroundColor: theme.accent }]}>
@@ -64,36 +66,67 @@ export function FitnessHeader(props: {
   );
 }
 
-export function FitnessCard(props: { children: ReactNode; style?: object; theme?: FitnessTheme }) {
+export function FitnessCard(props: {
+  children: ReactNode;
+  style?: object;
+  theme?: FitnessTheme;
+}) {
   const theme = props.theme ?? fitnessColors;
   return (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.stroke }, props.style]}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: theme.card, borderColor: theme.stroke },
+        props.style,
+      ]}
+    >
       {props.children}
     </View>
   );
 }
 
-export function CardTitle(props: { children: ReactNode; large?: boolean; theme?: FitnessTheme }) {
+export function CardTitle(props: {
+  children: ReactNode;
+  large?: boolean;
+  theme?: FitnessTheme;
+}) {
   const theme = props.theme ?? fitnessColors;
   return (
     <Text
       adjustsFontSizeToFit={!props.large}
       numberOfLines={props.large ? undefined : 1}
-      style={[props.large ? styles.cardTitleLarge : styles.cardTitle, { color: theme.text }]}
+      style={[
+        props.large ? styles.cardTitleLarge : styles.cardTitle,
+        { color: theme.text },
+      ]}
     >
       {props.children}
     </Text>
   );
 }
 
-export function CardSubtle(props: { children: ReactNode; theme?: FitnessTheme }) {
+export function CardSubtle(props: {
+  children: ReactNode;
+  theme?: FitnessTheme;
+}) {
   const theme = props.theme ?? fitnessColors;
-  return <Text style={[styles.cardSubtle, { color: theme.muted }]}>{props.children}</Text>;
+  return (
+    <Text style={[styles.cardSubtle, { color: theme.muted }]}>
+      {props.children}
+    </Text>
+  );
 }
 
-export function CardEyebrow(props: { children: ReactNode; theme?: FitnessTheme }) {
+export function CardEyebrow(props: {
+  children: ReactNode;
+  theme?: FitnessTheme;
+}) {
   const theme = props.theme ?? fitnessColors;
-  return <Text style={[styles.cardEyebrow, { color: theme.accent }]}>{props.children}</Text>;
+  return (
+    <Text style={[styles.cardEyebrow, { color: theme.accent }]}>
+      {props.children}
+    </Text>
+  );
 }
 
 export function DailyBalanceCard(props: {
@@ -123,34 +156,77 @@ export function DailyBalanceCard(props: {
 
       <View style={styles.balanceBody}>
         <View style={styles.balanceList}>
-          <BalanceLine icon="M" label="Meta" value={props.calories.toLocaleString()} color={theme.danger} theme={theme} />
-          <BalanceLine icon="C" label="Comida" value={`${props.food}`} color="#6688FF" theme={theme} />
-          <BalanceLine icon="E" label="Ejercicio" value={`${props.exercise}`} color={theme.accent} theme={theme} />
+          <BalanceLine
+            icon="M"
+            label="Meta"
+            value={props.calories.toLocaleString()}
+            color={theme.danger}
+            theme={theme}
+          />
+          <BalanceLine
+            icon="C"
+            label="Comida"
+            value={`${props.food}`}
+            color="#6688FF"
+            theme={theme}
+          />
+          <BalanceLine
+            icon="E"
+            label="Ejercicio"
+            value={`${props.exercise}`}
+            color={theme.accent}
+            theme={theme}
+          />
         </View>
 
-        <View style={[styles.ring, { backgroundColor: theme.cardMuted, borderColor: theme.accent }]}>
+        <View
+          style={[
+            styles.ring,
+            { backgroundColor: theme.cardMuted, borderColor: theme.accent },
+          ]}
+        >
           <View style={[styles.ringInner, { backgroundColor: theme.accent }]}>
-            <Text style={styles.ringValue}>{props.calories.toLocaleString()}</Text>
+            <Text style={styles.ringValue}>
+              {props.calories.toLocaleString()}
+            </Text>
             <Text style={styles.ringUnit}>kcal</Text>
           </View>
         </View>
       </View>
 
-      <View style={[styles.circadianStrip, { backgroundColor: theme.cardMuted }]}>
-        <Text style={[styles.stripText, { color: theme.muted }]}>{props.city}</Text>
-        <Text style={[styles.stripStrong, { color: theme.text }]}>Siguiente: {props.nextTime}</Text>
+      <View
+        style={[styles.circadianStrip, { backgroundColor: theme.cardMuted }]}
+      >
+        <Text style={[styles.stripText, { color: theme.muted }]}>
+          {props.city}
+        </Text>
+        <Text style={[styles.stripStrong, { color: theme.text }]}>
+          Siguiente: {props.nextTime}
+        </Text>
       </View>
     </FitnessCard>
   );
 }
 
-function BalanceLine(props: { icon: string; label: string; value: string; color: string; theme: FitnessTheme }) {
+function BalanceLine(props: {
+  icon: string;
+  label: string;
+  value: string;
+  color: string;
+  theme: FitnessTheme;
+}) {
   return (
     <View style={styles.balanceLine}>
-      <Text style={[styles.balanceIcon, { color: props.color }]}>{props.icon}</Text>
+      <Text style={[styles.balanceIcon, { color: props.color }]}>
+        {props.icon}
+      </Text>
       <View>
-        <Text style={[styles.balanceLabel, { color: props.theme.muted }]}>{props.label}</Text>
-        <Text style={[styles.balanceValue, { color: props.theme.text }]}>{props.value}</Text>
+        <Text style={[styles.balanceLabel, { color: props.theme.muted }]}>
+          {props.label}
+        </Text>
+        <Text style={[styles.balanceValue, { color: props.theme.text }]}>
+          {props.value}
+        </Text>
       </View>
     </View>
   );
@@ -171,15 +247,24 @@ export function SmallProgressCard(props: {
     <FitnessCard style={styles.smallCard} theme={theme}>
       <CardTitle theme={theme}>{props.label}</CardTitle>
       <View style={styles.inlineMetric}>
-        <Text style={[styles.smallIcon, { color: props.accent }]}>{props.icon}</Text>
-        <Text style={[styles.smallValue, { color: theme.text }]}>{props.value}</Text>
+        <Text style={[styles.smallIcon, { color: props.accent }]}>
+          {props.icon}
+        </Text>
+        <Text style={[styles.smallValue, { color: theme.text }]}>
+          {props.value}
+        </Text>
       </View>
       <CardSubtle theme={theme}>{props.caption}</CardSubtle>
-      <View style={[styles.progressTrack, { backgroundColor: theme.cardMuted }]}>
+      <View
+        style={[styles.progressTrack, { backgroundColor: theme.cardMuted }]}
+      >
         <View
           style={[
             styles.progressFill,
-            { width: `${Math.min(props.progress, 1) * 100}%`, backgroundColor: props.accent },
+            {
+              width: `${Math.min(props.progress, 1) * 100}%`,
+              backgroundColor: props.accent,
+            },
           ]}
         />
       </View>
@@ -200,11 +285,16 @@ export function MiniMetricCard(props: {
   return (
     <FitnessCard style={styles.miniMetricCard} theme={theme}>
       <View style={styles.inlineMetric}>
-        <Text style={[styles.smallIcon, { color: props.accent }]}>{props.icon}</Text>
+        <Text style={[styles.smallIcon, { color: props.accent }]}>
+          {props.icon}
+        </Text>
         <CardTitle theme={theme}>{props.label}</CardTitle>
       </View>
       <Text style={[styles.bigNumber, { color: theme.text }]}>
-        {props.value} <Text style={[styles.inlineUnit, { color: theme.muted }]}>{props.unit}</Text>
+        {props.value}{" "}
+        <Text style={[styles.inlineUnit, { color: theme.muted }]}>
+          {props.unit}
+        </Text>
       </Text>
     </FitnessCard>
   );
@@ -225,13 +315,20 @@ export function BarGraph(props: {
     <View style={[styles.graphRow, props.tall && styles.graphRowTall]}>
       {props.values.map((value, index) => (
         <View key={`${value}-${index}`} style={styles.graphColumn}>
-          <View style={[styles.graphTrack, props.tall && styles.graphTrackTall, { backgroundColor: theme.cardMuted }]}>
+          <View
+            style={[
+              styles.graphTrack,
+              props.tall && styles.graphTrackTall,
+              { backgroundColor: theme.cardMuted },
+            ]}
+          >
             <View
               style={[
                 styles.graphFill,
                 {
                   height: `${(value / maxValue) * 100}%`,
-                  backgroundColor: index === props.accentIndex ? props.accent : theme.stroke,
+                  backgroundColor:
+                    index === props.accentIndex ? props.accent : theme.stroke,
                 },
               ]}
             />
@@ -251,7 +348,12 @@ export function BarGraph(props: {
   );
 }
 
-export function SegmentButton(props: { label: string; active: boolean; onPress: () => void; theme?: FitnessTheme }) {
+export function SegmentButton(props: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  theme?: FitnessTheme;
+}) {
   const theme = props.theme ?? fitnessColors;
 
   return (
@@ -262,7 +364,12 @@ export function SegmentButton(props: { label: string; active: boolean; onPress: 
       ]}
       onPress={props.onPress}
     >
-      <Text style={[styles.segmentButtonText, { color: props.active ? "#FFFFFF" : theme.text }]}>
+      <Text
+        style={[
+          styles.segmentButtonText,
+          { color: props.active ? "#FFFFFF" : theme.text },
+        ]}
+      >
         {props.label}
       </Text>
     </Pressable>
@@ -288,7 +395,12 @@ export function BottomNav(props: {
 
   return (
     <View style={styles.bottomNavWrap}>
-      <View style={[styles.bottomNav, { backgroundColor: theme.card, borderColor: theme.stroke }]}>
+      <View
+        style={[
+          styles.bottomNav,
+          { backgroundColor: theme.card, borderColor: theme.stroke },
+        ]}
+      >
         {items.map((item) => {
           const active = props.activeTab === item.tab;
           const isCenter = item.tab === "nutrition";
@@ -311,7 +423,16 @@ export function BottomNav(props: {
                   style={[
                     styles.navCenterButton,
                     { backgroundColor: theme.accent },
-                    { transform: [{ scale: active || props.nutritionMenuOpen ? props.pulseScale : 1 }] },
+                    {
+                      transform: [
+                        {
+                          scale:
+                            active || props.nutritionMenuOpen
+                              ? props.pulseScale
+                              : 1,
+                        },
+                      ],
+                    },
                   ]}
                 >
                   <Ionicons
@@ -326,18 +447,29 @@ export function BottomNav(props: {
                     style={{
                       transform: [
                         {
-                          scale: active ? props.pulseScale.interpolate({
-                            inputRange: [1, 1.08],
-                            outputRange: [1, 1.08],
-                          }) : 1,
+                          scale: active
+                            ? props.pulseScale.interpolate({
+                                inputRange: [1, 1.08],
+                                outputRange: [1, 1.08],
+                              })
+                            : 1,
                         },
                         { translateY: active ? -2 : 0 },
                       ],
                     }}
                   >
-                    <Ionicons name={item.icon} size={23} color={active ? theme.accent : theme.muted} />
+                    <Ionicons
+                      name={item.icon}
+                      size={23}
+                      color={active ? theme.accent : theme.muted}
+                    />
                   </Animated.View>
-                  <Text style={[styles.navLabel, { color: active ? theme.text : theme.muted }]}>
+                  <Text
+                    style={[
+                      styles.navLabel,
+                      { color: active ? theme.text : theme.muted },
+                    ]}
+                  >
                     {item.label}
                   </Text>
                 </>

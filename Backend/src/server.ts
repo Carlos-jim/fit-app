@@ -7,6 +7,7 @@ import { analyzeMealRequestSchema } from "./contracts/analyze-meal-request.js";
 import { analyzeMealTextRequestSchema } from "./contracts/analyze-meal-text-request.js";
 import { bootstrapUserRequestSchema } from "./contracts/bootstrap-user-request.js";
 import { createMealUploadUrlRequestSchema } from "./contracts/create-meal-upload-url-request.js";
+import { suggestMealRequestSchema } from "./contracts/suggest-meal-request.js";
 import { AppError } from "./lib/app-error.js";
 import { prisma } from "./lib/prisma.js";
 import { LogRepository } from "./repositories/log.repository.js";
@@ -139,6 +140,19 @@ app.get("/logs", async (req, res) => {
     res.status(200).json({ data: logs });
   } catch (error) {
     handleError(res, error, "fetching meal logs");
+  }
+});
+
+app.post("/logs/suggest-meal", async (req, res) => {
+  try {
+    const request = parseBody(suggestMealRequestSchema, req.body);
+    const suggestion = await nutritionAnalysisService.suggestMealAlternative(request);
+
+    res.status(200).json({
+      data: suggestion,
+    });
+  } catch (error) {
+    handleError(res, error, "generating meal suggestion");
   }
 });
 

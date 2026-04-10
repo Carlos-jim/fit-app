@@ -3,6 +3,7 @@ import type {
   BootstrapUserResponse,
   MealAnalysisSummary,
   MealLog,
+  MealSuggestionResponse,
   UploadMealImageResponse,
 } from "../types/api";
 
@@ -96,6 +97,32 @@ class BiomaApi {
   async getLogs(userId: string): Promise<MealLog[]> {
     const response = await this.request<MealLog[]>(`/logs?userId=${encodeURIComponent(userId)}`, {
       method: "GET",
+    });
+
+    return response.data;
+  }
+
+  async suggestMeal(input: {
+    mealTitle: string;
+    calories: number;
+    proteinGrams: number;
+    carbsGrams: number;
+    fatGrams: number;
+    fiberGrams?: number | null;
+    sugarGrams?: number | null;
+    sodiumMg?: number | null;
+    ingredients: Array<{
+      name: string;
+      estimatedGrams: number;
+      calories: number;
+      proteinGrams: number;
+      carbsGrams: number;
+      fatGrams: number;
+    }>;
+  }): Promise<MealSuggestionResponse> {
+    const response = await this.request<MealSuggestionResponse>("/logs/suggest-meal", {
+      method: "POST",
+      body: JSON.stringify(input),
     });
 
     return response.data;
