@@ -103,6 +103,7 @@ class BiomaApi {
   }
 
   async suggestMeal(input: {
+    logId?: string;
     mealTitle: string;
     calories: number;
     proteinGrams: number;

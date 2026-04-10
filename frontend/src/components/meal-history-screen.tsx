@@ -382,8 +382,12 @@ function MealDetailView(props: {
   const expandAnim = useState(() => new Animated.Value(0))[0];
 
   useEffect(() => {
-    void loadSuggestion();
-  }, [meal.id]);
+    if (meal.aiSuggestion) {
+      setSuggestion(meal.aiSuggestion);
+    } else {
+      void loadSuggestion();
+    }
+  }, [meal.id, meal.aiSuggestion]);
 
   useEffect(() => {
     if (suggestionLoading) {
@@ -423,6 +427,7 @@ function MealDetailView(props: {
 
     try {
       const result = await biomaApi.suggestMeal({
+        logId: meal.id,
         mealTitle: meal.title ?? "Comida analizada",
         calories: meal.calories,
         proteinGrams: meal.proteinGrams,
@@ -431,7 +436,7 @@ function MealDetailView(props: {
         fiberGrams: meal.fiberGrams,
         sugarGrams: meal.sugarGrams,
         sodiumMg: meal.sodiumMg,
-        ingredients: meal.ingredients,
+        ingredients: meal.ingredients as any,
       });
 
       setSuggestion(result);

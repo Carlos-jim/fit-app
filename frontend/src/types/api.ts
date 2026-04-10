@@ -43,6 +43,7 @@ export interface MealLog extends MealAnalysisSummary {
   fiberGrams?: number | null;
   sugarGrams?: number | null;
   sodiumMg?: number | null;
+  aiSuggestion?: MealSuggestionResponse | null;
 }
 
 export interface SuggestedMeal {

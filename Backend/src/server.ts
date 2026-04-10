@@ -148,6 +148,10 @@ app.post("/logs/suggest-meal", async (req, res) => {
     const request = parseBody(suggestMealRequestSchema, req.body);
     const suggestion = await nutritionAnalysisService.suggestMealAlternative(request);
 
+    if (request.logId) {
+      await logRepository.saveMealSuggestion(request.logId, suggestion);
+    }
+
     res.status(200).json({
       data: suggestion,
     });

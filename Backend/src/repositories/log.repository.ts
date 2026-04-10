@@ -23,6 +23,7 @@ export interface MealLogSummary {
   sugarGrams: number | null;
   sodiumMg: number | null;
   confidence: string;
+  aiSuggestion: unknown | null;
   ingredients: unknown[];
   warnings: string[];
   createdAt: string;
@@ -132,9 +133,19 @@ export class LogRepository {
       sugarGrams: log.sugarGrams,
       sodiumMg: log.sodiumMg,
       confidence: log.confidence,
+      aiSuggestion: log.aiSuggestion ?? null,
       ingredients: Array.isArray(log.ingredients) ? log.ingredients : [],
       warnings: Array.isArray(log.warnings) ? (log.warnings as string[]) : [],
       createdAt: log.createdAt.toISOString(),
     }));
+  }
+
+  async saveMealSuggestion(logId: string, suggestion: unknown): Promise<void> {
+    await this.db.log.update({
+      where: { id: logId },
+      data: {
+        aiSuggestion: suggestion !== undefined ? (suggestion as Prisma.InputJsonValue) : Prisma.DbNull,
+      },
+    });
   }
 }

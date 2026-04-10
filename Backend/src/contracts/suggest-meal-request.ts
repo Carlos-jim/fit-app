@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const suggestMealRequestSchema = z.object({
+  logId: z.string().min(1).optional(),
   mealTitle: z.string().min(1),
   calories: z.number().nonnegative(),
   proteinGrams: z.number().nonnegative(),
