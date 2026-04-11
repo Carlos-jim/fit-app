@@ -146,6 +146,15 @@ app.get("/logs", async (req, res) => {
 app.post("/logs/suggest-meal", async (req, res) => {
   try {
     const request = parseBody(suggestMealRequestSchema, req.body);
+
+    if (request.logId) {
+      const cached = await logRepository.getLogSuggestion(request.logId);
+      if (cached) {
+        res.status(200).json({ data: cached });
+        return;
+      }
+    }
+
     const suggestion = await nutritionAnalysisService.suggestMealAlternative(request);
 
     if (request.logId) {

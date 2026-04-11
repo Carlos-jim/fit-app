@@ -674,12 +674,12 @@ export default function App() {
   }, [activeTab, statsPageWidth]);
 
   useEffect(() => {
-    if (activeTab !== "stats" || !userId || !env.apiBaseUrl) {
+    if (!userId || !env.apiBaseUrl) {
       return;
     }
 
     void loadStatsMealLogs(userId);
-  }, [activeTab, userId]);
+  }, [userId]);
 
   if (!fontsLoaded) {
     return null;
@@ -2677,13 +2677,39 @@ export default function App() {
         </View>
 
         {scannerMode === "food" ? (
-          <Pressable
-            style={styles.cameraCaptureButton}
-            onPress={imageAsset ? () => setImageAsset(null) : captureFoodPhoto}
-            disabled={!imageAsset && !cameraReady}
-          >
-            <View style={styles.cameraCaptureButtonInner} />
-          </Pressable>
+          imageAsset ? (
+            <View style={styles.cameraPostCaptureActions}>
+              <Pressable
+                style={styles.cameraRetakeButton}
+                onPress={() => setImageAsset(null)}
+              >
+                <Ionicons name="camera-reverse-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.cameraRetakeButtonText}>Retomar</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.cameraAnalyzeButton,
+                  analysisLoading && styles.buttonDisabled,
+                ]}
+                onPress={analyzeCurrentMeal}
+                disabled={analysisLoading}
+              >
+                {analysisLoading ? (
+                  <ActivityIndicator color="#000000" />
+                ) : (
+                  <Text style={styles.cameraAnalyzeButtonText}>Analizar comida</Text>
+                )}
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              style={styles.cameraCaptureButton}
+              onPress={captureFoodPhoto}
+              disabled={!cameraReady}
+            >
+              <View style={styles.cameraCaptureButtonInner} />
+            </Pressable>
+          )
         ) : null}
 
         <View style={styles.cameraOnlyTabs}>
@@ -3880,6 +3906,43 @@ const styles = StyleSheet.create({
     height: 62,
     borderRadius: 31,
     backgroundColor: "#FFFFFF",
+  },
+  cameraPostCaptureActions: {
+    position: "absolute",
+    bottom: 100,
+    left: 18,
+    right: 18,
+    flexDirection: "row",
+    gap: 12,
+    zIndex: 20,
+  },
+  cameraRetakeButton: {
+    flexDirection: "row",
+    gap: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 54,
+    borderRadius: 999,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    paddingHorizontal: 20,
+  },
+  cameraRetakeButtonText: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 14,
+  },
+  cameraAnalyzeButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 54,
+    borderRadius: 999,
+    backgroundColor: "#00C897",
+  },
+  cameraAnalyzeButtonText: {
+    color: "#000000",
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 15,
   },
   cameraOnlyTabs: {
     position: "absolute",

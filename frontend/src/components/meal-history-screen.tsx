@@ -439,6 +439,7 @@ function MealDetailView(props: {
         ingredients: meal.ingredients as any,
       });
 
+      meal.aiSuggestion = result;
       setSuggestion(result);
     } catch (e) {
       setSuggestionError(

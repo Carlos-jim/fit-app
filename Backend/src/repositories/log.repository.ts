@@ -113,6 +113,7 @@ export class LogRepository {
         sugarGrams: true,
         sodiumMg: true,
         confidence: true,
+        aiSuggestion: true,
         ingredients: true,
         warnings: true,
         createdAt: true,
@@ -138,6 +139,14 @@ export class LogRepository {
       warnings: Array.isArray(log.warnings) ? (log.warnings as string[]) : [],
       createdAt: log.createdAt.toISOString(),
     }));
+  }
+
+  async getLogSuggestion(logId: string): Promise<unknown | null> {
+    const log = await this.db.log.findUnique({
+      where: { id: logId },
+      select: { aiSuggestion: true },
+    });
+    return log?.aiSuggestion ?? null;
   }
 
   async saveMealSuggestion(logId: string, suggestion: unknown): Promise<void> {
