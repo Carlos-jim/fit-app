@@ -222,6 +222,10 @@ export default function App() {
   const statsMealsExpandAnim = useRef(new Animated.Value(0)).current;
   const statsPagerRef = useRef<ScrollView | null>(null);
   const cameraRef = useRef<CameraView | null>(null);
+  const analysisSourceRef = useRef<"camera" | null>(null);
+  const cameraLoadingRing1 = useRef(new Animated.Value(0)).current;
+  const cameraLoadingRing2 = useRef(new Animated.Value(0)).current;
+  const cameraLoadingIconScale = useRef(new Animated.Value(1)).current;
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [nutritionQuickMenuOpen, setNutritionQuickMenuOpen] = useState(false);
   const [initialMealForDetail, setInitialMealForDetail] =
@@ -638,6 +642,79 @@ export default function App() {
   ]);
 
   useEffect(() => {
+    if (!analysisLoading) {
+      cameraLoadingRing1.setValue(0);
+      cameraLoadingRing2.setValue(0);
+      cameraLoadingIconScale.setValue(1);
+      return;
+    }
+
+    const ring1Anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(cameraLoadingRing1, {
+          toValue: 1,
+          duration: 1600,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(cameraLoadingRing1, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    const ring2Anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(cameraLoadingRing2, {
+          toValue: 0,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(cameraLoadingRing2, {
+          toValue: 1,
+          duration: 1600,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(cameraLoadingRing2, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    const iconAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(cameraLoadingIconScale, {
+          toValue: 1.12,
+          duration: 700,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(cameraLoadingIconScale, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    ring1Anim.start();
+    ring2Anim.start();
+    iconAnim.start();
+
+    return () => {
+      ring1Anim.stop();
+      ring2Anim.stop();
+      iconAnim.stop();
+    };
+  }, [analysisLoading, cameraLoadingRing1, cameraLoadingRing2, cameraLoadingIconScale]);
+
+  useEffect(() => {
     Animated.spring(nutritionQuickMenuAnim, {
       toValue: nutritionQuickMenuOpen ? 1 : 0,
       friction: 8,
@@ -988,7 +1065,17 @@ export default function App() {
       }
 
       setStatusMessage("Analisis completado y guardado en el historial.");
+
+      if (analysisSourceRef.current === "camera") {
+        analysisSourceRef.current = null;
+        setSelectedStatsDate(getLocalDateKey(new Date()));
+        setStatsView("food");
+        setNutritionView("camera");
+        setImageAsset(null);
+        setActiveTab("stats");
+      }
     } catch (error) {
+      analysisSourceRef.current = null;
       const message =
         error instanceof Error
           ? error.message
@@ -2691,14 +2778,13 @@ export default function App() {
                   styles.cameraAnalyzeButton,
                   analysisLoading && styles.buttonDisabled,
                 ]}
-                onPress={analyzeCurrentMeal}
+                onPress={() => {
+                  analysisSourceRef.current = "camera";
+                  void analyzeCurrentMeal();
+                }}
                 disabled={analysisLoading}
               >
-                {analysisLoading ? (
-                  <ActivityIndicator color="#000000" />
-                ) : (
-                  <Text style={styles.cameraAnalyzeButtonText}>Analizar comida</Text>
-                )}
+                <Text style={styles.cameraAnalyzeButtonText}>Analizar comida</Text>
               </Pressable>
             </View>
           ) : (
@@ -2775,6 +2861,111 @@ export default function App() {
         >
           <Ionicons name="time-outline" size={22} color="#FFFFFF" />
         </Pressable>
+
+        {analysisLoading && analysisSourceRef.current === "camera" ? (
+          <View style={styles.cameraLoadingOverlay}>
+            {imageAsset ? (
+              <Image
+                source={{ uri: imageAsset.uri }}
+                style={StyleSheet.absoluteFillObject}
+                blurRadius={22}
+              />
+            ) : null}
+            <View style={styles.cameraLoadingDimmer} />
+
+            <View style={styles.cameraLoadingBody}>
+              <View style={styles.cameraLoadingRingContainer}>
+                <Animated.View
+                  style={[
+                    styles.cameraLoadingRing,
+                    {
+                      transform: [
+                        {
+                          scale: cameraLoadingRing1.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 2.6],
+                          }),
+                        },
+                      ],
+                      opacity: cameraLoadingRing1.interpolate({
+                        inputRange: [0, 0.3, 1],
+                        outputRange: [0.7, 0.5, 0],
+                      }),
+                    },
+                  ]}
+                />
+                <Animated.View
+                  style={[
+                    styles.cameraLoadingRing,
+                    {
+                      transform: [
+                        {
+                          scale: cameraLoadingRing2.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 2.6],
+                          }),
+                        },
+                      ],
+                      opacity: cameraLoadingRing2.interpolate({
+                        inputRange: [0, 0.3, 1],
+                        outputRange: [0.7, 0.5, 0],
+                      }),
+                    },
+                  ]}
+                />
+                <Animated.View
+                  style={[
+                    styles.cameraLoadingIconCircle,
+                    {
+                      transform: [{ scale: cameraLoadingIconScale }],
+                    },
+                  ]}
+                >
+                  <Ionicons name="sparkles" size={32} color="#000000" />
+                </Animated.View>
+              </View>
+
+              <Text style={styles.cameraLoadingTitle}>Analizando tu comida</Text>
+              <Text style={styles.cameraLoadingStatus} numberOfLines={2}>
+                {statusMessage ?? "Procesando..."}
+              </Text>
+
+              <View style={styles.cameraLoadingSteps}>
+                {(
+                  [
+                    ["Preparando perfil", "Preparando"],
+                    ["Subiendo imagen", "Subiendo"],
+                    ["Vision con IA", "Analizando"],
+                  ] as [string, string][]
+                ).map(([label, keyword], i) => {
+                  const msg = statusMessage ?? "";
+                  const stepOrder = ["Preparando", "Solicitando", "Subiendo", "Analizando"];
+                  const currentStep = stepOrder.findIndex((k) => msg.includes(k));
+                  const myStep = stepOrder.indexOf(keyword);
+                  const done = currentStep >= myStep;
+                  return (
+                    <View key={label} style={styles.cameraLoadingStepRow}>
+                      <View
+                        style={[
+                          styles.cameraLoadingStepDot,
+                          done && styles.cameraLoadingStepDotActive,
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.cameraLoadingStepText,
+                          done && styles.cameraLoadingStepTextActive,
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -3943,6 +4134,85 @@ const styles = StyleSheet.create({
     color: "#000000",
     fontFamily: "Inter_800ExtraBold",
     fontSize: 15,
+  },
+  cameraLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 50,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cameraLoadingDimmer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.62)",
+  },
+  cameraLoadingBody: {
+    alignItems: "center",
+    gap: 20,
+    paddingHorizontal: 32,
+  },
+  cameraLoadingRingContainer: {
+    width: 120,
+    height: 120,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cameraLoadingRing: {
+    position: "absolute",
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 1.5,
+    borderColor: "#00C897",
+  },
+  cameraLoadingIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#00C897",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cameraLoadingTitle: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 22,
+    textAlign: "center",
+    letterSpacing: -0.3,
+  },
+  cameraLoadingStatus: {
+    color: "rgba(255,255,255,0.55)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+    minHeight: 40,
+  },
+  cameraLoadingSteps: {
+    gap: 10,
+    alignSelf: "stretch",
+    marginTop: 4,
+  },
+  cameraLoadingStepRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  cameraLoadingStepDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  cameraLoadingStepDotActive: {
+    backgroundColor: "#00C897",
+  },
+  cameraLoadingStepText: {
+    color: "rgba(255,255,255,0.35)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+  },
+  cameraLoadingStepTextActive: {
+    color: "#FFFFFF",
   },
   cameraOnlyTabs: {
     position: "absolute",

@@ -64,10 +64,20 @@ app.post("/uploads/meal-image-url", async (req, res) => {
 
     const upload = await storageService.createMealImageUploadUrl(request);
 
+    console.log("[upload-meal-image-url] Signed URL created:", {
+      userId: request.userId,
+      fileName: request.fileName,
+      contentType: request.contentType,
+      bucket: upload.bucket,
+      path: upload.path,
+      fileUrl: upload.fileUrl,
+    });
+
     res.status(200).json({
       data: upload,
     });
   } catch (error) {
+    console.error("[upload-meal-image-url] Error:", error);
     handleError(res, error, "creating upload URL");
   }
 });
@@ -75,15 +85,39 @@ app.post("/uploads/meal-image-url", async (req, res) => {
 app.post("/logs/analyze-meal-image", async (req, res) => {
   try {
     const request = parseBody(analyzeMealRequestSchema, req.body);
+
+    console.log("[analyze-meal-image] Request received:", {
+      userId: request.userId,
+      bucket: request.bucket,
+      path: request.path,
+      mealLabel: request.mealLabel,
+      consumedAt: request.consumedAt,
+    });
+
     const imageAsset = await storageService.getImage({
       bucket: request.bucket,
       path: request.path,
+    });
+
+    console.log("[analyze-meal-image] Image fetched from storage:", {
+      bucket: imageAsset.bucket,
+      path: imageAsset.path,
+      contentType: imageAsset.contentType,
+      bytes: imageAsset.bytes.length,
+      publicUrl: imageAsset.publicUrl,
     });
 
     const analysisResult = await nutritionAnalysisService.analyzeFromImage({
       imageDataUrl: storageService.toDataUrl(imageAsset),
       mealLabel: request.mealLabel,
       notes: request.notes,
+    });
+
+    console.log("[analyze-meal-image] AI analysis done:", {
+      model: analysisResult.model,
+      mealName: analysisResult.parsed.mealName,
+      confidence: analysisResult.parsed.confidence,
+      calories: analysisResult.parsed.total.calories,
     });
 
     const log = await logRepository.createMealAnalysisLog({
@@ -99,10 +133,20 @@ app.post("/logs/analyze-meal-image", async (req, res) => {
       aiModel: analysisResult.model,
     });
 
+    console.log("[analyze-meal-image] Log saved:", {
+      logId: log.id,
+      imageUrl: log.imageUrl,
+    });
+
+    const response = serializeMealLog(log);
+
+    console.log("[analyze-meal-image] Response imageUrl:", response.imageUrl);
+
     res.status(201).json({
-      data: serializeMealLog(log),
+      data: response,
     });
   } catch (error) {
+    console.error("[analyze-meal-image] Error:", error);
     handleError(res, error, "processing meal image analysis");
   }
 });

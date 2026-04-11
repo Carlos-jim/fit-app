@@ -460,7 +460,13 @@ function MealDetailView(props: {
       {/* Image */}
       {meal.imageUrl ? (
         <View style={[styles.detailImageContainer, { backgroundColor: theme.cardMuted, borderColor: theme.stroke }]}>
-          <Image source={{ uri: meal.imageUrl }} style={styles.detailImage} resizeMode="cover" />
+          <Image
+            source={{ uri: meal.imageUrl }}
+            style={styles.detailImage}
+            resizeMode="cover"
+            onError={(e) => console.error("[MealDetail] Image load error:", meal.imageUrl, e.nativeEvent.error)}
+            onLoad={() => console.log("[MealDetail] Image loaded OK:", meal.imageUrl)}
+          />
         </View>
       ) : (
         <View style={[styles.detailImagePlaceholder, { backgroundColor: theme.card, borderColor: theme.stroke }]}>

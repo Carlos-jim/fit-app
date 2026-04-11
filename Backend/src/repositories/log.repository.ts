@@ -2,7 +2,7 @@ import {
   type AnalysisConfidence,
   type Log,
   type LogSource,
-  type Prisma,
+  Prisma,
   type PrismaClient,
 } from "@prisma/client";
 
