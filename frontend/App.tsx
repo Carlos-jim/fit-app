@@ -2921,7 +2921,14 @@ export default function App() {
                     },
                   ]}
                 >
-                  <Ionicons name="sparkles" size={32} color="#000000" />
+                  {imageAsset ? (
+                    <Image
+                      source={{ uri: imageAsset.uri }}
+                      style={styles.cameraLoadingIconImage}
+                    />
+                  ) : (
+                    <ActivityIndicator color="#000000" size="large" />
+                  )}
                 </Animated.View>
               </View>
 
@@ -4168,9 +4175,16 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#00C897",
+    backgroundColor: "#111",
+    overflow: "hidden",
+    borderWidth: 3,
+    borderColor: "#00C897",
     alignItems: "center",
     justifyContent: "center",
+  },
+  cameraLoadingIconImage: {
+    width: "100%",
+    height: "100%",
   },
   cameraLoadingTitle: {
     color: "#FFFFFF",
