@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
 import type { FitnessTheme } from "../fitness-ui";
 
 interface NextButtonProps {
@@ -15,31 +15,25 @@ export function NextButton({
   enabled,
   onPress,
   loading,
-  theme,
+  theme: _theme,
 }: NextButtonProps) {
+  const isActive = enabled && !loading;
+
   return (
     <Pressable
-      onPress={enabled ? onPress : undefined}
+      onPress={isActive ? onPress : undefined}
       style={[
         styles.button,
         {
-          backgroundColor: enabled ? theme.accent : theme.cardMuted,
+          backgroundColor: isActive ? "#101115" : "#B3B5BA",
         },
       ]}
-      disabled={!enabled}
+      disabled={!isActive}
     >
       {loading ? (
-        <Text
-          style={[styles.text, { color: enabled ? "#000000" : theme.muted }]}
-        >
-          ...
-        </Text>
+        <ActivityIndicator size="small" color="#FFFFFF" />
       ) : (
-        <Text
-          style={[styles.text, { color: enabled ? "#000000" : theme.muted }]}
-        >
-          {label}
-        </Text>
+        <Text style={styles.text}>{label}</Text>
       )}
     </Pressable>
   );
@@ -47,13 +41,15 @@ export function NextButton({
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: 16,
-    paddingVertical: 18,
+    minHeight: 60,
+    borderRadius: 10,
+    paddingHorizontal: 16,
     alignItems: "center",
     justifyContent: "center",
   },
   text: {
-    fontSize: 18,
-    fontWeight: "700",
+    fontFamily: "Inter_700Bold",
+    fontSize: 19,
+    color: "#FFFFFF",
   },
 });

@@ -1,11 +1,11 @@
 import React from "react";
 import {
+  Dimensions,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
-  Pressable,
-  Dimensions,
-  ScrollView,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -27,41 +27,37 @@ export function WelcomeScreen({
   loading = false,
 }: WelcomeScreenProps) {
   const darkMode = theme.background === "#050505";
-  const heroGradient: readonly [string, string, string] = darkMode
-    ? ["#04110D", "#0A1F18", "#050505"]
-    : ["#FFF8EC", "#F5EEE2", "#ECE4D8"];
-  const heroText = darkMode ? "#FFFFFF" : theme.text;
-  const heroMuted = darkMode ? "rgba(255,255,255,0.74)" : theme.muted;
-  const cardTone = darkMode
-    ? "rgba(255,255,255,0.06)"
-    : "rgba(255,255,255,0.72)";
-  const cardStroke = darkMode
-    ? "rgba(255,255,255,0.12)"
-    : "rgba(23,19,15,0.08)";
-  const pillTone = darkMode
-    ? "rgba(118,239,229,0.16)"
-    : "rgba(0,200,151,0.12)";
+  const gradient: readonly [string, string, string] = darkMode
+    ? ["#04100D", "#0B1F18", "#050505"]
+    : ["#FCF7EE", "#F3EBDC", "#F7F4EE"];
+  const heroText = darkMode ? "#FCFFFD" : theme.text;
+  const heroMuted = darkMode ? "rgba(245,251,248,0.74)" : theme.muted;
+  const panelTone = darkMode ? "rgba(17,24,21,0.84)" : "rgba(255,255,255,0.82)";
+  const panelStroke = darkMode
+    ? "rgba(255,255,255,0.10)"
+    : "rgba(23,19,15,0.09)";
+  const chipTone = darkMode ? "rgba(118,239,229,0.16)" : "rgba(0,200,151,0.11)";
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <LinearGradient colors={heroGradient} style={styles.gradient}>
+      <LinearGradient colors={gradient} style={styles.container}>
         <View
           style={[
-            styles.heroGlowPrimary,
+            styles.glowPrimary,
             {
               backgroundColor: darkMode
-                ? "rgba(118,239,229,0.22)"
+                ? "rgba(118,239,229,0.20)"
                 : "rgba(0,200,151,0.16)",
             },
           ]}
         />
         <View
           style={[
-            styles.heroGlowSecondary,
+            styles.glowSecondary,
             {
               backgroundColor: darkMode
-                ? "rgba(232,255,84,0.18)"
-                : "rgba(232,255,84,0.14)",
+                ? "rgba(232,255,84,0.14)"
+                : "rgba(232,255,84,0.12)",
             },
           ]}
         />
@@ -70,95 +66,98 @@ export function WelcomeScreen({
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.content}>
-            <View style={[styles.badge, { backgroundColor: pillTone }]}> 
-              <Ionicons name="sparkles" size={14} color={theme.accent} />
-              <Text style={[styles.badgeText, { color: heroText }]}>BIOMA PREMIER</Text>
+          <View
+            style={[
+              styles.heroPanel,
+              { backgroundColor: panelTone, borderColor: panelStroke },
+            ]}
+          >
+            <View style={[styles.badge, { backgroundColor: chipTone }]}>
+              <Ionicons name="sparkles" size={13} color={theme.accent} />
+              <Text style={[styles.badgeText, { color: heroText }]}>BIOMA FIT</Text>
             </View>
 
-            <Text style={[styles.title, { color: heroText }]}>Tu salud en modo elite.</Text>
-            <Text style={[styles.subtitle, { color: heroMuted }]}> 
-              Nutricion, macros y seguimiento inteligente en una experiencia
-              limpia, rapida y personalizada para ti.
+            <Text style={[styles.title, { color: heroText }]}>
+              Tu plan de nutricion inteligente.
+            </Text>
+            <Text style={[styles.subtitle, { color: heroMuted }]}>
+              Personaliza calorias, sigue tu progreso y mejora cada semana con
+              un flujo simple, visual y accionable.
             </Text>
 
-            <View style={styles.kpiRow}>
-              <KpiCard
+            <View style={styles.metricsRow}>
+              <InfoMetric
+                value="2 min"
+                label="Setup inicial"
+                textColor={heroText}
+                mutedColor={heroMuted}
+              />
+              <InfoMetric
                 value="24/7"
                 label="Asistente IA"
                 textColor={heroText}
                 mutedColor={heroMuted}
-                tone={cardTone}
-                stroke={cardStroke}
               />
-              <KpiCard
-                value="+98%"
-                label="Precision estimada"
+              <InfoMetric
+                value="100%"
+                label="Personal"
                 textColor={heroText}
                 mutedColor={heroMuted}
-                tone={cardTone}
-                stroke={cardStroke}
               />
             </View>
 
-            <View style={styles.features}>
+            <View style={styles.featureList}>
               <FeatureItem
                 icon="camera-outline"
-                title="Escaneo instantaneo"
-                text="Foto o texto, resultado nutricional en segundos."
+                title="Escaneo Rapido"
+                text="Analiza comidas por foto o texto en segundos."
                 textColor={heroText}
                 mutedColor={heroMuted}
-                tone={cardTone}
-                stroke={cardStroke}
               />
               <FeatureItem
-                icon="fitness-outline"
-                title="Plan dinamico"
-                text="Objetivos y calorias ajustados a tu progreso real."
+                icon="bar-chart-outline"
+                title="Seguimiento Claro"
+                text="Mira tus macros y tu progreso diario sin ruido."
                 textColor={heroText}
                 mutedColor={heroMuted}
-                tone={cardTone}
-                stroke={cardStroke}
               />
               <FeatureItem
-                icon="trending-up-outline"
-                title="Seguimiento premium"
-                text="Visualiza mejoras diarias con metricas claras."
+                icon="pulse-outline"
+                title="Ajustes Inteligentes"
+                text="Tu plan evoluciona con tus resultados reales."
                 textColor={heroText}
                 mutedColor={heroMuted}
-                tone={cardTone}
-                stroke={cardStroke}
               />
             </View>
           </View>
 
           <View style={styles.footer}>
             <Pressable
-              style={[styles.continueButton, loading && styles.buttonDisabled]}
               onPress={onContinue}
               disabled={loading}
+              style={[styles.primaryButton, loading && styles.buttonDisabled]}
             >
               <LinearGradient
-                colors={[theme.accent, darkMode ? "#76EFE5" : "#00B889"]}
+                colors={[theme.accent, darkMode ? "#75EDE2" : "#00B88A"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.continueButtonFill}
+                style={styles.primaryButtonFill}
               >
                 <Text
                   style={[
-                    styles.continueButtonText,
+                    styles.primaryButtonText,
                     { color: darkMode ? "#03130E" : "#FFFFFF" },
                   ]}
                 >
-                  {loading ? "Conectando..." : "Continuar"}
+                  {loading ? "Conectando..." : "Comenzar Ahora"}
                 </Text>
               </LinearGradient>
             </Pressable>
 
-            <Pressable onPress={onLogin} style={styles.loginLink}>
-              <Text style={[styles.loginText, { color: heroMuted }]}> 
+            <Pressable onPress={onLogin} style={styles.loginWrap}>
+              <Text style={[styles.loginText, { color: heroMuted }]}>
                 Ya tienes cuenta?{" "}
-                <Text style={[styles.loginLinkText, { color: theme.accent }]}> 
+                <Text style={[styles.loginLink, { color: theme.accent }]}>
                   Inicia sesion
                 </Text>
               </Text>
@@ -176,29 +175,17 @@ function FeatureItem({
   text,
   textColor,
   mutedColor,
-  tone,
-  stroke,
 }: {
   icon: React.ComponentProps<typeof Ionicons>["name"];
   title: string;
   text: string;
   textColor: string;
   mutedColor: string;
-  tone: string;
-  stroke: string;
 }) {
   return (
-    <View
-      style={[
-        styles.featureItem,
-        {
-          backgroundColor: tone,
-          borderColor: stroke,
-        },
-      ]}
-    >
+    <View style={styles.featureItem}>
       <View style={styles.featureIconWrap}>
-        <Ionicons name={icon} size={20} color={textColor} />
+        <Ionicons name={icon} size={18} color={textColor} />
       </View>
       <View style={styles.featureTextWrap}>
         <Text style={[styles.featureTitle, { color: textColor }]}>{title}</Text>
@@ -208,33 +195,21 @@ function FeatureItem({
   );
 }
 
-function KpiCard({
+function InfoMetric({
   value,
   label,
   textColor,
   mutedColor,
-  tone,
-  stroke,
 }: {
   value: string;
   label: string;
   textColor: string;
   mutedColor: string;
-  tone: string;
-  stroke: string;
 }) {
   return (
-    <View
-      style={[
-        styles.kpiCard,
-        {
-          backgroundColor: tone,
-          borderColor: stroke,
-        },
-      ]}
-    >
-      <Text style={[styles.kpiValue, { color: textColor }]}>{value}</Text>
-      <Text style={[styles.kpiLabel, { color: mutedColor }]}>{label}</Text>
+    <View style={styles.metricCard}>
+      <Text style={[styles.metricValue, { color: textColor }]}>{value}</Text>
+      <Text style={[styles.metricLabel, { color: mutedColor }]}>{label}</Text>
     </View>
   );
 }
@@ -243,136 +218,140 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  gradient: {
-    flex: 1,
+  glowPrimary: {
+    position: "absolute",
+    top: -96,
+    right: -52,
+    width: 264,
+    height: 264,
+    borderRadius: 132,
+  },
+  glowSecondary: {
+    position: "absolute",
+    bottom: 120,
+    left: -88,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
   },
   scrollContent: {
     minHeight: height,
-    paddingTop: 54,
-    paddingBottom: 44,
+    paddingHorizontal: 20,
+    paddingTop: 44,
+    paddingBottom: 28,
+    gap: 18,
   },
-  heroGlowPrimary: {
-    position: "absolute",
-    top: -90,
-    right: -48,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-  },
-  heroGlowSecondary: {
-    position: "absolute",
-    bottom: 140,
-    left: -80,
-    width: 230,
-    height: 230,
-    borderRadius: 115,
-  },
-  content: {
-    paddingHorizontal: 24,
+  heroPanel: {
+    borderRadius: 30,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
   badge: {
     alignSelf: "flex-start",
     borderRadius: 999,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 18,
+    gap: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    marginBottom: 14,
   },
   badgeText: {
     fontFamily: "Inter_700Bold",
-    fontSize: 11,
-    letterSpacing: 1.1,
+    fontSize: 10,
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
   },
   title: {
     fontFamily: "Manrope_800ExtraBold",
-    fontSize: width > 380 ? 44 : 38,
-    lineHeight: width > 380 ? 50 : 44,
-    marginBottom: 14,
+    fontSize: width > 380 ? 40 : 34,
+    lineHeight: width > 380 ? 46 : 40,
   },
   subtitle: {
+    marginTop: 10,
     fontFamily: "Inter_500Medium",
-    fontSize: 15,
-    lineHeight: 24,
-    maxWidth: 540,
+    fontSize: 14,
+    lineHeight: 22,
   },
-  kpiRow: {
-    marginTop: 22,
-    flexDirection: "row",
-    gap: 12,
-  },
-  kpiCard: {
-    flex: 1,
-    borderRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 6,
-  },
-  kpiValue: {
-    fontFamily: "Manrope_800ExtraBold",
-    fontSize: 24,
-    lineHeight: 28,
-  },
-  kpiLabel: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-  },
-  features: {
+  metricsRow: {
     marginTop: 18,
-    gap: 16,
+    flexDirection: "row",
+    gap: 8,
+  },
+  metricCard: {
+    flex: 1,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    gap: 4,
+  },
+  metricValue: {
+    fontFamily: "Manrope_800ExtraBold",
+    fontSize: 20,
+  },
+  metricLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+  },
+  featureList: {
+    marginTop: 18,
+    gap: 10,
   },
   featureItem: {
     flexDirection: "row",
     alignItems: "flex-start",
-    borderRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 10,
   },
   featureIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.12)",
-    marginRight: 12,
+    backgroundColor: "rgba(0,0,0,0.14)",
   },
   featureTextWrap: {
     flex: 1,
-    gap: 4,
+    gap: 2,
   },
   featureTitle: {
     fontFamily: "Inter_700Bold",
-    fontSize: 15,
+    fontSize: 14,
   },
   featureText: {
     fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 18,
   },
   footer: {
-    marginTop: 24,
-    paddingHorizontal: 24,
-    gap: 14,
+    marginTop: "auto",
+    gap: 12,
   },
-  continueButton: {
-    borderRadius: 20,
+  primaryButton: {
+    borderRadius: 18,
     overflow: "hidden",
   },
-  continueButtonFill: {
-    borderRadius: 20,
-    minHeight: 60,
+  primaryButtonFill: {
+    minHeight: 58,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
-  continueButtonText: {
+  primaryButtonText: {
     fontFamily: "Inter_800ExtraBold",
-    fontSize: 17,
+    fontSize: 16,
   },
-  loginLink: {
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  loginWrap: {
     alignItems: "center",
     paddingVertical: 8,
   },
@@ -380,10 +359,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 14,
   },
-  loginLinkText: {
+  loginLink: {
     fontFamily: "Inter_700Bold",
-  },
-  buttonDisabled: {
-    opacity: 0.7,
   },
 });

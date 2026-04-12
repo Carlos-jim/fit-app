@@ -2,6 +2,7 @@ export { ProgressBar } from "./progress-bar";
 export { OnboardingOptionCard } from "./onboarding-option-card";
 export { NextButton } from "./next-button";
 export { HorizontalSlider } from "./horizontal-slider";
+export { OnboardingShell } from "./onboarding-shell";
 export { WelcomeScreen } from "./welcome-screen";
 export { AuthScreen } from "./auth-screen";
 export { RegisterScreen } from "./register-screen";

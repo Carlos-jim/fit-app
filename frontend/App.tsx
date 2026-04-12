@@ -1208,6 +1208,7 @@ export default function App() {
         return (
           <OnboardingWorkoutScreen
             userId={userId}
+            goal={onboardingGoal}
             theme={theme}
             onBack={handleOnboardingBack}
             onNext={() => handleOnboardingNext("body")}

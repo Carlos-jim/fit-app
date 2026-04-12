@@ -1,19 +1,14 @@
-import React, { useState } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  Pressable,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import React, { useMemo, useState } from "react";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import type { FitnessTheme } from "../fitness-ui";
 import { biomaApi } from "../../services/bioma-api";
-import { HorizontalSlider, NextButton, ProgressBar } from "../onboarding";
+import { HorizontalSlider, NextButton, OnboardingShell } from "../onboarding";
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 7;
 const STEP = 3;
+
+type HeightUnit = "FT" | "CM";
+type WeightUnit = "LBS" | "KG";
 
 interface OnboardingBodyProps {
   userId: string;
@@ -28,128 +23,204 @@ export function OnboardingBodyScreen({
   onBack,
   onNext,
 }: OnboardingBodyProps) {
-  const [weightKg, setWeightKg] = useState(70);
-  const [heightCm, setHeightCm] = useState(170);
+  const [weightKg, setWeightKg] = useState(54);
+  const [heightCm, setHeightCm] = useState(168);
+  const [heightUnit, setHeightUnit] = useState<HeightUnit>("FT");
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>("LBS");
   const [loading, setLoading] = useState(false);
+
+  const heightDisplayValue = useMemo(() => {
+    if (heightUnit === "CM") {
+      return `${Math.round(heightCm)}cm`;
+    }
+    const totalInches = heightCm / 2.54;
+    const feet = Math.floor(totalInches / 12);
+    const inches = Math.round(totalInches - feet * 12);
+    return `${feet}ft,${inches}in`;
+  }, [heightCm, heightUnit]);
+
+  const weightDisplayValue = useMemo(() => {
+    if (weightUnit === "KG") {
+      return `${Math.round(weightKg)}kg`;
+    }
+    const pounds = Math.round(weightKg * 2.20462);
+    return `${pounds}lbs`;
+  }, [weightKg, weightUnit]);
 
   const handleNext = async () => {
     setLoading(true);
     try {
-      await biomaApi.onboardingStep3(userId, weightKg, heightCm);
+      await biomaApi.onboardingStep3(userId, Number(weightKg.toFixed(1)), Number(heightCm.toFixed(1)));
       onNext(weightKg);
     } catch (err) {
-      console.error("Error saving body data:", err);
+      Alert.alert(
+        "No se pudo guardar",
+        err instanceof Error ? err.message : "Intenta de nuevo.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
+    <OnboardingShell
+      theme={theme}
+      step={STEP}
+      totalSteps={TOTAL_STEPS}
+      title="Altura y peso"
+      subtitle="Esto se utilizara para calibrar su plan personalizado."
+      onBack={onBack}
+      footer={
+        <NextButton
+          enabled
+          onPress={handleNext}
+          loading={loading}
+          label="Siguiente"
+          theme={theme}
+        />
+      }
     >
-      <View style={styles.header}>
-        <Pressable
-          onPress={onBack}
-          style={[styles.backButton, { backgroundColor: theme.cardMuted }]}
-        >
-          <Ionicons name="arrow-back" size={24} color={theme.text} />
-        </Pressable>
-        <View style={styles.progressWrapper}>
-          <ProgressBar
-            currentStep={STEP}
-            totalSteps={TOTAL_STEPS}
-            theme={theme}
-          />
-        </View>
-        <View style={styles.placeholder} />
-      </View>
-
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <Text style={[styles.title, { color: theme.text }]}>Altura y peso</Text>
-        <Text style={[styles.subtitle, { color: theme.muted }]}>
-          Esto se utilizará para calibrar su plan personalizado.
-        </Text>
-
+      <View style={styles.formFields}>
         <HorizontalSlider
-          value={heightCm}
-          min={140}
-          max={220}
-          step={1}
-          unit="cm"
+          value={heightUnit === "CM" ? heightCm : heightCm / 30.48}
+          min={heightUnit === "CM" ? 140 : 4}
+          max={heightUnit === "CM" ? 220 : 7.5}
+          step={heightUnit === "CM" ? 1 : 0.1}
+          unit=""
           label="Altura"
+          majorStep={heightUnit === "CM" ? 20 : 1}
+          formatValue={() => heightDisplayValue}
+          headerRight={
+            <UnitToggle
+              leftLabel="ft/in"
+              rightLabel="cm"
+              activeSide={heightUnit === "FT" ? "left" : "right"}
+              onPressLeft={() => setHeightUnit("FT")}
+              onPressRight={() => setHeightUnit("CM")}
+            />
+          }
           theme={theme}
-          onChange={setHeightCm}
+          onChange={(next) => {
+            if (heightUnit === "CM") {
+              setHeightCm(next);
+            } else {
+              setHeightCm(next * 30.48);
+            }
+          }}
         />
 
         <HorizontalSlider
-          value={weightKg}
-          min={40}
-          max={200}
-          step={1}
-          unit="kg"
+          value={weightUnit === "KG" ? weightKg : weightKg * 2.20462}
+          min={weightUnit === "KG" ? 40 : 88}
+          max={weightUnit === "KG" ? 200 : 440}
+          step={weightUnit === "KG" ? 0.5 : 1}
+          unit=""
           label="Peso"
+          majorStep={weightUnit === "KG" ? 10 : 10}
+          formatValue={() => weightDisplayValue}
+          headerRight={
+            <UnitToggle
+              leftLabel="lbs"
+              rightLabel="kg"
+              activeSide={weightUnit === "LBS" ? "left" : "right"}
+              onPressLeft={() => setWeightUnit("LBS")}
+              onPressRight={() => setWeightUnit("KG")}
+            />
+          }
           theme={theme}
-          onChange={setWeightKg}
+          onChange={(next) => {
+            if (weightUnit === "KG") {
+              setWeightKg(next);
+            } else {
+              setWeightKg(next / 2.20462);
+            }
+          }}
         />
+      </View>
+    </OnboardingShell>
+  );
+}
 
-        <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: theme.muted }]}>
-            * Su información se eliminará después de generar un plan.
-          </Text>
-          <NextButton
-            enabled
-            onPress={handleNext}
-            loading={loading}
-            theme={theme}
-          />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+function UnitToggle({
+  leftLabel,
+  rightLabel,
+  activeSide,
+  onPressLeft,
+  onPressRight,
+}: {
+  leftLabel: string;
+  rightLabel: string;
+  activeSide: "left" | "right";
+  onPressLeft: () => void;
+  onPressRight: () => void;
+}) {
+  return (
+    <View style={styles.toggleWrap}>
+      <Pressable
+        onPress={onPressLeft}
+        style={[
+          styles.toggleButton,
+          activeSide === "left" ? styles.toggleButtonActive : null,
+        ]}
+      >
+        <Text
+          style={[
+            styles.toggleText,
+            activeSide === "left" ? styles.toggleTextActive : null,
+          ]}
+        >
+          {leftLabel}
+        </Text>
+      </Pressable>
+      <Pressable
+        onPress={onPressRight}
+        style={[
+          styles.toggleButton,
+          activeSide === "right" ? styles.toggleButtonActive : null,
+        ]}
+      >
+        <Text
+          style={[
+            styles.toggleText,
+            activeSide === "right" ? styles.toggleTextActive : null,
+          ]}
+        >
+          {rightLabel}
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
+  formFields: {
+    gap: 44,
+    marginTop: 8,
+  },
+  toggleWrap: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 16,
+    backgroundColor: "#DCDDE2",
+    borderRadius: 999,
+    padding: 4,
   },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  toggleButton: {
+    minWidth: 74,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
   },
-  progressWrapper: { flex: 1 },
-  placeholder: { width: 44 },
-  content: { flex: 1 },
-  scrollContent: { paddingHorizontal: 24, paddingBottom: 40 },
-  title: {
-    fontSize: 32,
-    fontWeight: "800",
-    marginTop: 24,
-    marginBottom: 12,
+  toggleButtonActive: {
+    backgroundColor: "#0F1014",
   },
-  subtitle: {
-    fontSize: 16,
-    marginBottom: 40,
-    lineHeight: 24,
+  toggleText: {
+    color: "#24262A",
+    fontFamily: "Inter_500Medium",
+    fontSize: 18,
   },
-  footer: {
-    marginTop: "auto",
-    paddingTop: 40,
-    gap: 20,
-  },
-  footerText: {
-    fontSize: 13,
-    textAlign: "center",
+  toggleTextActive: {
+    color: "#FFFFFF",
   },
 });

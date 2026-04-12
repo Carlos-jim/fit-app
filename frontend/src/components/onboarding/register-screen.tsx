@@ -1,14 +1,14 @@
-import React, { useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
-  StyleSheet,
-  Text,
-  View,
-  Pressable,
-  TextInput,
+  Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
-  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,36 +22,64 @@ interface RegisterScreenProps {
   onShowLogin: () => void;
 }
 
-export function RegisterScreen({ theme, onRegisterSuccess, onBack, onShowLogin }: RegisterScreenProps) {
+export function RegisterScreen({
+  theme,
+  onRegisterSuccess,
+  onBack,
+  onShowLogin,
+}: RegisterScreenProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const emailRef = useRef<TextInput | null>(null);
+  const passwordRef = useRef<TextInput | null>(null);
+  const confirmRef = useRef<TextInput | null>(null);
+
+  const darkMode = theme.background === "#050505";
+  const gradient: readonly [string, string, string] = darkMode
+    ? ["#061612", "#0A1F18", "#050505"]
+    : ["#FDF8EF", "#F2EADA", "#F7F4EE"];
+  const panelTone = darkMode ? "rgba(17,24,21,0.90)" : "rgba(255,255,255,0.88)";
+  const panelStroke = darkMode
+    ? "rgba(255,255,255,0.10)"
+    : "rgba(23,19,15,0.10)";
+
+  const emailTrimmed = useMemo(() => email.trim().toLowerCase(), [email]);
+  const passwordTrimmed = useMemo(() => password.trim(), [password]);
+  const canSubmit =
+    name.trim().length >= 2 &&
+    emailTrimmed.length > 4 &&
+    passwordTrimmed.length >= 6 &&
+    confirmPassword.trim().length >= 6;
+
   const handleRegister = async () => {
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      Alert.alert("Error", "Completa todos los campos.");
+    if (!canSubmit) {
+      Alert.alert("Completa los campos", "Revisa nombre, correo y contrasena.");
       return;
     }
-    if (password !== confirmPassword) {
-      Alert.alert("Error", "Las contraseñas no coinciden.");
+    if (passwordTrimmed !== confirmPassword.trim()) {
+      Alert.alert("Contrasenas distintas", "Asegurate de que coincidan.");
       return;
     }
-    if (password.length < 6) {
-      Alert.alert("Error", "La contraseña debe tener al menos 6 caracteres.");
-      return;
-    }
+
     setLoading(true);
     try {
       const result = await biomaApi.registerWithEmail({
         name: name.trim(),
-        email: email.trim(),
-        password: password.trim(),
+        email: emailTrimmed,
+        password: passwordTrimmed,
       });
       onRegisterSuccess(result.id);
     } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : "No se pudo crear la cuenta.");
+      Alert.alert(
+        "No se pudo crear la cuenta",
+        err instanceof Error ? err.message : "Intenta de nuevo.",
+      );
     } finally {
       setLoading(false);
     }
@@ -62,203 +90,319 @@ export function RegisterScreen({ theme, onRegisterSuccess, onBack, onShowLogin }
       style={[styles.container, { backgroundColor: theme.background }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <LinearGradient
-        colors={
-          theme.accent === "#00C897" && theme.background === "#050505"
-            ? ["#0A1F18", "#050505"]
-            : ["#F7F4EE", "#E8E4DB"]
-        }
-        style={styles.gradient}
-      >
-        <Pressable onPress={onBack} style={[styles.backButton, { backgroundColor: theme.cardMuted }]}>
-          <Ionicons name="arrow-back" size={24} color={theme.text} />
-        </Pressable>
-
-        <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-          <Text style={[styles.title, { color: theme.text }]}>Crear cuenta</Text>
-          <Text style={[styles.subtitle, { color: theme.muted }]}>
-            Regístrate para comenzar tu plan personalizado.
-          </Text>
-
+      <LinearGradient colors={gradient} style={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           <Pressable
-            style={[styles.socialButton, { backgroundColor: theme.cardMuted }]}
-            onPress={() => Alert.alert("Google Sign-In", "Configura Google OAuth para habilitar esta función.")}
+            onPress={onBack}
+            style={[styles.backButton, { backgroundColor: theme.cardMuted }]}
+            accessibilityLabel="Volver"
           >
-            <Ionicons name="logo-google" size={22} color="#DB4437" />
-            <Text style={[styles.socialButtonText, { color: theme.text }]}>
-              Registrarse con Google
-            </Text>
+            <Ionicons name="arrow-back" size={20} color={theme.text} />
           </Pressable>
 
-          <View style={styles.divider}>
-            <View style={[styles.dividerLine, { backgroundColor: theme.stroke }]} />
-            <Text style={[styles.dividerText, { color: theme.muted }]}>o</Text>
-            <View style={[styles.dividerLine, { backgroundColor: theme.stroke }]} />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: theme.muted }]}>Nombre</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.cardMuted, color: theme.text }]}
-              placeholder="Tu nombre"
-              placeholderTextColor={theme.muted}
-              value={name}
-              onChangeText={setName}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: theme.muted }]}>Email</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.cardMuted, color: theme.text }]}
-              placeholder="tu@email.com"
-              placeholderTextColor={theme.muted}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={email}
-              onChangeText={setEmail}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: theme.muted }]}>Contraseña</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.cardMuted, color: theme.text }]}
-              placeholder="Mínimo 6 caracteres"
-              placeholderTextColor={theme.muted}
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: theme.muted }]}>Confirmar contraseña</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.cardMuted, color: theme.text }]}
-              placeholder="Repite tu contraseña"
-              placeholderTextColor={theme.muted}
-              secureTextEntry
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-            />
-          </View>
-
-          <Pressable
+          <View
             style={[
-              styles.registerButton,
-              { backgroundColor: name && email && password ? theme.accent : theme.cardMuted },
+              styles.panel,
+              { backgroundColor: panelTone, borderColor: panelStroke },
             ]}
-            onPress={handleRegister}
-            disabled={loading || !name || !email || !password}
           >
-            <Text
-              style={[
-                styles.registerButtonText,
-                { color: name && email && password ? theme.background : theme.muted },
-              ]}
-            >
-              {loading ? "Creando cuenta..." : "Registrarse"}
+            <Text style={[styles.title, { color: theme.text }]}>Crear Cuenta</Text>
+            <Text style={[styles.subtitle, { color: theme.muted }]}>
+              Activa tu perfil y empieza tu onboarding en menos de dos minutos.
             </Text>
-          </Pressable>
 
-          <Pressable onPress={onShowLogin} style={styles.switchLink}>
-            <Text style={[styles.switchText, { color: theme.muted }]}>
-              ¿Ya tienes cuenta?{" "}
-              <Text style={[styles.switchLinkText, { color: theme.accent }]}>
-                Inicia sesión
+            <Pressable
+              style={[styles.socialButton, { backgroundColor: theme.cardMuted }]}
+              onPress={() =>
+                Alert.alert("Google Sign-In", "Configura Google OAuth para habilitarlo.")
+              }
+            >
+              <Ionicons name="logo-google" size={18} color="#DB4437" />
+              <Text style={[styles.socialButtonText, { color: theme.text }]}>
+                Registrarte con Google
               </Text>
-            </Text>
-          </Pressable>
+            </Pressable>
+
+            <View style={styles.divider}>
+              <View style={[styles.dividerLine, { backgroundColor: theme.stroke }]} />
+              <Text style={[styles.dividerText, { color: theme.muted }]}>o</Text>
+              <View style={[styles.dividerLine, { backgroundColor: theme.stroke }]} />
+            </View>
+
+            <View style={styles.fields}>
+              <Field
+                label="Nombre"
+                theme={theme}
+                icon="person-outline"
+                value={name}
+                onChangeText={setName}
+                placeholder="Tu nombre"
+                returnKeyType="next"
+                onSubmitEditing={() => emailRef.current?.focus()}
+              />
+              <Field
+                inputRef={emailRef}
+                label="Correo"
+                theme={theme}
+                icon="mail-outline"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="tu@email.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+              />
+              <PasswordField
+                inputRef={passwordRef}
+                label="Contrasena"
+                theme={theme}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Minimo 6 caracteres"
+                showPassword={showPassword}
+                onTogglePassword={() => setShowPassword((current) => !current)}
+                returnKeyType="next"
+                onSubmitEditing={() => confirmRef.current?.focus()}
+              />
+              <PasswordField
+                inputRef={confirmRef}
+                label="Confirmar Contrasena"
+                theme={theme}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder="Repite tu contrasena"
+                showPassword={showConfirmPassword}
+                onTogglePassword={() =>
+                  setShowConfirmPassword((current) => !current)
+                }
+                returnKeyType="go"
+                onSubmitEditing={handleRegister}
+              />
+            </View>
+
+            <Pressable
+              style={[
+                styles.primaryButton,
+                { backgroundColor: canSubmit ? theme.accent : theme.cardMuted },
+              ]}
+              onPress={handleRegister}
+              disabled={loading || !canSubmit}
+            >
+              <Text
+                style={[
+                  styles.primaryButtonText,
+                  { color: canSubmit ? theme.background : theme.muted },
+                ]}
+              >
+                {loading ? "Creando Cuenta..." : "Crear Cuenta"}
+              </Text>
+            </Pressable>
+
+            <Pressable onPress={onShowLogin} style={styles.linkWrap}>
+              <Text style={[styles.linkText, { color: theme.muted }]}>
+                Ya tienes cuenta?{" "}
+                <Text style={[styles.linkAccent, { color: theme.accent }]}>
+                  Inicia sesion
+                </Text>
+              </Text>
+            </Pressable>
+          </View>
         </ScrollView>
       </LinearGradient>
     </KeyboardAvoidingView>
   );
 }
 
+function Field({
+  inputRef,
+  label,
+  theme,
+  icon,
+  ...inputProps
+}: {
+  inputRef?: React.RefObject<TextInput | null>;
+  label: string;
+  theme: FitnessTheme;
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+} & React.ComponentProps<typeof TextInput>) {
+  return (
+    <View style={styles.fieldBlock}>
+      <Text style={[styles.fieldLabel, { color: theme.muted }]}>{label}</Text>
+      <View style={[styles.inputShell, { backgroundColor: theme.cardMuted }]}>
+        <Ionicons name={icon} size={16} color={theme.muted} />
+        <TextInput
+          ref={inputRef}
+          style={[styles.input, { color: theme.text }]}
+          placeholderTextColor={theme.muted}
+          {...inputProps}
+        />
+      </View>
+    </View>
+  );
+}
+
+function PasswordField({
+  inputRef,
+  label,
+  theme,
+  showPassword,
+  onTogglePassword,
+  ...inputProps
+}: {
+  inputRef?: React.RefObject<TextInput | null>;
+  label: string;
+  theme: FitnessTheme;
+  showPassword: boolean;
+  onTogglePassword: () => void;
+} & React.ComponentProps<typeof TextInput>) {
+  return (
+    <View style={styles.fieldBlock}>
+      <Text style={[styles.fieldLabel, { color: theme.muted }]}>{label}</Text>
+      <View style={[styles.inputShell, { backgroundColor: theme.cardMuted }]}>
+        <Ionicons name="lock-closed-outline" size={16} color={theme.muted} />
+        <TextInput
+          ref={inputRef}
+          style={[styles.input, { color: theme.text }]}
+          placeholderTextColor={theme.muted}
+          secureTextEntry={!showPassword}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="password"
+          textContentType="password"
+          {...inputProps}
+        />
+        <Pressable
+          onPress={onTogglePassword}
+          accessibilityLabel={showPassword ? "Ocultar contrasena" : "Ver contrasena"}
+        >
+          <Ionicons
+            name={showPassword ? "eye-off-outline" : "eye-outline"}
+            size={18}
+            color={theme.muted}
+          />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  gradient: { flex: 1 },
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+    gap: 14,
+  },
   backButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 20,
-    marginTop: 16,
   },
-  content: { flex: 1, paddingHorizontal: 24 },
-  scrollContent: { paddingBottom: 40 },
+  panel: {
+    borderRadius: 28,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingTop: 20,
+    paddingBottom: 18,
+  },
   title: {
-    fontSize: 32,
-    fontWeight: "800",
-    marginTop: 40,
-    marginBottom: 8,
+    fontFamily: "Manrope_800ExtraBold",
+    fontSize: 34,
+    lineHeight: 38,
   },
   subtitle: {
-    fontSize: 16,
-    marginBottom: 32,
-    lineHeight: 24,
+    marginTop: 10,
+    fontFamily: "Inter_500Medium",
+    fontSize: 15,
+    lineHeight: 22,
   },
   socialButton: {
+    marginTop: 20,
+    borderRadius: 16,
+    minHeight: 52,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
-    borderRadius: 16,
-    paddingVertical: 16,
-    marginBottom: 24,
+    gap: 10,
   },
   socialButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
   },
   divider: {
+    marginTop: 18,
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
-    marginBottom: 24,
+    gap: 10,
   },
   dividerLine: {
     flex: 1,
     height: 1,
   },
   dividerText: {
-    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
   },
-  inputGroup: {
-    marginBottom: 20,
+  fields: {
+    marginTop: 16,
+    gap: 12,
   },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 8,
+  fieldBlock: {
+    gap: 8,
+  },
+  fieldLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  inputShell: {
+    borderRadius: 14,
+    minHeight: 50,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   input: {
+    flex: 1,
+    fontFamily: "Inter_500Medium",
+    fontSize: 15,
+    paddingVertical: 0,
+  },
+  primaryButton: {
+    marginTop: 22,
     borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    minHeight: 54,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryButtonText: {
+    fontFamily: "Inter_700Bold",
     fontSize: 16,
   },
-  registerButton: {
-    borderRadius: 16,
-    paddingVertical: 18,
-    alignItems: "center",
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  registerButtonText: {
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  switchLink: {
+  linkWrap: {
+    marginTop: 16,
     alignItems: "center",
   },
-  switchText: {
+  linkText: {
+    fontFamily: "Inter_500Medium",
     fontSize: 14,
   },
-  switchLinkText: {
-    fontWeight: "600",
+  linkAccent: {
+    fontFamily: "Inter_700Bold",
   },
 });

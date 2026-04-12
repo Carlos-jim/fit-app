@@ -1,24 +1,28 @@
 import React, { useState } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  Pressable,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Alert, StyleSheet, View } from "react-native";
 import type { FitnessTheme } from "../fitness-ui";
 import { biomaApi, type GoalType } from "../../services/bioma-api";
-import { NextButton, OnboardingOptionCard, ProgressBar } from "../onboarding";
+import { NextButton, OnboardingOptionCard, OnboardingShell } from "../onboarding";
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 7;
 const STEP = 1;
 
-const OPTIONS: { value: GoalType; label: string }[] = [
-  { value: "LOSE_WEIGHT", label: "Perder peso" },
-  { value: "MAINTAIN", label: "Mantener" },
-  { value: "GAIN_WEIGHT", label: "Aumentar de peso" },
+const OPTIONS: { value: GoalType; label: string; subtitle: string }[] = [
+  {
+    value: "LOSE_WEIGHT",
+    label: "Perder peso",
+    subtitle: "",
+  },
+  {
+    value: "MAINTAIN",
+    label: "Mantener",
+    subtitle: "",
+  },
+  {
+    value: "GAIN_WEIGHT",
+    label: "Aumentar de peso",
+    subtitle: "",
+  },
 ];
 
 interface OnboardingGoalProps {
@@ -44,124 +48,52 @@ export function OnboardingGoalScreen({
       await biomaApi.onboardingStep1(userId, selected);
       onNext(selected);
     } catch (err) {
-      console.error("Error saving goal:", err);
+      Alert.alert(
+        "No se pudo guardar",
+        err instanceof Error ? err.message : "Intenta de nuevo.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
+    <OnboardingShell
+      theme={theme}
+      step={STEP}
+      totalSteps={TOTAL_STEPS}
+      title="¿Cuál es su objetivo?"
+      subtitle="Esto nos ayuda a generar un plan para su ingesta de calorías."
+      onBack={onBack}
+      footer={
+        <NextButton
+          enabled={!!selected}
+          onPress={handleNext}
+          loading={loading}
+          label="Siguiente"
+          theme={theme}
+        />
+      }
     >
-      <View style={styles.header}>
-        <Pressable
-          onPress={onBack}
-          style={[styles.backButton, { backgroundColor: theme.cardMuted }]}
-        >
-          <Ionicons name="arrow-back" size={24} color={theme.text} />
-        </Pressable>
-        <View style={styles.progressWrapper}>
-          <ProgressBar
-            currentStep={STEP}
-            totalSteps={TOTAL_STEPS}
+      <View style={styles.optionsContainer}>
+        {OPTIONS.map((option) => (
+          <OnboardingOptionCard
+            key={option.value}
+            option={{ value: option.value, label: option.label }}
+            subtitle={option.subtitle}
+            selected={selected === option.value}
+            onPress={setSelected}
             theme={theme}
           />
-        </View>
-        <View style={styles.placeholder} />
+        ))}
       </View>
-
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <Text style={[styles.title, { color: theme.text }]}>
-          ¿Cuál es su objetivo?
-        </Text>
-        <Text style={[styles.subtitle, { color: theme.muted }]}>
-          Esto nos ayuda a generar un plan para su ingesta de calorías.
-        </Text>
-
-        <View style={styles.optionsContainer}>
-          {OPTIONS.map((option) => (
-            <OnboardingOptionCard
-              key={option.value}
-              option={option}
-              selected={selected === option.value}
-              onPress={setSelected}
-              theme={theme}
-            />
-          ))}
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: theme.muted }]}>
-            * Su información se eliminará después de generar un plan.
-          </Text>
-          <NextButton
-            enabled={!!selected}
-            onPress={handleNext}
-            loading={loading}
-            theme={theme}
-          />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+    </OnboardingShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 16,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  progressWrapper: {
-    flex: 1,
-  },
-  placeholder: {
-    width: 44,
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "800",
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  subtitle: {
-    fontSize: 16,
-    marginBottom: 40,
-    lineHeight: 24,
-  },
   optionsContainer: {
-    marginTop: 20,
-  },
-  footer: {
-    marginTop: "auto",
-    paddingTop: 40,
-    gap: 20,
-  },
-  footerText: {
-    fontSize: 13,
-    textAlign: "center",
+    marginTop: 320,
+    gap: 2,
   },
 });

@@ -1,44 +1,43 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
-  SafeAreaView,
-  ScrollView,
+  Alert,
+  Pressable,
   StyleSheet,
   Text,
-  View,
-  Pressable,
   TextInput,
+  View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { FitnessTheme } from "../fitness-ui";
 import { biomaApi } from "../../services/bioma-api";
-import { NextButton, ProgressBar } from "../onboarding";
+import { NextButton, OnboardingShell } from "../onboarding";
 
 const TOTAL_STEPS = 7;
 const STEP = 7;
 
 const COUNTRIES = [
-  { code: "AR", name: "Argentina", flag: "🇦🇷" },
-  { code: "BO", name: "Bolivia", flag: "🇧🇴" },
-  { code: "BR", name: "Brasil", flag: "🇧🇷" },
-  { code: "CL", name: "Chile", flag: "🇨" },
-  { code: "CO", name: "Colombia", flag: "🇨🇴" },
-  { code: "CR", name: "Costa Rica", flag: "🇨🇷" },
-  { code: "CU", name: "Cuba", flag: "🇨" },
-  { code: "EC", name: "Ecuador", flag: "🇪🇨" },
-  { code: "SV", name: "El Salvador", flag: "🇸🇻" },
-  { code: "ES", name: "España", flag: "🇪🇸" },
-  { code: "US", name: "Estados Unidos", flag: "🇺🇸" },
-  { code: "GT", name: "Guatemala", flag: "🇬🇹" },
-  { code: "HN", name: "Honduras", flag: "🇭🇳" },
-  { code: "MX", name: "México", flag: "🇲🇽" },
-  { code: "NI", name: "Nicaragua", flag: "🇳🇮" },
-  { code: "PA", name: "Panamá", flag: "🇵" },
-  { code: "PY", name: "Paraguay", flag: "🇵🇾" },
-  { code: "PE", name: "Perú", flag: "🇵" },
-  { code: "PR", name: "Puerto Rico", flag: "🇵" },
-  { code: "DO", name: "Rep. Dominicana", flag: "🇩🇴" },
-  { code: "UY", name: "Uruguay", flag: "🇺🇾" },
-  { code: "VE", name: "Venezuela", flag: "🇻🇪" },
+  "Argentina",
+  "Bolivia",
+  "Brasil",
+  "Chile",
+  "Colombia",
+  "Costa Rica",
+  "Cuba",
+  "Ecuador",
+  "El Salvador",
+  "Espana",
+  "Estados Unidos",
+  "Guatemala",
+  "Honduras",
+  "Mexico",
+  "Nicaragua",
+  "Panama",
+  "Paraguay",
+  "Peru",
+  "Puerto Rico",
+  "Republica Dominicana",
+  "Uruguay",
+  "Venezuela",
 ];
 
 interface OnboardingCountryProps {
@@ -58,11 +57,13 @@ export function OnboardingCountryScreen({
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return COUNTRIES;
-    return COUNTRIES.filter((c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()),
-    );
+  const filteredCountries = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) {
+      return COUNTRIES;
+    }
+
+    return COUNTRIES.filter((country) => country.toLowerCase().includes(query));
   }, [search]);
 
   const handleFinish = async () => {
@@ -73,157 +74,135 @@ export function OnboardingCountryScreen({
       await biomaApi.deleteOnboardingSession(userId);
       onFinish();
     } catch (err) {
-      console.error("Error saving country:", err);
+      Alert.alert(
+        "No se pudo guardar",
+        err instanceof Error ? err.message : "Intenta de nuevo.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
-        <Pressable onPress={onBack} style={[styles.backButton, { backgroundColor: theme.cardMuted }]}>
-          <Ionicons name="arrow-back" size={24} color={theme.text} />
-        </Pressable>
-        <View style={styles.progressWrapper}>
-          <ProgressBar currentStep={STEP} totalSteps={TOTAL_STEPS} theme={theme} />
-        </View>
-        <View style={styles.placeholder} />
+    <OnboardingShell
+      theme={theme}
+      step={STEP}
+      totalSteps={TOTAL_STEPS}
+      title="De que pais eres?"
+      subtitle="Nos ayuda a mostrar referencias y recomendaciones mas relevantes."
+      onBack={onBack}
+      keyboardAware
+      footer={
+        <NextButton
+          label="Finalizar"
+          enabled={!!selected}
+          onPress={handleFinish}
+          loading={loading}
+          theme={theme}
+        />
+      }
+    >
+      <View style={[styles.searchBar, { backgroundColor: theme.cardMuted }]}>
+        <Ionicons name="search" size={18} color={theme.muted} />
+        <TextInput
+          style={[styles.searchInput, { color: theme.text }]}
+          placeholder="Buscar pais"
+          placeholderTextColor={theme.muted}
+          value={search}
+          onChangeText={setSearch}
+          autoCorrect={false}
+          autoCapitalize="words"
+          returnKeyType="search"
+        />
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-        <Text style={[styles.title, { color: theme.text }]}>¿De qué país eres?</Text>
-        <Text style={[styles.subtitle, { color: theme.muted }]}>
-          Esto se utilizará para calibrar su plan personalizado.
-        </Text>
-
-        <View style={[styles.searchBar, { backgroundColor: theme.cardMuted }]}>
-          <Ionicons name="search" size={20} color={theme.muted} />
-          <TextInput
-            style={[styles.searchInput, { color: theme.text }]}
-            placeholder="Buscar país..."
-            placeholderTextColor={theme.muted}
-            value={search}
-            onChangeText={setSearch}
-          />
-        </View>
-
-        <View style={styles.countriesList}>
-          {filtered.map((country) => (
-            <Pressable
-              key={country.code}
-              onPress={() => setSelected(country.name)}
-              style={[
-                styles.countryItem,
-                {
-                  backgroundColor:
-                    selected === country.name ? theme.accent : theme.cardMuted,
-                },
-              ]}
-            >
-              <Text style={styles.countryFlag}>{country.flag}</Text>
-              <Text
+      <View style={styles.countryList}>
+        {filteredCountries.length > 0 ? (
+          filteredCountries.map((country) => {
+            const active = selected === country;
+            return (
+              <Pressable
+                key={country}
+                onPress={() => setSelected(country)}
                 style={[
-                  styles.countryName,
-                  { color: selected === country.name ? theme.background : theme.text },
+                  styles.countryRow,
+                  {
+                    backgroundColor: active ? theme.accent : theme.cardMuted,
+                    borderColor: active ? theme.accent : theme.stroke,
+                  },
                 ]}
               >
-                {country.name}
-              </Text>
-              {selected === country.name && (
-                <Ionicons name="checkmark" size={22} color={theme.background} />
-              )}
-            </Pressable>
-          ))}
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: theme.muted }]}>
-            * Su información se eliminará después de generar un plan.
-          </Text>
-          <NextButton
-            label="Finalizar"
-            enabled={!!selected}
-            onPress={handleFinish}
-            loading={loading}
-            theme={theme}
-          />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+                <Text
+                  style={[
+                    styles.countryLabel,
+                    { color: active ? theme.background : theme.text },
+                  ]}
+                >
+                  {country}
+                </Text>
+                {active ? (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={18}
+                    color={theme.background}
+                  />
+                ) : null}
+              </Pressable>
+            );
+          })
+        ) : (
+          <View style={[styles.emptyCard, { backgroundColor: theme.cardMuted }]}>
+            <Text style={[styles.emptyText, { color: theme.muted }]}>
+              No encontramos resultados para "{search}".
+            </Text>
+          </View>
+        )}
+      </View>
+    </OnboardingShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 16,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  progressWrapper: { flex: 1 },
-  placeholder: { width: 44 },
-  content: { flex: 1 },
-  scrollContent: { paddingHorizontal: 24, paddingBottom: 40 },
-  title: {
-    fontSize: 32,
-    fontWeight: "800",
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  subtitle: {
-    fontSize: 16,
-    marginBottom: 24,
-    lineHeight: 24,
-  },
   searchBar: {
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 20,
+    gap: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontFamily: "Inter_500Medium",
+    fontSize: 15,
+    paddingVertical: 0,
   },
-  countriesList: {
+  countryList: {
     gap: 8,
   },
-  countryItem: {
+  countryRow: {
+    borderRadius: 14,
+    borderWidth: 1,
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
+    justifyContent: "space-between",
+    gap: 10,
   },
-  countryFlag: {
-    fontSize: 24,
-  },
-  countryName: {
+  countryLabel: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
   },
-  footer: {
-    marginTop: "auto",
-    paddingTop: 32,
-    gap: 20,
+  emptyCard: {
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
   },
-  footerText: {
+  emptyText: {
+    fontFamily: "Inter_500Medium",
     fontSize: 13,
-    textAlign: "center",
   },
 });

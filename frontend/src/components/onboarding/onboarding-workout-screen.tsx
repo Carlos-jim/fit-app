@@ -1,32 +1,28 @@
-import React, { useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
-  SafeAreaView,
-  ScrollView,
+  Alert,
+  Animated,
+  PanResponder,
+  Pressable,
   StyleSheet,
   Text,
   View,
-  Pressable,
+  type LayoutChangeEvent,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import type { FitnessTheme } from "../fitness-ui";
-import { biomaApi, type WorkoutFrequency } from "../../services/bioma-api";
 import {
-  NextButton,
-  OnboardingOptionCard,
-  ProgressBar,
-} from "../onboarding";
+  biomaApi,
+  type GoalType,
+  type WorkoutFrequency,
+} from "../../services/bioma-api";
+import { NextButton, OnboardingShell } from "../onboarding";
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 7;
 const STEP = 2;
-
-const OPTIONS: { value: WorkoutFrequency; label: string; subtitle: string }[] = [
-  { value: "LOW", label: "0-2", subtitle: "Entrenamientos de vez en cuando" },
-  { value: "MEDIUM", label: "3-5", subtitle: "Algunos entrenamientos por semana" },
-  { value: "HIGH", label: "6+", subtitle: "Atleta dedicado" },
-];
 
 interface OnboardingWorkoutProps {
   userId: string;
+  goal: GoalType;
   theme: FitnessTheme;
   onBack: () => void;
   onNext: () => void;
@@ -34,125 +30,186 @@ interface OnboardingWorkoutProps {
 
 export function OnboardingWorkoutScreen({
   userId,
+  goal,
   theme,
   onBack,
   onNext,
 }: OnboardingWorkoutProps) {
-  const [selected, setSelected] = useState<WorkoutFrequency | null>(null);
+  const [rateKgWeek, setRateKgWeek] = useState(1.0);
   const [loading, setLoading] = useState(false);
+  const [trackWidth, setTrackWidth] = useState(0);
+  const pulse = useRef(new Animated.Value(1)).current;
+
+  const MIN = 0.1;
+  const MAX = 1.5;
+  const STEP_SIZE = 0.1;
+  const ratio = (rateKgWeek - MIN) / (MAX - MIN);
+
+  const category = useMemo<WorkoutFrequency>(() => {
+    if (rateKgWeek < 0.6) return "LOW";
+    if (rateKgWeek < 1.1) return "MEDIUM";
+    return "HIGH";
+  }, [rateKgWeek]);
+
+  const descriptor = useMemo(() => {
+    if (goal === "LOSE_WEIGHT") return "Perder peso velocidad por semana";
+    if (goal === "GAIN_WEIGHT") return "Ganar peso velocidad por semana";
+    return "Cambiar peso velocidad por semana";
+  }, [goal]);
+
+  const setRateFromX = (x: number) => {
+    if (trackWidth <= 0) return;
+    const bounded = Math.max(0, Math.min(trackWidth, x));
+    const localRatio = bounded / trackWidth;
+    const raw = MIN + localRatio * (MAX - MIN);
+    const snapped = Number((Math.round(raw / STEP_SIZE) * STEP_SIZE).toFixed(1));
+    setRateKgWeek(snapped);
+    Animated.sequence([
+      Animated.timing(pulse, {
+        toValue: 1.04,
+        duration: 90,
+        useNativeDriver: true,
+      }),
+      Animated.timing(pulse, {
+        toValue: 1,
+        duration: 110,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (event) => {
+          setRateFromX(event.nativeEvent.locationX);
+        },
+        onPanResponderMove: (event) => {
+          setRateFromX(event.nativeEvent.locationX);
+        },
+      }),
+    [trackWidth],
+  );
+
+  const handleTrackLayout = (event: LayoutChangeEvent) => {
+    setTrackWidth(event.nativeEvent.layout.width);
+  };
 
   const handleNext = async () => {
-    if (!selected) return;
     setLoading(true);
     try {
-      await biomaApi.onboardingStep2(userId, selected);
+      await biomaApi.onboardingStep2(userId, category);
       onNext();
     } catch (err) {
-      console.error("Error saving workout frequency:", err);
+      Alert.alert(
+        "No se pudo guardar",
+        err instanceof Error ? err.message : "Intenta de nuevo.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
-        <Pressable onPress={onBack} style={[styles.backButton, { backgroundColor: theme.cardMuted }]}>
-          <Ionicons name="arrow-back" size={24} color={theme.text} />
+    <OnboardingShell
+      theme={theme}
+      step={STEP}
+      totalSteps={TOTAL_STEPS}
+      title="¿En cuánto tiempo desea alcanzar su objetivo?"
+      subtitle="Esto se utilizará para calibrar su plan personalizado."
+      onBack={onBack}
+      footer={
+        <NextButton
+          enabled
+          onPress={handleNext}
+          loading={loading}
+          label="Siguiente"
+          theme={theme}
+        />
+      }
+    >
+      <View style={styles.contentBlock}>
+        <Text style={styles.descriptor}>{descriptor}</Text>
+        <Animated.Text
+          style={[styles.value, { transform: [{ scale: pulse }] }]}
+        >
+          {rateKgWeek.toFixed(1)}kg
+        </Animated.Text>
+
+        <Pressable
+          onPress={(event) => setRateFromX(event.nativeEvent.locationX)}
+          onLayout={handleTrackLayout}
+          style={styles.track}
+          {...panResponder.panHandlers}
+        >
+          <View style={[styles.trackFill, { width: `${ratio * 100}%` }]} />
+          <View style={[styles.thumb, { left: `${ratio * 100}%` }]} />
         </Pressable>
-        <View style={styles.progressWrapper}>
-          <ProgressBar currentStep={STEP} totalSteps={TOTAL_STEPS} theme={theme} />
+
+        <View style={styles.scaleRow}>
+          <Text style={styles.scaleText}>0.1kg</Text>
+          <Text style={styles.scaleText}>0.8kg</Text>
+          <Text style={styles.scaleText}>1.5kg</Text>
         </View>
-        <View style={styles.placeholder} />
       </View>
-
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-        <Text style={[styles.title, { color: theme.text }]}>¿Cuántos entrenamientos haces a la semana?</Text>
-        <Text style={[styles.subtitle, { color: theme.muted }]}>
-          Esto se utilizará para calibrar su plan personalizado.
-        </Text>
-
-        <View style={styles.optionsContainer}>
-          {OPTIONS.map((option) => (
-            <OnboardingOptionCard
-              key={option.value}
-              option={{ value: option.value, label: option.label }}
-              subtitle={option.subtitle}
-              selected={selected === option.value}
-              onPress={setSelected}
-              theme={theme}
-            />
-          ))}
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: theme.muted }]}>
-            * Su información se eliminará después de generar un plan.
-          </Text>
-          <NextButton
-            enabled={!!selected}
-            onPress={handleNext}
-            loading={loading}
-            theme={theme}
-          />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+    </OnboardingShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  contentBlock: {
+    marginTop: 280,
+    gap: 14,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 16,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  progressWrapper: {
-    flex: 1,
-  },
-  placeholder: {
-    width: 44,
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "800",
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  subtitle: {
-    fontSize: 16,
-    marginBottom: 40,
-    lineHeight: 24,
-  },
-  optionsContainer: {
-    marginTop: 20,
-  },
-  footer: {
-    marginTop: "auto",
-    paddingTop: 40,
-    gap: 20,
-  },
-  footerText: {
-    fontSize: 13,
+  descriptor: {
     textAlign: "center",
+    color: "#222429",
+    fontFamily: "Inter_500Medium",
+    fontSize: 22,
+  },
+  value: {
+    color: "#111318",
+    textAlign: "center",
+    fontFamily: "Manrope_800ExtraBold",
+    fontSize: 48,
+    lineHeight: 54,
+  },
+  track: {
+    marginTop: 18,
+    height: 10,
+    backgroundColor: "#C2C4CA",
+    borderRadius: 999,
+    position: "relative",
+  },
+  trackFill: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "#101115",
+    borderRadius: 999,
+  },
+  thumb: {
+    position: "absolute",
+    top: -10,
+    marginLeft: -14,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#F4F5F7",
+    borderWidth: 1,
+    borderColor: "#D4D7DD",
+  },
+  scaleRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  scaleText: {
+    color: "#222429",
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
   },
 });
