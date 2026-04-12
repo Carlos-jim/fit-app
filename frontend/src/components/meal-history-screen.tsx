@@ -50,6 +50,30 @@ function getLocalDateKey(iso: string): string {
   return `${y}-${m}-${day}`;
 }
 
+const MONTH_NAMES = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+];
+
+function getMonthKey(dateKey: string): string {
+  return dateKey.slice(0, 7); // "2025-04"
+}
+
+function getMonthLabel(monthKey: string): string {
+  const [year, month] = monthKey.split("-").map(Number);
+  return `${MONTH_NAMES[month - 1]} ${year}`;
+}
+
 function formatDateLabel(dateKey: string): string {
   const today = getLocalDateKey(new Date().toISOString());
   const yesterday = (() => {
@@ -92,11 +116,22 @@ function getHealthScoreLabel(score: number): string {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function MealHistoryScreen({ userId, theme, mode, onOpenCamera, initialMeal, onClearInitialMeal }: Props) {
+export function MealHistoryScreen({
+  userId,
+  theme,
+  mode,
+  onOpenCamera,
+  initialMeal,
+  onClearInitialMeal,
+}: Props) {
   const [nav, setNav] = useState<NavState>(() => {
     if (initialMeal) {
       const dateKey = getLocalDateKey(initialMeal.createdAt);
-      return { view: "mealDetail", meal: initialMeal, dayLabel: formatDateLabel(dateKey) };
+      return {
+        view: "mealDetail",
+        meal: initialMeal,
+        dayLabel: formatDateLabel(dateKey),
+      };
     }
     return { view: "days" };
   });
@@ -107,7 +142,11 @@ export function MealHistoryScreen({ userId, theme, mode, onOpenCamera, initialMe
   useEffect(() => {
     if (initialMeal) {
       const dateKey = getLocalDateKey(initialMeal.createdAt);
-      setNav({ view: "mealDetail", meal: initialMeal, dayLabel: formatDateLabel(dateKey) });
+      setNav({
+        view: "mealDetail",
+        meal: initialMeal,
+        dayLabel: formatDateLabel(dateKey),
+      });
     }
   }, [initialMeal]);
 
@@ -124,7 +163,9 @@ export function MealHistoryScreen({ userId, theme, mode, onOpenCamera, initialMe
       const data = await biomaApi.getLogs(id);
       setLogs(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar el historial.");
+      setError(
+        e instanceof Error ? e.message : "No se pudo cargar el historial.",
+      );
     } finally {
       setLoading(false);
     }
@@ -143,7 +184,9 @@ export function MealHistoryScreen({ userId, theme, mode, onOpenCamera, initialMe
       .map(([date, meals]) => ({
         date,
         label: formatDateLabel(date),
-        totalCalories: Math.round(meals.reduce((sum, m) => sum + m.calories, 0)),
+        totalCalories: Math.round(
+          meals.reduce((sum, m) => sum + m.calories, 0),
+        ),
         mealCount: meals.length,
         meals,
       }));
@@ -159,7 +202,12 @@ export function MealHistoryScreen({ userId, theme, mode, onOpenCamera, initialMe
         theme={theme}
         onOpenCamera={onOpenCamera}
         onSelectDay={(group) =>
-          setNav({ view: "dayMeals", date: group.date, label: group.label, meals: group.meals })
+          setNav({
+            view: "dayMeals",
+            date: group.date,
+            label: group.label,
+            meals: group.meals,
+          })
         }
         onRetry={() => userId && void loadLogs(userId)}
       />
@@ -189,7 +237,9 @@ export function MealHistoryScreen({ userId, theme, mode, onOpenCamera, initialMe
       onBack={() => {
         onClearInitialMeal?.();
         const dateKey = getLocalDateKey(nav.meal.createdAt);
-        const dayMeals = logs.filter((l) => getLocalDateKey(l.createdAt) === dateKey);
+        const dayMeals = logs.filter(
+          (l) => getLocalDateKey(l.createdAt) === dateKey,
+        );
 
         if (dayMeals.length > 0) {
           setNav({
@@ -219,12 +269,51 @@ function DayListView(props: {
   onRetry: () => void;
 }) {
   const { theme } = props;
+  const now = new Date();
+  const [filterYear, setFilterYear] = useState(now.getFullYear());
+  const [filterMonth, setFilterMonth] = useState(now.getMonth());
+
+  const filterMonthKey = `${filterYear}-${String(filterMonth + 1).padStart(2, "0")}`;
+
+  const filteredGroups = useMemo(() => {
+    return props.dayGroups.filter(
+      (g) => getMonthKey(g.date) === filterMonthKey,
+    );
+  }, [props.dayGroups, filterMonthKey]);
+
+  const hasAnyData = props.dayGroups.length > 0;
+
+  const goPrevMonth = () => {
+    if (filterMonth === 0) {
+      setFilterMonth(11);
+      setFilterYear((y) => y - 1);
+    } else {
+      setFilterMonth((m) => m - 1);
+    }
+  };
+
+  const goNextMonth = () => {
+    const nowY = now.getFullYear();
+    const nowM = now.getMonth();
+    if (filterYear === nowY && filterMonth === nowM) return;
+    if (filterMonth === 11) {
+      setFilterMonth(0);
+      setFilterYear((y) => y + 1);
+    } else {
+      setFilterMonth((m) => m + 1);
+    }
+  };
+
+  const isCurrentMonth =
+    filterYear === now.getFullYear() && filterMonth === now.getMonth();
 
   return (
     <View style={styles.screen}>
       <View style={[styles.headerRow]}>
         <View>
-          <Text style={[styles.eyebrow, { color: theme.accent }]}>Nutricion IA</Text>
+          <Text style={[styles.eyebrow, { color: theme.accent }]}>
+            Nutricion IA
+          </Text>
           <Text style={[styles.title, { color: theme.text }]}>Historial</Text>
         </View>
         <Pressable
@@ -235,34 +324,88 @@ function DayListView(props: {
         </Pressable>
       </View>
 
+      {hasAnyData && (
+        <View style={styles.monthFilterBar}>
+          <Pressable
+            style={[styles.monthArrow, { opacity: isCurrentMonth ? 0.3 : 1 }]}
+            onPress={goPrevMonth}
+            disabled={isCurrentMonth}
+          >
+            <Ionicons name="chevron-back" size={22} color={theme.text} />
+          </Pressable>
+          <Text style={[styles.monthLabel, { color: theme.text }]}>
+            {getMonthLabel(filterMonthKey)}
+          </Text>
+          <Pressable
+            style={[styles.monthArrow, { opacity: isCurrentMonth ? 0.3 : 1 }]}
+            onPress={goNextMonth}
+            disabled={isCurrentMonth}
+          >
+            <Ionicons name="chevron-forward" size={22} color={theme.text} />
+          </Pressable>
+        </View>
+      )}
+
       {props.loading ? (
         <View style={styles.centered}>
           <ActivityIndicator color={theme.accent} size="large" />
-          <Text style={[styles.mutedText, { color: theme.muted }]}>Cargando historial...</Text>
+          <Text style={[styles.mutedText, { color: theme.muted }]}>
+            Cargando historial...
+          </Text>
         </View>
       ) : props.error ? (
-        <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.stroke }]}>
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>No se pudo cargar</Text>
-          <Text style={[styles.emptyText, { color: theme.muted }]}>{props.error}</Text>
+        <View
+          style={[
+            styles.emptyCard,
+            { backgroundColor: theme.card, borderColor: theme.stroke },
+          ]}
+        >
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>
+            No se pudo cargar
+          </Text>
+          <Text style={[styles.emptyText, { color: theme.muted }]}>
+            {props.error}
+          </Text>
           <Pressable
             style={[styles.retryButton, { backgroundColor: theme.accent }]}
             onPress={props.onRetry}
           >
-            <Text style={[styles.retryButtonText, { color: theme.background }]}>Reintentar</Text>
+            <Text style={[styles.retryButtonText, { color: theme.background }]}>
+              Reintentar
+            </Text>
           </Pressable>
         </View>
       ) : !props.userId ? (
-        <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.stroke }]}>
-          <Ionicons name="person-circle-outline" size={40} color={theme.muted} />
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>Perfil no conectado</Text>
+        <View
+          style={[
+            styles.emptyCard,
+            { backgroundColor: theme.card, borderColor: theme.stroke },
+          ]}
+        >
+          <Ionicons
+            name="person-circle-outline"
+            size={40}
+            color={theme.muted}
+          />
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>
+            Perfil no conectado
+          </Text>
           <Text style={[styles.emptyText, { color: theme.muted }]}>
-            Conecta tu perfil desde la tab de Perfil para ver el historial de comidas.
+            Conecta tu perfil desde la tab de Perfil para ver el historial de
+            comidas.
           </Text>
         </View>
       ) : props.dayGroups.length === 0 ? (
-        <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.stroke }]}>
+        <View
+          style={[
+            styles.emptyCard,
+            { backgroundColor: theme.card, borderColor: theme.stroke },
+          ]}
+        >
           <Ionicons name="nutrition-outline" size={40} color={theme.muted} />
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>Sin registros aun</Text>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>
+            Sin registros aun
+          </Text>
           <Text style={[styles.emptyText, { color: theme.muted }]}>
             Escanea tu primera comida con la camara para empezar el historial.
           </Text>
@@ -270,28 +413,38 @@ function DayListView(props: {
             style={[styles.retryButton, { backgroundColor: theme.accent }]}
             onPress={props.onOpenCamera}
           >
-            <Text style={[styles.retryButtonText, { color: theme.background }]}>Escanear comida</Text>
+            <Text style={[styles.retryButtonText, { color: theme.background }]}>
+              Escanear comida
+            </Text>
           </Pressable>
         </View>
       ) : (
-        props.dayGroups.map((group) => (
+        filteredGroups.map((group) => (
           <Pressable
             key={group.date}
-            style={[styles.dayCard, { backgroundColor: theme.card, borderColor: theme.stroke }]}
+            style={[
+              styles.dayCard,
+              { backgroundColor: theme.card, borderColor: theme.stroke },
+            ]}
             onPress={() => props.onSelectDay(group)}
           >
             <View style={styles.dayCardContent}>
               <View style={styles.dayCardLeft}>
-                <Text style={[styles.dayLabel, { color: theme.text }]}>{group.label}</Text>
+                <Text style={[styles.dayLabel, { color: theme.text }]}>
+                  {group.label}
+                </Text>
                 <Text style={[styles.dayMeta, { color: theme.muted }]}>
-                  {group.mealCount} {group.mealCount === 1 ? "comida" : "comidas"}
+                  {group.mealCount}{" "}
+                  {group.mealCount === 1 ? "comida" : "comidas"}
                 </Text>
               </View>
               <View style={styles.dayCardRight}>
                 <Text style={[styles.dayCalories, { color: theme.accent }]}>
                   {group.totalCalories.toLocaleString()}
                 </Text>
-                <Text style={[styles.dayCaloriesUnit, { color: theme.muted }]}>kcal</Text>
+                <Text style={[styles.dayCaloriesUnit, { color: theme.muted }]}>
+                  kcal
+                </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={theme.muted} />
             </View>
@@ -312,46 +465,70 @@ function DayMealsView(props: {
   onSelectMeal: (meal: MealLog) => void;
 }) {
   const { theme } = props;
-  const totalCalories = Math.round(props.meals.reduce((s, m) => s + m.calories, 0));
+  const totalCalories = Math.round(
+    props.meals.reduce((s, m) => s + m.calories, 0),
+  );
 
   return (
     <View style={styles.screen}>
       <Pressable style={styles.backRow} onPress={props.onBack}>
         <Ionicons name="chevron-back" size={20} color={theme.accent} />
-        <Text style={[styles.backText, { color: theme.accent }]}>Historial</Text>
+        <Text style={[styles.backText, { color: theme.accent }]}>
+          Historial
+        </Text>
       </Pressable>
 
       <Text style={[styles.title, { color: theme.text }]}>{props.label}</Text>
       <Text style={[styles.daySubtitle, { color: theme.muted }]}>
-        {props.meals.length} {props.meals.length === 1 ? "comida" : "comidas"} · {totalCalories.toLocaleString()} kcal total
+        {props.meals.length} {props.meals.length === 1 ? "comida" : "comidas"} ·{" "}
+        {totalCalories.toLocaleString()} kcal total
       </Text>
 
       {props.meals.map((meal) => (
         <Pressable
           key={meal.id}
-          style={[styles.mealCard, { backgroundColor: theme.card, borderColor: theme.stroke }]}
+          style={[
+            styles.mealCard,
+            { backgroundColor: theme.card, borderColor: theme.stroke },
+          ]}
           onPress={() => props.onSelectMeal(meal)}
         >
-          <View style={[styles.mealThumb, { backgroundColor: theme.cardMuted }]}>
+          <View
+            style={[styles.mealThumb, { backgroundColor: theme.cardMuted }]}
+          >
             {meal.imageUrl ? (
-              <Image source={{ uri: meal.imageUrl }} style={styles.mealThumbImage} />
+              <Image
+                source={{ uri: meal.imageUrl }}
+                style={styles.mealThumbImage}
+              />
             ) : (
-              <Ionicons name="restaurant-outline" size={22} color={theme.muted} />
+              <Ionicons
+                name="restaurant-outline"
+                size={22}
+                color={theme.muted}
+              />
             )}
           </View>
 
           <View style={styles.mealInfo}>
-            <Text style={[styles.mealName, { color: theme.text }]} numberOfLines={2}>
+            <Text
+              style={[styles.mealName, { color: theme.text }]}
+              numberOfLines={2}
+            >
               {meal.title ?? "Comida analizada"}
             </Text>
-            <Text style={[styles.mealTime, { color: theme.muted }]}>{formatTime(meal.createdAt)}</Text>
+            <Text style={[styles.mealTime, { color: theme.muted }]}>
+              {formatTime(meal.createdAt)}
+            </Text>
           </View>
 
           <View style={styles.mealCalBlock}>
             <Text style={[styles.mealCal, { color: theme.text }]}>
               {Math.round(meal.calories)}
             </Text>
-            <Text style={[styles.mealCalUnit, { color: theme.muted }]}>kcal</Text>
+            <Text style={[styles.mealCalUnit, { color: theme.muted }]}>
+              kcal
+            </Text>
           </View>
 
           <Ionicons name="chevron-forward" size={16} color={theme.muted} />
@@ -373,7 +550,9 @@ function MealDetailView(props: {
   const { meal, theme } = props;
   const palette = props.mode === "night" ? nightPalette : dayPalette;
 
-  const [suggestion, setSuggestion] = useState<MealSuggestionResponse | null>(null);
+  const [suggestion, setSuggestion] = useState<MealSuggestionResponse | null>(
+    null,
+  );
   const [suggestionLoading, setSuggestionLoading] = useState(false);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
   const [suggestionExpanded, setSuggestionExpanded] = useState(false);
@@ -454,22 +633,42 @@ function MealDetailView(props: {
     <View style={styles.screen}>
       <Pressable style={styles.backRow} onPress={props.onBack}>
         <Ionicons name="chevron-back" size={20} color={theme.accent} />
-        <Text style={[styles.backText, { color: theme.accent }]}>{props.dayLabel}</Text>
+        <Text style={[styles.backText, { color: theme.accent }]}>
+          {props.dayLabel}
+        </Text>
       </Pressable>
 
       {/* Image */}
       {meal.imageUrl ? (
-        <View style={[styles.detailImageContainer, { backgroundColor: theme.cardMuted, borderColor: theme.stroke }]}>
+        <View
+          style={[
+            styles.detailImageContainer,
+            { backgroundColor: theme.cardMuted, borderColor: theme.stroke },
+          ]}
+        >
           <Image
             source={{ uri: meal.imageUrl }}
             style={styles.detailImage}
             resizeMode="cover"
-            onError={(e) => console.error("[MealDetail] Image load error:", meal.imageUrl, e.nativeEvent.error)}
-            onLoad={() => console.log("[MealDetail] Image loaded OK:", meal.imageUrl)}
+            onError={(e) =>
+              console.error(
+                "[MealDetail] Image load error:",
+                meal.imageUrl,
+                e.nativeEvent.error,
+              )
+            }
+            onLoad={() =>
+              console.log("[MealDetail] Image loaded OK:", meal.imageUrl)
+            }
           />
         </View>
       ) : (
-        <View style={[styles.detailImagePlaceholder, { backgroundColor: theme.card, borderColor: theme.stroke }]}>
+        <View
+          style={[
+            styles.detailImagePlaceholder,
+            { backgroundColor: theme.card, borderColor: theme.stroke },
+          ]}
+        >
           <Ionicons name="restaurant-outline" size={48} color={theme.muted} />
         </View>
       )}
@@ -477,7 +676,9 @@ function MealDetailView(props: {
       {/* Title + confidence */}
       <View style={styles.detailTitleRow}>
         <View style={styles.detailTitleBlock}>
-          <Text style={[styles.detailEyebrow, { color: theme.accent }]}>Resultado IA</Text>
+          <Text style={[styles.detailEyebrow, { color: theme.accent }]}>
+            Resultado IA
+          </Text>
           <Text style={[styles.detailTitle, { color: theme.text }]}>
             {meal.title ?? "Comida analizada"}
           </Text>
@@ -485,44 +686,112 @@ function MealDetailView(props: {
             {props.dayLabel} · {formatTime(meal.createdAt)}
           </Text>
         </View>
-        <View style={[styles.confidencePill, { backgroundColor: palette.confidenceBg }]}>
-          <Text style={[styles.confidenceText, { color: palette.confidenceText }]}>
+        <View
+          style={[
+            styles.confidencePill,
+            { backgroundColor: palette.confidenceBg },
+          ]}
+        >
+          <Text
+            style={[styles.confidenceText, { color: palette.confidenceText }]}
+          >
             {meal.confidence}
           </Text>
         </View>
       </View>
 
       {/* Macro grid */}
-      <View style={[styles.macroCard, { backgroundColor: theme.card, borderColor: theme.stroke }]}>
-        <Text style={[styles.macroCardTitle, { color: theme.text }]}>Macronutrientes</Text>
+      <View
+        style={[
+          styles.macroCard,
+          { backgroundColor: theme.card, borderColor: theme.stroke },
+        ]}
+      >
+        <Text style={[styles.macroCardTitle, { color: theme.text }]}>
+          Macronutrientes
+        </Text>
         <View style={styles.macroGrid}>
-          <MacroBox label="Calorias" value={`${Math.round(meal.calories)}`} unit="kcal" theme={theme} accent={theme.accent} />
-          <MacroBox label="Proteina" value={`${Math.round(meal.proteinGrams)}`} unit="g" theme={theme} accent="#76EFE5" />
-          <MacroBox label="Carbohidratos" value={`${Math.round(meal.carbsGrams)}`} unit="g" theme={theme} accent="#E8FF54" />
-          <MacroBox label="Grasas" value={`${Math.round(meal.fatGrams)}`} unit="g" theme={theme} accent="#FF9A5C" />
+          <MacroBox
+            label="Calorias"
+            value={`${Math.round(meal.calories)}`}
+            unit="kcal"
+            theme={theme}
+            accent={theme.accent}
+          />
+          <MacroBox
+            label="Proteina"
+            value={`${Math.round(meal.proteinGrams)}`}
+            unit="g"
+            theme={theme}
+            accent="#76EFE5"
+          />
+          <MacroBox
+            label="Carbohidratos"
+            value={`${Math.round(meal.carbsGrams)}`}
+            unit="g"
+            theme={theme}
+            accent="#E8FF54"
+          />
+          <MacroBox
+            label="Grasas"
+            value={`${Math.round(meal.fatGrams)}`}
+            unit="g"
+            theme={theme}
+            accent="#FF9A5C"
+          />
           {meal.fiberGrams != null && (
-            <MacroBox label="Fibra" value={`${Math.round(meal.fiberGrams)}`} unit="g" theme={theme} accent={theme.muted} />
+            <MacroBox
+              label="Fibra"
+              value={`${Math.round(meal.fiberGrams)}`}
+              unit="g"
+              theme={theme}
+              accent={theme.muted}
+            />
           )}
           {meal.sugarGrams != null && (
-            <MacroBox label="Azucar" value={`${Math.round(meal.sugarGrams)}`} unit="g" theme={theme} accent={theme.muted} />
+            <MacroBox
+              label="Azucar"
+              value={`${Math.round(meal.sugarGrams)}`}
+              unit="g"
+              theme={theme}
+              accent={theme.muted}
+            />
           )}
           {meal.sodiumMg != null && (
-            <MacroBox label="Sodio" value={`${Math.round(meal.sodiumMg)}`} unit="mg" theme={theme} accent={theme.muted} />
+            <MacroBox
+              label="Sodio"
+              value={`${Math.round(meal.sodiumMg)}`}
+              unit="mg"
+              theme={theme}
+              accent={theme.muted}
+            />
           )}
         </View>
       </View>
 
       {/* Ingredients */}
       {meal.ingredients.length > 0 && (
-        <View style={[styles.macroCard, { backgroundColor: theme.card, borderColor: theme.stroke }]}>
-          <Text style={[styles.macroCardTitle, { color: theme.text }]}>Ingredientes detectados</Text>
+        <View
+          style={[
+            styles.macroCard,
+            { backgroundColor: theme.card, borderColor: theme.stroke },
+          ]}
+        >
+          <Text style={[styles.macroCardTitle, { color: theme.text }]}>
+            Ingredientes detectados
+          </Text>
           {meal.ingredients.map((ing, i) => (
             <View
               key={`${ing.name}-${i}`}
-              style={[styles.ingredientRow, { borderBottomColor: theme.stroke }]}
+              style={[
+                styles.ingredientRow,
+                { borderBottomColor: theme.stroke },
+              ]}
             >
               <View>
-                <Text style={[styles.ingredientName, { color: theme.text }]}>{ing.name}</Text>
+                <Text style={[styles.ingredientName, { color: theme.text }]}>
+                  {ing.name}
+                </Text>
                 <Text style={[styles.ingredientGrams, { color: theme.muted }]}>
                   {Math.round(ing.estimatedGrams)} g
                 </Text>
@@ -537,8 +806,15 @@ function MealDetailView(props: {
 
       {/* Warnings */}
       {meal.warnings.length > 0 && (
-        <View style={[styles.macroCard, { backgroundColor: theme.card, borderColor: theme.stroke }]}>
-          <Text style={[styles.macroCardTitle, { color: theme.text }]}>Observaciones</Text>
+        <View
+          style={[
+            styles.macroCard,
+            { backgroundColor: theme.card, borderColor: theme.stroke },
+          ]}
+        >
+          <Text style={[styles.macroCardTitle, { color: theme.text }]}>
+            Observaciones
+          </Text>
           {meal.warnings.map((w, i) => (
             <Text key={i} style={[styles.warningText, { color: theme.muted }]}>
               · {w}
@@ -548,13 +824,25 @@ function MealDetailView(props: {
       )}
 
       {/* ─── AI Suggestion Section ───────────────────────────────────────── */}
-      <View style={[styles.suggestionSection, { backgroundColor: theme.card, borderColor: theme.stroke }]}>
+      <View
+        style={[
+          styles.suggestionSection,
+          { backgroundColor: theme.card, borderColor: theme.stroke },
+        ]}
+      >
         <View style={styles.suggestionHeader}>
-          <View style={[styles.suggestionIconWrap, { backgroundColor: `${theme.accent}18` }]}>
+          <View
+            style={[
+              styles.suggestionIconWrap,
+              { backgroundColor: `${theme.accent}18` },
+            ]}
+          >
             <Ionicons name="sparkles" size={18} color={theme.accent} />
           </View>
           <View style={styles.suggestionHeaderText}>
-            <Text style={[styles.suggestionEyebrow, { color: theme.accent }]}>ANALISIS IA</Text>
+            <Text style={[styles.suggestionEyebrow, { color: theme.accent }]}>
+              ANALISIS IA
+            </Text>
             <Text style={[styles.suggestionHeaderTitle, { color: theme.text }]}>
               Evaluacion nutricional
             </Text>
@@ -584,7 +872,9 @@ function MealDetailView(props: {
               ]}
             />
             <ActivityIndicator color={theme.accent} size="small" />
-            <Text style={[styles.suggestionLoadingText, { color: theme.muted }]}>
+            <Text
+              style={[styles.suggestionLoadingText, { color: theme.muted }]}
+            >
               Analizando con IA...
             </Text>
           </View>
@@ -595,10 +885,18 @@ function MealDetailView(props: {
               {suggestionError}
             </Text>
             <Pressable
-              style={[styles.suggestionRetryButton, { backgroundColor: theme.accent }]}
+              style={[
+                styles.suggestionRetryButton,
+                { backgroundColor: theme.accent },
+              ]}
               onPress={loadSuggestion}
             >
-              <Text style={[styles.suggestionRetryText, { color: theme.background }]}>
+              <Text
+                style={[
+                  styles.suggestionRetryText,
+                  { color: theme.background },
+                ]}
+              >
                 Reintentar
               </Text>
             </Pressable>
@@ -629,7 +927,9 @@ function MealDetailView(props: {
                 <Text style={[styles.healthScoreLabel, { color: theme.text }]}>
                   {getHealthScoreLabel(suggestion.healthScore)}
                 </Text>
-                <Text style={[styles.healthScoreCaption, { color: theme.muted }]}>
+                <Text
+                  style={[styles.healthScoreCaption, { color: theme.muted }]}
+                >
                   {suggestion.isHealthy
                     ? "Esta comida es una buena eleccion"
                     : "Se detectaron areas de mejora"}
@@ -653,8 +953,12 @@ function MealDetailView(props: {
                 </View>
                 {suggestion.positiveAspects.map((aspect, i) => (
                   <View key={i} style={styles.aspectItem}>
-                    <View style={[styles.aspectDot, { backgroundColor: "#34D399" }]} />
-                    <Text style={[styles.aspectText, { color: theme.text }]}>{aspect}</Text>
+                    <View
+                      style={[styles.aspectDot, { backgroundColor: "#34D399" }]}
+                    />
+                    <Text style={[styles.aspectText, { color: theme.text }]}>
+                      {aspect}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -671,8 +975,12 @@ function MealDetailView(props: {
                 </View>
                 {suggestion.concerns.map((concern, i) => (
                   <View key={i} style={styles.aspectItem}>
-                    <View style={[styles.aspectDot, { backgroundColor: "#FBBF24" }]} />
-                    <Text style={[styles.aspectText, { color: theme.text }]}>{concern}</Text>
+                    <View
+                      style={[styles.aspectDot, { backgroundColor: "#FBBF24" }]}
+                    />
+                    <Text style={[styles.aspectText, { color: theme.text }]}>
+                      {concern}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -690,14 +998,23 @@ function MealDetailView(props: {
               onPress={() => setSuggestionExpanded((current) => !current)}
             >
               <View style={styles.alternativeHeader}>
-                <View style={[styles.alternativeIconBadge, { backgroundColor: `${theme.accent}20` }]}>
+                <View
+                  style={[
+                    styles.alternativeIconBadge,
+                    { backgroundColor: `${theme.accent}20` },
+                  ]}
+                >
                   <Ionicons name="leaf" size={18} color={theme.accent} />
                 </View>
                 <View style={styles.alternativeHeaderText}>
-                  <Text style={[styles.alternativeEyebrow, { color: theme.accent }]}>
+                  <Text
+                    style={[styles.alternativeEyebrow, { color: theme.accent }]}
+                  >
                     ALTERNATIVA SUGERIDA
                   </Text>
-                  <Text style={[styles.alternativeTitle, { color: theme.text }]}>
+                  <Text
+                    style={[styles.alternativeTitle, { color: theme.text }]}
+                  >
                     {suggestion.suggestion.title}
                   </Text>
                 </View>
@@ -719,7 +1036,12 @@ function MealDetailView(props: {
 
               {suggestionExpanded && (
                 <View style={styles.alternativeBody}>
-                  <Text style={[styles.alternativeDescription, { color: theme.muted }]}>
+                  <Text
+                    style={[
+                      styles.alternativeDescription,
+                      { color: theme.muted },
+                    ]}
+                  >
                     {suggestion.suggestion.description}
                   </Text>
 
@@ -727,28 +1049,36 @@ function MealDetailView(props: {
                   <View style={styles.alternativeMacroRow}>
                     <MiniMacro
                       label="Cal"
-                      value={Math.round(suggestion.suggestion.estimatedCalories)}
+                      value={Math.round(
+                        suggestion.suggestion.estimatedCalories,
+                      )}
                       unit="kcal"
                       accent={theme.accent}
                       theme={theme}
                     />
                     <MiniMacro
                       label="Prot"
-                      value={Math.round(suggestion.suggestion.estimatedProteinGrams)}
+                      value={Math.round(
+                        suggestion.suggestion.estimatedProteinGrams,
+                      )}
                       unit="g"
                       accent="#76EFE5"
                       theme={theme}
                     />
                     <MiniMacro
                       label="Carbs"
-                      value={Math.round(suggestion.suggestion.estimatedCarbsGrams)}
+                      value={Math.round(
+                        suggestion.suggestion.estimatedCarbsGrams,
+                      )}
                       unit="g"
                       accent="#E8FF54"
                       theme={theme}
                     />
                     <MiniMacro
                       label="Grasa"
-                      value={Math.round(suggestion.suggestion.estimatedFatGrams)}
+                      value={Math.round(
+                        suggestion.suggestion.estimatedFatGrams,
+                      )}
                       unit="g"
                       accent="#FF9A5C"
                       theme={theme}
@@ -760,8 +1090,14 @@ function MealDetailView(props: {
                     <View style={styles.benefitsWrap}>
                       {suggestion.suggestion.benefits.map((benefit, i) => (
                         <View key={i} style={styles.benefitItem}>
-                          <Ionicons name="star" size={12} color={theme.accent} />
-                          <Text style={[styles.benefitText, { color: theme.text }]}>
+                          <Ionicons
+                            name="star"
+                            size={12}
+                            color={theme.accent}
+                          />
+                          <Text
+                            style={[styles.benefitText, { color: theme.text }]}
+                          >
                             {benefit}
                           </Text>
                         </View>
@@ -789,12 +1125,23 @@ function MacroBox(props: {
 }) {
   const { theme } = props;
   return (
-    <View style={[styles.macroBox, { backgroundColor: theme.cardMuted, borderColor: theme.stroke }]}>
-      <View style={[styles.macroAccentDot, { backgroundColor: props.accent }]} />
-      <Text style={[styles.macroLabel, { color: theme.muted }]}>{props.label}</Text>
+    <View
+      style={[
+        styles.macroBox,
+        { backgroundColor: theme.cardMuted, borderColor: theme.stroke },
+      ]}
+    >
+      <View
+        style={[styles.macroAccentDot, { backgroundColor: props.accent }]}
+      />
+      <Text style={[styles.macroLabel, { color: theme.muted }]}>
+        {props.label}
+      </Text>
       <Text style={[styles.macroValue, { color: theme.text }]}>
         {props.value}{" "}
-        <Text style={[styles.macroUnit, { color: theme.muted }]}>{props.unit}</Text>
+        <Text style={[styles.macroUnit, { color: theme.muted }]}>
+          {props.unit}
+        </Text>
       </Text>
     </View>
   );
@@ -812,7 +1159,9 @@ function MiniMacro(props: {
   return (
     <View style={styles.miniMacroItem}>
       <View style={[styles.miniMacroDot, { backgroundColor: props.accent }]} />
-      <Text style={[styles.miniMacroValue, { color: props.theme.text }]}>{props.value}</Text>
+      <Text style={[styles.miniMacroValue, { color: props.theme.text }]}>
+        {props.value}
+      </Text>
       <Text style={[styles.miniMacroLabel, { color: props.theme.muted }]}>
         {props.label}
       </Text>
@@ -843,6 +1192,23 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-end",
     marginBottom: 4,
+  },
+  monthFilterBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 24,
+    paddingVertical: 14,
+    marginBottom: 8,
+  },
+  monthArrow: {
+    padding: 6,
+  },
+  monthLabel: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    minWidth: 160,
+    textAlign: "center",
   },
   eyebrow: {
     fontFamily: "Inter_700Bold",

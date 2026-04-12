@@ -59,6 +59,18 @@ import {
   fitnessColors,
   fitnessLightColors,
 } from "./src/components/fitness-ui";
+import {
+  WelcomeScreen,
+  AuthScreen,
+  RegisterScreen,
+  OnboardingGoalScreen,
+  OnboardingWorkoutScreen,
+  OnboardingBodyScreen,
+  OnboardingTargetWeightScreen,
+  OnboardingGenderScreen,
+  OnboardingAgeScreen,
+  OnboardingCountryScreen,
+} from "./src/components/onboarding";
 import { HealthProviderStatusCard } from "./src/components/health-provider-status-card";
 import { MacroResultCard } from "./src/components/macro-result-card";
 import { MealHistoryScreen } from "./src/components/meal-history-screen";
@@ -142,6 +154,82 @@ function getStartOfWeek(input: Date): Date {
 function clampDateToMonth(year: number, monthIndex: number, day: number): Date {
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
   return new Date(year, monthIndex, Math.min(day, daysInMonth), 12, 0, 0, 0);
+}
+
+function RingProgress(props: {
+  size: number;
+  strokeWidth: number;
+  percentage: number;
+  color: string;
+  trackColor: string;
+}) {
+  const { size, strokeWidth: sw, percentage, color, trackColor } = props;
+  const p = Math.min(Math.max(percentage, 0), 1);
+  const half = size / 2;
+  // rightR: rotation for right-half clipper (fills 0°→180°, i.e. 12→6 o'clock via 3)
+  const rightR = Math.min(p * 360 - 135, 45);
+  // leftR: rotation for left-half clipper (fills 180°→360°, i.e. 6→12 o'clock via 9)
+  const leftR = Math.max(p * 360 - 315, -135);
+
+  const base = {
+    position: "absolute" as const,
+    width: size,
+    height: size,
+    borderRadius: half,
+    borderWidth: sw,
+  };
+
+  return (
+    <View style={{ position: "absolute", width: size, height: size }}>
+      <View style={[base, { borderColor: trackColor }]} />
+      <View
+        style={{
+          position: "absolute",
+          width: half,
+          height: size,
+          right: 0,
+          overflow: "hidden",
+        }}
+      >
+        <View
+          style={[
+            base,
+            {
+              left: -half,
+              borderTopColor: color,
+              borderRightColor: color,
+              borderBottomColor: "transparent",
+              borderLeftColor: "transparent",
+              transform: [{ rotate: `${rightR}deg` }],
+            },
+          ]}
+        />
+      </View>
+      <View
+        style={{
+          position: "absolute",
+          width: half,
+          height: size,
+          left: 0,
+          overflow: "hidden",
+        }}
+      >
+        <View
+          style={[
+            base,
+            {
+              left: 0,
+              borderTopColor: "transparent",
+              borderRightColor: "transparent",
+              borderBottomColor: color,
+              borderLeftColor: color,
+              transform: [{ rotate: `${leftR}deg` }],
+            },
+          ]}
+        />
+      </View>
+    </View>
+  );
 }
 
 export default function App() {
@@ -230,6 +318,27 @@ export default function App() {
   const [nutritionQuickMenuOpen, setNutritionQuickMenuOpen] = useState(false);
   const [initialMealForDetail, setInitialMealForDetail] =
     useState<MealLog | null>(null);
+
+  // ─── Onboarding state ────────────────────────────────────────────
+  const [authFlow, setAuthFlow] = useState<
+    "welcome" | "login" | "register" | "onboarding" | "done"
+  >("welcome");
+  const [onboardingStep, setOnboardingStep] = useState<
+    | "idle"
+    | "goal"
+    | "workout"
+    | "body"
+    | "targetWeight"
+    | "gender"
+    | "age"
+    | "country"
+  >("idle");
+
+  // Store onboarding data for passing between screens
+  const [onboardingGoal, setOnboardingGoal] = useState<
+    "LOSE_WEIGHT" | "MAINTAIN" | "GAIN_WEIGHT"
+  >("MAINTAIN");
+  const [onboardingWeightKg, setOnboardingWeightKg] = useState(70);
 
   const circadianPlan = useMemo(
     () => createCircadianPlan(circadianCity, now),
@@ -534,6 +643,19 @@ export default function App() {
     ? "Perfil conectado"
     : "Perfil listo para conectar";
 
+  // ─── Check existing session on startup ───────────────────────────
+  useEffect(() => {
+    if (!fontsLoaded || userId) return;
+
+    const checkSession = async () => {
+      // Check if there's a stored userId from a previous session
+      // For now, always start at welcome screen
+      // In production, you'd check AsyncStorage for a saved userId
+    };
+
+    checkSession();
+  }, [fontsLoaded]);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(new Date());
@@ -712,7 +834,12 @@ export default function App() {
       ring2Anim.stop();
       iconAnim.stop();
     };
-  }, [analysisLoading, cameraLoadingRing1, cameraLoadingRing2, cameraLoadingIconScale]);
+  }, [
+    analysisLoading,
+    cameraLoadingRing1,
+    cameraLoadingRing2,
+    cameraLoadingIconScale,
+  ]);
 
   useEffect(() => {
     Animated.spring(nutritionQuickMenuAnim, {
@@ -975,6 +1102,25 @@ export default function App() {
       setStatusMessage(
         `Perfil listo para ${profile.fullName ?? profile.email}.`,
       );
+
+      // Check for existing onboarding session
+      const session = await biomaApi.getOnboardingSession(profile.id);
+      if (session && !session.completed && session.currentStep > 1) {
+        // Resume from where they left off
+        const stepMap: Record<number, typeof onboardingStep> = {
+          2: "workout",
+          3: "body",
+          4: "targetWeight",
+          5: "gender",
+          6: "age",
+          7: "country",
+        };
+        setOnboardingStep(stepMap[session.currentStep] ?? "goal");
+      } else if (!session) {
+        // New user - start from beginning
+        setOnboardingStep("goal");
+      }
+
       return profile.id;
     } catch (error) {
       const message =
@@ -986,6 +1132,139 @@ export default function App() {
       return null;
     } finally {
       setBootstrapLoading(false);
+    }
+  };
+
+  // ─── Onboarding navigation ───────────────────────────────────────
+  const handleOnboardingBack = () => {
+    const stepOrder: (typeof onboardingStep)[] = [
+      "idle",
+      "goal",
+      "workout",
+      "body",
+      "targetWeight",
+      "gender",
+      "age",
+      "country",
+    ];
+    const currentIndex = stepOrder.indexOf(onboardingStep);
+    if (currentIndex > 1) {
+      setOnboardingStep(stepOrder[currentIndex - 1]);
+    } else {
+      setOnboardingStep("idle");
+    }
+  };
+
+  const handleOnboardingNext = (step: typeof onboardingStep) => {
+    setOnboardingStep(step);
+  };
+
+  const handleOnboardingFinish = () => {
+    setOnboardingStep("idle");
+    setAuthFlow("done");
+  };
+
+  // ─── Auth handlers ───────────────────────────────────────────────
+  const handleAuthSuccess = (newUserId: string) => {
+    setUserId(newUserId);
+    setAuthFlow("onboarding");
+    setOnboardingStep("goal");
+  };
+
+  const handleWelcomeContinue = async () => {
+    if (bootstrapLoading) {
+      return;
+    }
+
+    const resolvedUserId = userId ?? (await connectProfile());
+    if (!resolvedUserId) {
+      return;
+    }
+
+    setUserId(resolvedUserId);
+    setAuthFlow("onboarding");
+    setOnboardingStep((currentStep) =>
+      currentStep === "idle" ? "goal" : currentStep,
+    );
+  };
+
+  const renderOnboardingFlow = () => {
+    if (!userId) return null;
+
+    switch (onboardingStep) {
+      case "goal":
+        return (
+          <OnboardingGoalScreen
+            userId={userId}
+            theme={theme}
+            onBack={handleOnboardingBack}
+            onNext={(goal) => {
+              setOnboardingGoal(goal);
+              handleOnboardingNext("workout");
+            }}
+          />
+        );
+      case "workout":
+        return (
+          <OnboardingWorkoutScreen
+            userId={userId}
+            theme={theme}
+            onBack={handleOnboardingBack}
+            onNext={() => handleOnboardingNext("body")}
+          />
+        );
+      case "body":
+        return (
+          <OnboardingBodyScreen
+            userId={userId}
+            theme={theme}
+            onBack={handleOnboardingBack}
+            onNext={(weightKg) => {
+              setOnboardingWeightKg(weightKg);
+              handleOnboardingNext("targetWeight");
+            }}
+          />
+        );
+      case "targetWeight":
+        return (
+          <OnboardingTargetWeightScreen
+            userId={userId}
+            goal={onboardingGoal}
+            currentWeightKg={onboardingWeightKg}
+            theme={theme}
+            onBack={handleOnboardingBack}
+            onNext={() => handleOnboardingNext("gender")}
+          />
+        );
+      case "gender":
+        return (
+          <OnboardingGenderScreen
+            userId={userId}
+            theme={theme}
+            onBack={handleOnboardingBack}
+            onNext={() => handleOnboardingNext("age")}
+          />
+        );
+      case "age":
+        return (
+          <OnboardingAgeScreen
+            userId={userId}
+            theme={theme}
+            onBack={handleOnboardingBack}
+            onNext={() => handleOnboardingNext("country")}
+          />
+        );
+      case "country":
+        return (
+          <OnboardingCountryScreen
+            userId={userId}
+            theme={theme}
+            onBack={handleOnboardingBack}
+            onFinish={handleOnboardingFinish}
+          />
+        );
+      default:
+        return null;
     }
   };
 
@@ -1118,6 +1397,45 @@ export default function App() {
 
   if (activeTab === "nutrition" && nutritionView === "text") {
     return renderTextOnlyScreen();
+  }
+
+  // ─── Welcome / Auth flow ─────────────────────────────────────────
+  if (authFlow === "welcome") {
+    return (
+      <WelcomeScreen
+        theme={theme}
+        onContinue={handleWelcomeContinue}
+        onLogin={() => setAuthFlow("login")}
+        loading={bootstrapLoading}
+      />
+    );
+  }
+
+  if (authFlow === "login") {
+    return (
+      <AuthScreen
+        theme={theme}
+        onLoginSuccess={handleAuthSuccess}
+        onBack={() => setAuthFlow("welcome")}
+        onShowRegister={() => setAuthFlow("register")}
+      />
+    );
+  }
+
+  if (authFlow === "register") {
+    return (
+      <RegisterScreen
+        theme={theme}
+        onRegisterSuccess={handleAuthSuccess}
+        onBack={() => setAuthFlow("welcome")}
+        onShowLogin={() => setAuthFlow("login")}
+      />
+    );
+  }
+
+  // Show onboarding flow if active
+  if (authFlow === "onboarding" && onboardingStep !== "idle") {
+    return renderOnboardingFlow();
   }
 
   return (
@@ -2122,7 +2440,15 @@ export default function App() {
             </Text>
           </Pressable>
 
-          <View style={styles.foodStatsHeaderSpacer} />
+          <Pressable
+            style={styles.foodStatsHistoryButton}
+            onPress={() => {
+              setActiveTab("nutrition");
+              setNutritionView("history");
+            }}
+          >
+            <Ionicons name="time-outline" size={20} color={foodTextMuted} />
+          </Pressable>
         </View>
 
         {statsMonthPickerExpanded ? (
@@ -2307,34 +2633,26 @@ export default function App() {
               },
             ]}
           />
-          <View
-            style={[styles.foodRingOuterTrack, { borderColor: foodRingTrack }]}
+          <RingProgress
+            size={252}
+            strokeWidth={18}
+            percentage={selectedCarbs / 184}
+            color={theme.accent}
+            trackColor={foodRingTrack}
           />
-          <View
-            style={[
-              styles.foodRingOuterProgress,
-              {
-                borderTopColor: theme.accent,
-                borderRightColor: theme.accent,
-                borderBottomColor: theme.accent,
-              },
-            ]}
+          <RingProgress
+            size={214}
+            strokeWidth={14}
+            percentage={selectedProtein / 184}
+            color={theme.mint}
+            trackColor={foodSurfaceSecondary}
           />
-          <View
-            style={[
-              styles.foodRingInnerTrack,
-              { borderColor: foodSurfaceSecondary },
-            ]}
-          />
-          <View
-            style={[
-              styles.foodRingInnerProgress,
-              {
-                borderTopColor: theme.mint,
-                borderRightColor: theme.mint,
-                borderBottomColor: theme.mint,
-              },
-            ]}
+          <RingProgress
+            size={178}
+            strokeWidth={12}
+            percentage={selectedFat / 70}
+            color={theme.lime}
+            trackColor={foodSurfaceSecondary}
           />
 
           <View
@@ -2770,7 +3088,11 @@ export default function App() {
                 style={styles.cameraRetakeButton}
                 onPress={() => setImageAsset(null)}
               >
-                <Ionicons name="camera-reverse-outline" size={20} color="#FFFFFF" />
+                <Ionicons
+                  name="camera-reverse-outline"
+                  size={20}
+                  color="#FFFFFF"
+                />
                 <Text style={styles.cameraRetakeButtonText}>Retomar</Text>
               </Pressable>
               <Pressable
@@ -2784,7 +3106,9 @@ export default function App() {
                 }}
                 disabled={analysisLoading}
               >
-                <Text style={styles.cameraAnalyzeButtonText}>Analizar comida</Text>
+                <Text style={styles.cameraAnalyzeButtonText}>
+                  Analizar comida
+                </Text>
               </Pressable>
             </View>
           ) : (
@@ -2932,7 +3256,9 @@ export default function App() {
                 </Animated.View>
               </View>
 
-              <Text style={styles.cameraLoadingTitle}>Analizando tu comida</Text>
+              <Text style={styles.cameraLoadingTitle}>
+                Analizando tu comida
+              </Text>
               <Text style={styles.cameraLoadingStatus} numberOfLines={2}>
                 {statusMessage ?? "Procesando..."}
               </Text>
@@ -2946,8 +3272,15 @@ export default function App() {
                   ] as [string, string][]
                 ).map(([label, keyword], i) => {
                   const msg = statusMessage ?? "";
-                  const stepOrder = ["Preparando", "Solicitando", "Subiendo", "Analizando"];
-                  const currentStep = stepOrder.findIndex((k) => msg.includes(k));
+                  const stepOrder = [
+                    "Preparando",
+                    "Solicitando",
+                    "Subiendo",
+                    "Analizando",
+                  ];
+                  const currentStep = stepOrder.findIndex((k) =>
+                    msg.includes(k),
+                  );
                   const myStep = stepOrder.indexOf(keyword);
                   const done = currentStep >= myStep;
                   return (
@@ -5124,6 +5457,13 @@ const styles = StyleSheet.create({
   foodStatsHeaderSpacer: {
     width: 42,
     height: 42,
+  },
+  foodStatsHistoryButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
   },
   foodStatsHeading: {
     flex: 1,

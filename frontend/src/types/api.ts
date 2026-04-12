@@ -64,3 +64,33 @@ export interface MealSuggestionResponse {
   concerns: string[];
   suggestion: SuggestedMeal;
 }
+
+export type GoalType = "LOSE_WEIGHT" | "MAINTAIN" | "GAIN_WEIGHT";
+export type ActivityLevel =
+  | "SEDENTARY"
+  | "LIGHT"
+  | "MODERATE"
+  | "ACTIVE"
+  | "VERY_ACTIVE";
+export type WorkoutFrequency = "LOW" | "MEDIUM" | "HIGH";
+export type Gender = "MALE" | "FEMALE" | "NON_BINARY";
+
+export interface OnboardingSession {
+  id: string;
+  userId: string;
+  goal: GoalType | null;
+  weightKg: number | null;
+  heightCm: number | null;
+  desiredWeightKg: number | null;
+  gender: Gender | null;
+  age: number | null;
+  country: string | null;
+  workoutFrequency: WorkoutFrequency | null;
+  activityLevel: ActivityLevel | null;
+  dietaryPrefs: Record<string, unknown> | null;
+  completed: boolean;
+  currentStep: number;
+  totalSteps: number;
+  createdAt: string;
+  updatedAt: string;
+}

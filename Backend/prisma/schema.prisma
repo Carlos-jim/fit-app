@@ -23,13 +23,68 @@ enum AnalysisConfidence {
   HIGH
 }
 
+enum GoalType {
+  LOSE_WEIGHT
+  MAINTAIN
+  GAIN_WEIGHT
+}
+
+enum ActivityLevel {
+  SEDENTARY
+  LIGHT
+  MODERATE
+  ACTIVE
+  VERY_ACTIVE
+}
+
+enum WorkoutFrequency {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  NON_BINARY
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+}
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  fullName  String?
-  logs      Log[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String             @id @default(cuid())
+  email            String             @unique
+  fullName         String?
+  passwordHash     String?
+  authProvider     AuthProvider       @default(EMAIL)
+  logs             Log[]
+  onboardingSession OnboardingSession?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+}
+
+model OnboardingSession {
+  id               String            @id @default(cuid())
+  userId           String            @unique
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal             GoalType?
+  weightKg         Float?
+  heightCm         Float?
+  desiredWeightKg  Float?
+  gender           Gender?
+  age              Int?
+  country          String?
+  workoutFrequency WorkoutFrequency?
+  activityLevel    ActivityLevel?
+  dietaryPrefs     Json?
+  completed        Boolean           @default(false)
+  currentStep      Int               @default(1)
+  totalSteps       Int               @default(7)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 }
 
 model Log {

@@ -7,17 +7,35 @@ import { analyzeMealRequestSchema } from "./contracts/analyze-meal-request.js";
 import { analyzeMealTextRequestSchema } from "./contracts/analyze-meal-text-request.js";
 import { bootstrapUserRequestSchema } from "./contracts/bootstrap-user-request.js";
 import { createMealUploadUrlRequestSchema } from "./contracts/create-meal-upload-url-request.js";
+import {
+  googleLoginRequestSchema,
+  loginRequestSchema,
+  registerRequestSchema,
+} from "./contracts/auth-request.js";
+import {
+  onboardingStep1Schema,
+  onboardingStep2Schema,
+  onboardingStep3Schema,
+  onboardingStep4Schema,
+  onboardingStep5Schema,
+  onboardingStep6Schema,
+  onboardingStep7Schema,
+} from "./contracts/onboarding-request.js";
 import { suggestMealRequestSchema } from "./contracts/suggest-meal-request.js";
 import { AppError } from "./lib/app-error.js";
 import { prisma } from "./lib/prisma.js";
 import { LogRepository } from "./repositories/log.repository.js";
+import { OnboardingRepository } from "./repositories/onboarding.repository.js";
 import { UserRepository } from "./repositories/user.repository.js";
+import { AuthService } from "./services/auth.service.js";
 import { NutritionAnalysisService } from "./services/nutrition-analysis.service.js";
 import { SupabaseStorageService } from "./services/supabase-storage.service.js";
 
 const app = express();
 const userRepository = new UserRepository(prisma);
 const logRepository = new LogRepository(prisma);
+const onboardingRepository = new OnboardingRepository(prisma);
+const authService = new AuthService(prisma);
 const nutritionAnalysisService = new NutritionAnalysisService();
 const storageService = new SupabaseStorageService();
 
@@ -47,6 +65,158 @@ app.post("/users/bootstrap", async (req, res) => {
     });
   } catch (error) {
     handleError(res, error, "bootstrapping user");
+  }
+});
+
+// ─── Auth endpoints ────────────────────────────────────────────────
+
+app.post("/auth/register", async (req, res) => {
+  try {
+    const request = parseBody(registerRequestSchema, req.body);
+    const user = await authService.register(request);
+    res.status(201).json({ data: user });
+  } catch (error) {
+    handleError(res, error, "registering user");
+  }
+});
+
+app.post("/auth/login", async (req, res) => {
+  try {
+    const request = parseBody(loginRequestSchema, req.body);
+    const user = await authService.loginWithEmail(request);
+    res.status(200).json({ data: user });
+  } catch (error) {
+    handleError(res, error, "logging in user");
+  }
+});
+
+app.post("/auth/google", async (req, res) => {
+  try {
+    const request = parseBody(googleLoginRequestSchema, req.body);
+    // In production, verify the Google ID token here
+    // For now, we'll create/login the user directly
+    // You would normally use google-auth-library to verify the token
+    const user = await authService.loginWithGoogle({
+      googleId: "google-placeholder",
+      email: "google-user@example.com",
+      name: "Google User",
+    });
+    res.status(200).json({ data: user });
+  } catch (error) {
+    handleError(res, error, "logging in with Google");
+  }
+});
+
+// ─── Onboarding endpoints ─────────────────────────────────────────
+
+app.post("/onboarding/step/1", async (req, res) => {
+  try {
+    const request = parseBody(onboardingStep1Schema, req.body);
+    const session = await onboardingRepository.updateStep1(
+      request.userId,
+      request,
+    );
+    res.status(200).json({ data: session });
+  } catch (error) {
+    handleError(res, error, "saving onboarding step 1");
+  }
+});
+
+app.post("/onboarding/step/2", async (req, res) => {
+  try {
+    const request = parseBody(onboardingStep2Schema, req.body);
+    const session = await onboardingRepository.updateStep2(
+      request.userId,
+      request,
+    );
+    res.status(200).json({ data: session });
+  } catch (error) {
+    handleError(res, error, "saving onboarding step 2");
+  }
+});
+
+app.post("/onboarding/step/3", async (req, res) => {
+  try {
+    const request = parseBody(onboardingStep3Schema, req.body);
+    const session = await onboardingRepository.updateStep3(
+      request.userId,
+      request,
+    );
+    res.status(200).json({ data: session });
+  } catch (error) {
+    handleError(res, error, "saving onboarding step 3");
+  }
+});
+
+app.post("/onboarding/step/4", async (req, res) => {
+  try {
+    const request = parseBody(onboardingStep4Schema, req.body);
+    const session = await onboardingRepository.updateStep4(
+      request.userId,
+      request,
+    );
+    res.status(200).json({ data: session });
+  } catch (error) {
+    handleError(res, error, "saving onboarding step 4");
+  }
+});
+
+app.post("/onboarding/step/5", async (req, res) => {
+  try {
+    const request = parseBody(onboardingStep5Schema, req.body);
+    const session = await onboardingRepository.updateStep5(
+      request.userId,
+      request,
+    );
+    res.status(200).json({ data: session });
+  } catch (error) {
+    handleError(res, error, "saving onboarding step 5");
+  }
+});
+
+app.post("/onboarding/step/6", async (req, res) => {
+  try {
+    const request = parseBody(onboardingStep6Schema, req.body);
+    const session = await onboardingRepository.updateStep6(
+      request.userId,
+      request,
+    );
+    res.status(200).json({ data: session });
+  } catch (error) {
+    handleError(res, error, "saving onboarding step 6");
+  }
+});
+
+app.post("/onboarding/step/7", async (req, res) => {
+  try {
+    const request = parseBody(onboardingStep7Schema, req.body);
+    const session = await onboardingRepository.updateStep7(
+      request.userId,
+      request,
+    );
+    res.status(200).json({ data: session });
+  } catch (error) {
+    handleError(res, error, "saving onboarding step 7");
+  }
+});
+
+app.get("/onboarding/session", async (req, res) => {
+  try {
+    const userId = parseQueryUserId(req);
+    const session = await onboardingRepository.getSession(userId);
+    res.status(200).json({ data: session });
+  } catch (error) {
+    handleError(res, error, "fetching onboarding session");
+  }
+});
+
+app.delete("/onboarding/session", async (req, res) => {
+  try {
+    const userId = parseQueryUserId(req);
+    await onboardingRepository.deleteSession(userId);
+    res.status(200).json({ data: { ok: true } });
+  } catch (error) {
+    handleError(res, error, "deleting onboarding session");
   }
 });
 
@@ -199,7 +369,8 @@ app.post("/logs/suggest-meal", async (req, res) => {
       }
     }
 
-    const suggestion = await nutritionAnalysisService.suggestMealAlternative(request);
+    const suggestion =
+      await nutritionAnalysisService.suggestMealAlternative(request);
 
     if (request.logId) {
       await logRepository.saveMealSuggestion(request.logId, suggestion);
@@ -259,7 +430,7 @@ function handleError(res: Response, error: unknown, context: string): void {
     res.status(error.statusCode).json({
       error: error.code,
       message: error.message,
-      details: error.expose ? error.cause ?? null : null,
+      details: error.expose ? (error.cause ?? null) : null,
     });
     return;
   }
