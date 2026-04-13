@@ -71,6 +71,11 @@ import {
   OnboardingAgeScreen,
   OnboardingCountryScreen,
 } from "./src/components/onboarding";
+import { HomeScreen } from "./src/components/home-screen";
+import { WaterCelebration } from "./src/components/water-celebration";
+import { useWaterStore } from "./src/store/water-store";
+import { ProfileScreen } from "./src/components/profile-screen";
+import { compressForUpload } from "./src/utils/image-utils";
 import { HealthProviderStatusCard } from "./src/components/health-provider-status-card";
 import { MacroResultCard } from "./src/components/macro-result-card";
 import { MealHistoryScreen } from "./src/components/meal-history-screen";
@@ -603,6 +608,11 @@ export default function App() {
   const [nutritionQuickMenuOpen, setNutritionQuickMenuOpen] = useState(false);
   const [initialMealForDetail, setInitialMealForDetail] =
     useState<MealLog | null>(null);
+  
+  const dailyWaterGlasses = useWaterStore((state) => state.waterGlasses);
+  const waterGoal = useWaterStore((state) => state.waterGoal);
+  const incrementWater = useWaterStore((state) => state.increment);
+  const decrementWater = useWaterStore((state) => state.decrement);
 
   // ─── Onboarding state ────────────────────────────────────────────
   const [authFlow, setAuthFlow] = useState<
@@ -816,6 +826,44 @@ export default function App() {
     homeTodayMeals.reduce((sum, meal) => sum + meal.calories, 0),
   );
   const homeTodayMealsCount = homeTodayMeals.length;
+
+  const homeLastMeal = useMemo(() => {
+    if (statsMealLogs.length === 0) return null;
+    return (
+      [...statsMealLogs].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )[0] ?? null
+    );
+  }, [statsMealLogs]);
+
+  const homeMealsWithScore = useMemo(
+    () => statsMealLogs.filter((m) => m.aiSuggestion?.healthScore != null),
+    [statsMealLogs],
+  );
+
+  const homeTopBestMeals = useMemo(
+    () =>
+      [...homeMealsWithScore]
+        .sort(
+          (a, b) =>
+            b.aiSuggestion!.healthScore - a.aiSuggestion!.healthScore,
+        )
+        .slice(0, 3),
+    [homeMealsWithScore],
+  );
+
+  const homeTopWorstMeals = useMemo(
+    () =>
+      [...homeMealsWithScore]
+        .sort(
+          (a, b) =>
+            a.aiSuggestion!.healthScore - b.aiSuggestion!.healthScore,
+        )
+        .slice(0, 3),
+    [homeMealsWithScore],
+  );
+
   const homeStepGoal = 10000;
   const homeStepProgress = Math.min(wearableSnapshot.steps / homeStepGoal, 1);
   const homeRecoveryAccent =
@@ -1603,18 +1651,23 @@ export default function App() {
       }
 
       if (mealMode === "photo" && imageAsset) {
-        setStatusMessage("Solicitando URL firmada...");
+        setStatusMessage("Optimizando imagen...");
+        const compressed = await compressForUpload(
+          imageAsset.uri,
+          imageAsset.fileName,
+        );
 
+        setStatusMessage("Solicitando URL firmada...");
         const upload = await biomaApi.createMealUploadUrl({
           userId: resolvedUserId,
-          fileName: imageAsset.fileName ?? `meal-${Date.now()}.jpg`,
-          contentType: imageAsset.mimeType ?? "image/jpeg",
+          fileName: compressed.fileName,
+          contentType: compressed.mimeType,
         });
 
         setStatusMessage("Subiendo imagen al storage...");
         await biomaApi.uploadImageToStorage(
           upload.uploadUrl,
-          imageAsset.uri,
+          compressed.uri,
           upload.requiredHeaders,
         );
 
@@ -1686,10 +1739,47 @@ export default function App() {
       case "tips":
         return renderTipsScreen();
       case "profile":
-        return renderProfileScreen();
+        return (
+          <ProfileScreen
+            theme={theme}
+            visualMode={visualMode}
+            fullName={fullName}
+            setFullName={setFullName}
+            email={email}
+            setEmail={setEmail}
+            userId={userId}
+            onConnectProfile={connectProfile}
+            bootstrapLoading={bootstrapLoading}
+            onToggleMode={() =>
+              setVisualMode((cur) => (cur === "light" ? "dark" : "light"))
+            }
+            ambientPulse={ambientPulse}
+            mainScrollY={mainScrollY}
+            healthProvider={mockHealthProvider}
+            wellnessCardMode={wellnessCardMode}
+          />
+        );
       case "home":
       default:
-        return renderHomeScreen();
+        return (
+          <HomeScreen
+            theme={theme}
+            visualMode={visualMode}
+            todayCalories={homeTodayCalories}
+            todayMealsCount={homeTodayMealsCount}
+            lastMeal={homeLastMeal}
+            topBestMeals={homeTopBestMeals}
+            topWorstMeals={homeTopWorstMeals}
+            waterGlasses={dailyWaterGlasses}
+            waterGoal={waterGoal}
+            onWaterIncrement={incrementWater}
+            onWaterDecrement={decrementWater}
+            onOpenCamera={() => openCameraScreen("home")}
+            ambientPulse={ambientPulse}
+            heroScale={heroScale}
+            mainScrollY={mainScrollY}
+          />
+        );
     }
   })();
 
@@ -1993,6 +2083,7 @@ export default function App() {
         nutritionMenuOpen={nutritionQuickMenuOpen}
         theme={theme}
       />
+      <WaterCelebration isDark={visualMode === "dark"} />
     </SafeAreaView>
   );
 
