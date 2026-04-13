@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { env } from "./config/env.js";
 import { analyzeMealRequestSchema } from "./contracts/analyze-meal-request.js";
+import { analyzeMenuRequestSchema } from "./contracts/analyze-menu-request.js";
 import { analyzeMealTextRequestSchema } from "./contracts/analyze-meal-text-request.js";
 import { bootstrapUserRequestSchema } from "./contracts/bootstrap-user-request.js";
 import { createMealUploadUrlRequestSchema } from "./contracts/create-meal-upload-url-request.js";
@@ -344,6 +345,34 @@ app.post("/logs/analyze-meal-text", async (req, res) => {
     });
   } catch (error) {
     handleError(res, error, "processing meal text analysis");
+  }
+});
+
+app.post("/logs/analyze-menu-image", async (req, res) => {
+  try {
+    const request = parseBody(analyzeMenuRequestSchema, req.body);
+
+    console.log("[analyze-menu-image] Request received:", {
+      userId: request.userId,
+      imageUrl: request.imageUrl,
+    });
+
+    const menuAnalysisResult = await nutritionAnalysisService.analyzeMenuImage(
+      request.imageUrl,
+    );
+
+    console.log("[analyze-menu-image] AI analysis done:", {
+      dishesDetected: menuAnalysisResult.dishesDetected.length,
+      recommendedDishes: menuAnalysisResult.recommendedDishes.length,
+      dishesToAvoid: menuAnalysisResult.dishesToAvoid.length,
+    });
+
+    res.status(200).json({
+      data: menuAnalysisResult,
+    });
+  } catch (error) {
+    console.error("[analyze-menu-image] Error:", error);
+    handleError(res, error, "processing menu image analysis");
   }
 });
 

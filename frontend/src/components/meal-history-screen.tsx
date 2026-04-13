@@ -293,9 +293,6 @@ function DayListView(props: {
   };
 
   const goNextMonth = () => {
-    const nowY = now.getFullYear();
-    const nowM = now.getMonth();
-    if (filterYear === nowY && filterMonth === nowM) return;
     if (filterMonth === 11) {
       setFilterMonth(0);
       setFilterYear((y) => y + 1);
@@ -304,32 +301,17 @@ function DayListView(props: {
     }
   };
 
-  const isCurrentMonth =
-    filterYear === now.getFullYear() && filterMonth === now.getMonth();
-
   return (
     <View style={styles.screen}>
       <View style={[styles.headerRow]}>
-        <View>
-          <Text style={[styles.eyebrow, { color: theme.accent }]}>
-            Nutricion IA
-          </Text>
-          <Text style={[styles.title, { color: theme.text }]}>Historial</Text>
-        </View>
-        <Pressable
-          style={[styles.cameraButton, { backgroundColor: theme.accent }]}
-          onPress={props.onOpenCamera}
-        >
-          <Ionicons name="camera" size={20} color={theme.background} />
-        </Pressable>
+        <Text style={[styles.title, { color: theme.text }]}>Historial</Text>
       </View>
 
       {hasAnyData && (
         <View style={styles.monthFilterBar}>
           <Pressable
-            style={[styles.monthArrow, { opacity: isCurrentMonth ? 0.3 : 1 }]}
+            style={[styles.monthArrow, { opacity: 1 }]}
             onPress={goPrevMonth}
-            disabled={isCurrentMonth}
           >
             <Ionicons name="chevron-back" size={22} color={theme.text} />
           </Pressable>
@@ -337,9 +319,8 @@ function DayListView(props: {
             {getMonthLabel(filterMonthKey)}
           </Text>
           <Pressable
-            style={[styles.monthArrow, { opacity: isCurrentMonth ? 0.3 : 1 }]}
+            style={[styles.monthArrow, { opacity: 1 }]}
             onPress={goNextMonth}
-            disabled={isCurrentMonth}
           >
             <Ionicons name="chevron-forward" size={22} color={theme.text} />
           </Pressable>

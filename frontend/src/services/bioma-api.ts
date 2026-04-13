@@ -4,6 +4,7 @@ import type {
   MealAnalysisSummary,
   MealLog,
   MealSuggestionResponse,
+  MenuAnalysisResponse,
   OnboardingSession,
   UploadMealImageResponse,
 } from "../types/api";
@@ -188,6 +189,24 @@ class BiomaApi {
       {
         method: "POST",
         body: JSON.stringify(input),
+      },
+    );
+
+    return response.data;
+  }
+
+  async analyzeMenuImage(
+    imageUrl: string,
+    userId: string,
+  ): Promise<MenuAnalysisResponse> {
+    const response = await this.request<MenuAnalysisResponse>(
+      "/logs/analyze-menu-image",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          userId,
+          imageUrl,
+        }),
       },
     );
 

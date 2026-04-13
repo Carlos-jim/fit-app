@@ -12,6 +12,11 @@ import {
   type MealSuggestion,
   type SuggestMealRequest,
 } from "../contracts/suggest-meal-request.js";
+import {
+  menuAnalysisJsonSchema,
+  menuAnalysisSchema,
+  type MenuAnalysis,
+} from "../contracts/analyze-menu-request.js";
 import { AppError } from "../lib/app-error.js";
 
 const geminiClient = new GoogleGenAI({
@@ -47,6 +52,26 @@ const SUGGESTION_SYSTEM_PROMPT = [
   "Return only valid JSON that matches the provided schema.",
 ].join(" ");
 
+const MENU_ANALYSIS_SYSTEM_PROMPT = [
+  "You are a restaurant menu analysis AI for a health and fitness app used in Venezuela and Latin America.",
+  "You will receive a photo of a restaurant menu/card with dishes written in Spanish.",
+  "Your job is to:",
+  "1. Read and identify all the dishes on the menu",
+  "2. Estimate the nutritional content (calories, protein, carbs, fat) for each dish based on typical preparations in Latin America",
+  "3. Recommend the best dishes based on a user's daily macro targets (you'll receive these as context)",
+  "4. Suggest which dishes to avoid and why",
+  "5. Provide a summary with personalized recommendations",
+  "",
+  "IMPORTANT GUIDELINES:",
+  "- Respond in Spanish (Latin American)",
+  "- Consider typical Latin American/Venezuelan portions and preparations",
+  "- Be realistic about calories and macros - don't underestimate restaurant portions",
+  "- For recommended dishes, give a matchScore from 0-100 based on how well they fit typical daily macro targets",
+  "- For dishes to avoid, explain why (e.g., too many calories, excessive carbs, fried, etc.)",
+  "- The summary should be personalized and encouraging",
+  "- Account for cooking methods (fried vs grilled, sauces, etc.)",
+  "- Return only valid JSON that matches the provided schema",
+].join(" ");
 
 export interface AnalyzeNutritionInput {
   imageDataUrl?: string;
@@ -61,7 +86,9 @@ export interface AnalyzeNutritionResult {
 }
 
 export class NutritionAnalysisService {
-  async analyzeFromImage(input: AnalyzeNutritionInput): Promise<AnalyzeNutritionResult> {
+  async analyzeFromImage(
+    input: AnalyzeNutritionInput,
+  ): Promise<AnalyzeNutritionResult> {
     if (!input.imageDataUrl) {
       throw new AppError("Image data is required for image analysis.", {
         statusCode: 400,
@@ -78,7 +105,9 @@ export class NutritionAnalysisService {
     });
   }
 
-  async analyzeFromText(input: AnalyzeNutritionInput): Promise<AnalyzeNutritionResult> {
+  async analyzeFromText(
+    input: AnalyzeNutritionInput,
+  ): Promise<AnalyzeNutritionResult> {
     if (!input.description?.trim()) {
       throw new AppError("Meal description is required for text analysis.", {
         statusCode: 400,
@@ -92,7 +121,136 @@ export class NutritionAnalysisService {
     });
   }
 
-  async suggestMealAlternative(input: SuggestMealRequest): Promise<MealSuggestion> {
+  async analyzeMenuImage(imageUrl: string): Promise<MenuAnalysis> {
+    // Check if we should use mock data for testing
+    if (env.GEMINI_API_KEY === "mock" || env.GEMINI_API_KEY === "test") {
+      return this.getMockMenuAnalysis();
+    }
+
+    const imagePart = {
+      fileData: {
+        mimeType: "image/jpeg",
+        fileUri: imageUrl,
+      },
+    };
+
+    const prompt = this.buildMenuPrompt();
+
+    const candidateModels = Array.from(
+      new Set([
+        env.GEMINI_MODEL,
+        FALLBACK_GEMINI_MODEL,
+        SECONDARY_FALLBACK_GEMINI_MODEL,
+      ]),
+    );
+
+    let lastError: unknown;
+
+    for (const modelName of candidateModels) {
+      try {
+        const maxAttempts =
+          modelName === SECONDARY_FALLBACK_GEMINI_MODEL ? 1 : 2;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+          try {
+            const response = await geminiClient.models.generateContent({
+              model: modelName,
+              contents: [
+                {
+                  role: "user",
+                  parts: [{ text: prompt }, imagePart],
+                },
+              ],
+              config: {
+                systemInstruction: MENU_ANALYSIS_SYSTEM_PROMPT,
+                responseMimeType: "application/json",
+                responseJsonSchema: menuAnalysisJsonSchema,
+                temperature: 0.3,
+                topP: 0.9,
+                maxOutputTokens: 3072,
+              },
+            });
+
+            const rawOutput = response.text?.trim();
+
+            if (!rawOutput) {
+              throw new AppError(
+                "Gemini returned an empty response for menu analysis.",
+                {
+                  statusCode: 502,
+                  code: "GEMINI_EMPTY_RESPONSE",
+                },
+              );
+            }
+
+            let parsedJson: unknown;
+
+            try {
+              parsedJson = JSON.parse(this.stripCodeFences(rawOutput));
+            } catch (error) {
+              throw new AppError(
+                "Gemini returned invalid JSON for menu analysis.",
+                {
+                  statusCode: 502,
+                  code: "GEMINI_INVALID_JSON",
+                  cause: error,
+                },
+              );
+            }
+
+            const parsed = menuAnalysisSchema.safeParse(parsedJson);
+
+            if (!parsed.success) {
+              throw new AppError(
+                "Gemini menu analysis response did not match schema.",
+                {
+                  statusCode: 502,
+                  code: "GEMINI_SCHEMA_MISMATCH",
+                  cause: parsed.error.flatten(),
+                },
+              );
+            }
+
+            return parsed.data;
+          } catch (error) {
+            if (error instanceof AppError) {
+              throw error;
+            }
+
+            if (!this.shouldRetrySameModel(error, attempt, maxAttempts)) {
+              throw error;
+            }
+
+            await this.delay(800 * attempt);
+          }
+        }
+
+        throw new Error(
+          `Gemini menu analysis attempts exhausted for model ${modelName}.`,
+        );
+      } catch (error) {
+        if (error instanceof AppError) {
+          throw error;
+        }
+
+        lastError = error;
+
+        if (!this.shouldRetryWithFallback(error, modelName)) {
+          break;
+        }
+      }
+    }
+
+    throw new AppError("Failed to analyze menu image with Gemini.", {
+      statusCode: 502,
+      code: "GEMINI_REQUEST_FAILED",
+      cause: lastError,
+    });
+  }
+
+  async suggestMealAlternative(
+    input: SuggestMealRequest,
+  ): Promise<MealSuggestion> {
     const prompt = this.buildSuggestionPrompt(input);
 
     const candidateModels = Array.from(
@@ -107,7 +265,8 @@ export class NutritionAnalysisService {
 
     for (const modelName of candidateModels) {
       try {
-        const maxAttempts = modelName === SECONDARY_FALLBACK_GEMINI_MODEL ? 1 : 2;
+        const maxAttempts =
+          modelName === SECONDARY_FALLBACK_GEMINI_MODEL ? 1 : 2;
 
         for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
           try {
@@ -132,10 +291,13 @@ export class NutritionAnalysisService {
             const rawOutput = response.text?.trim();
 
             if (!rawOutput) {
-              throw new AppError("Gemini returned an empty response for suggestion.", {
-                statusCode: 502,
-                code: "GEMINI_EMPTY_RESPONSE",
-              });
+              throw new AppError(
+                "Gemini returned an empty response for suggestion.",
+                {
+                  statusCode: 502,
+                  code: "GEMINI_EMPTY_RESPONSE",
+                },
+              );
             }
 
             let parsedJson: unknown;
@@ -143,21 +305,27 @@ export class NutritionAnalysisService {
             try {
               parsedJson = JSON.parse(this.stripCodeFences(rawOutput));
             } catch (error) {
-              throw new AppError("Gemini returned invalid JSON for suggestion.", {
-                statusCode: 502,
-                code: "GEMINI_INVALID_JSON",
-                cause: error,
-              });
+              throw new AppError(
+                "Gemini returned invalid JSON for suggestion.",
+                {
+                  statusCode: 502,
+                  code: "GEMINI_INVALID_JSON",
+                  cause: error,
+                },
+              );
             }
 
             const parsed = mealSuggestionSchema.safeParse(parsedJson);
 
             if (!parsed.success) {
-              throw new AppError("Gemini suggestion response did not match schema.", {
-                statusCode: 502,
-                code: "GEMINI_SCHEMA_MISMATCH",
-                cause: parsed.error.flatten(),
-              });
+              throw new AppError(
+                "Gemini suggestion response did not match schema.",
+                {
+                  statusCode: 502,
+                  code: "GEMINI_SCHEMA_MISMATCH",
+                  cause: parsed.error.flatten(),
+                },
+              );
             }
 
             return parsed.data;
@@ -174,7 +342,9 @@ export class NutritionAnalysisService {
           }
         }
 
-        throw new Error(`Gemini suggestion attempts exhausted for model ${modelName}.`);
+        throw new Error(
+          `Gemini suggestion attempts exhausted for model ${modelName}.`,
+        );
       } catch (error) {
         if (error instanceof AppError) {
           throw error;
@@ -301,11 +471,14 @@ export class NutritionAnalysisService {
         const parsed = nutritionAnalysisSchema.safeParse(parsedJson);
 
         if (!parsed.success) {
-          throw new AppError("Gemini response did not match the nutrition schema.", {
-            statusCode: 502,
-            code: "GEMINI_SCHEMA_MISMATCH",
-            cause: parsed.error.flatten(),
-          });
+          throw new AppError(
+            "Gemini response did not match the nutrition schema.",
+            {
+              statusCode: 502,
+              code: "GEMINI_SCHEMA_MISMATCH",
+              cause: parsed.error.flatten(),
+            },
+          );
         }
 
         return {
@@ -328,7 +501,10 @@ export class NutritionAnalysisService {
     throw new Error(`Gemini attempts exhausted for model ${modelName}.`);
   }
 
-  private shouldRetryWithFallback(error: unknown, currentModel: string): boolean {
+  private shouldRetryWithFallback(
+    error: unknown,
+    currentModel: string,
+  ): boolean {
     if (currentModel === SECONDARY_FALLBACK_GEMINI_MODEL) {
       return false;
     }
@@ -370,8 +546,14 @@ export class NutritionAnalysisService {
     });
   }
 
-  private parseImageDataUrl(dataUrl: string): { mimeType: string; data: string } {
-    const match = /^data:(?<mimeType>[-\w.+/]+);base64,(?<data>[A-Za-z0-9+/=]+)$/u.exec(dataUrl);
+  private parseImageDataUrl(dataUrl: string): {
+    mimeType: string;
+    data: string;
+  } {
+    const match =
+      /^data:(?<mimeType>[-\w.+/]+);base64,(?<data>[A-Za-z0-9+/=]+)$/u.exec(
+        dataUrl,
+      );
 
     if (!match?.groups?.mimeType || !match.groups.data) {
       throw new AppError("Invalid image payload for Gemini analysis.", {
@@ -469,5 +651,103 @@ export class NutritionAnalysisService {
 
     return lines.join("\n");
   }
-}
 
+  private buildMenuPrompt(): string {
+    const lines = [
+      "Analiza esta carta de restaurante y extrae todos los platos visibles.",
+      "Para cada plato, estima las calorías y macronutrientes basándote en porciones típicas de Latinoamérica.",
+      "",
+      "Contexto para el usuario:",
+      "- El usuario está siguiendo un plan nutricional diario",
+      "- Necesitas recomendar los platos que mejor se ajusten a sus macros del día",
+      "- También debes indicar qué platos debería evitar y por qué",
+      "",
+      "Instrucciones:",
+      "1. Detecta TODOS los platos en el menú",
+      "2. Para cada plato estima: calorías, proteína, carbohidratos y grasas",
+      "3. Recomienda 2-3 platos que sean más saludables (balance de macros, menor calorías, más proteína, etc.)",
+      "4. Identifica 1-2 platos que debería evitar (muy calóricos, fritos, excesivos en carbohidratos, etc.)",
+      "5. Da un resumen personalizado y alentador",
+      "",
+      "Para los platos recomendados:",
+      "- Asigna un matchScore de 0-100 según qué tan bien se ajustan a un plan saludable",
+      "- Explica por qué es una buena opción (ej. 'buena relación proteína-calorías', 'rico en fibra', etc.)",
+      "",
+      "Para los platos a evitar:",
+      "- Explica claramente por qué (ej. 'demasiadas calorías por porción', 'exceso de grasas saturadas', etc.)",
+      "",
+      "El resumen final debe ser útil y motivador para el usuario.",
+    ];
+
+    return lines.join("\n");
+  }
+
+  private async getMockMenuAnalysis(): Promise<MenuAnalysis> {
+    return {
+      dishesDetected: [
+        {
+          name: "Pollo a la Plancha",
+          description: "Pechuga de pollo a la plancha con arroz y ensalada",
+          estimatedCalories: 450,
+          estimatedProteinGrams: 35,
+          estimatedCarbsGrams: 45,
+          estimatedFatGrams: 12,
+        },
+        {
+          name: "Pescado del Día",
+          description: "Filete de pescado al horno con vegetales asados",
+          estimatedCalories: 380,
+          estimatedProteinGrams: 32,
+          estimatedCarbsGrams: 25,
+          estimatedFatGrams: 18,
+        },
+        {
+          name: "Pasta Carbonara",
+          description: "Pasta con salsa carbonara, panceta y queso parmesano",
+          estimatedCalories: 720,
+          estimatedProteinGrams: 28,
+          estimatedCarbsGrams: 68,
+          estimatedFatGrams: 35,
+        },
+      ],
+      recommendedDishes: [
+        {
+          name: "Pescado del Día",
+          description: "Filete de pescado al horno con vegetales asados",
+          estimatedCalories: 380,
+          estimatedProteinGrams: 32,
+          estimatedCarbsGrams: 25,
+          estimatedFatGrams: 18,
+          matchScore: 92,
+          reason:
+            "Excelente balance de proteína y grasas saludables. Bajo en carbohidratos refinados.",
+        },
+        {
+          name: "Pollo a la Plancha",
+          description: "Pechuga de pollo a la plancha con arroz y ensalada",
+          estimatedCalories: 450,
+          estimatedProteinGrams: 35,
+          estimatedCarbsGrams: 45,
+          estimatedFatGrams: 12,
+          matchScore: 85,
+          reason:
+            "Alto en proteína magra con carbohidratos moderados de arroz integral.",
+        },
+      ],
+      dishesToAvoid: [
+        {
+          name: "Pasta Carbonara",
+          reason:
+            "Demasiadas calorías y grasas saturadas por porción. Excede tu límite diario de grasa.",
+          estimatedCalories: 720,
+        },
+      ],
+      summary:
+        "Hoy tienes buen margen para una comida saludable. El Pescado del Día es tu mejor opción - rico en omega-3 y proteína de calidad. Si prefieres algo más contundente, el Pollo a la Plancha también es excelente. Evita la Carbonara si quieres mantener tus macros del día.",
+      totalCaloriesRemaining: 650,
+      proteinTarget: 35,
+      carbsTarget: 50,
+      fatTarget: 20,
+    };
+  }
+}

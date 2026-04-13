@@ -65,6 +65,39 @@ export interface MealSuggestionResponse {
   suggestion: SuggestedMeal;
 }
 
+export interface DishRecommendation {
+  name: string;
+  description: string;
+  estimatedCalories: number;
+  estimatedProteinGrams: number;
+  estimatedCarbsGrams: number;
+  estimatedFatGrams: number;
+  matchScore: number;
+  reason: string;
+}
+
+export interface MenuAnalysisResponse {
+  dishesDetected: Array<{
+    name: string;
+    description: string;
+    estimatedCalories: number;
+    estimatedProteinGrams: number;
+    estimatedCarbsGrams: number;
+    estimatedFatGrams: number;
+  }>;
+  recommendedDishes: DishRecommendation[];
+  dishesToAvoid: Array<{
+    name: string;
+    reason: string;
+    estimatedCalories: number;
+  }>;
+  summary: string;
+  totalCaloriesRemaining: number;
+  proteinTarget: number;
+  carbsTarget: number;
+  fatTarget: number;
+}
+
 export type GoalType = "LOSE_WEIGHT" | "MAINTAIN" | "GAIN_WEIGHT";
 export type ActivityLevel =
   | "SEDENTARY"

@@ -89,9 +89,13 @@ import {
   createRecoverySnapshot,
 } from "./src/services/recovery-engine";
 import { mockHealthProvider } from "./src/services/wearables/mock-health-provider";
-import type { MealAnalysisSummary, MealLog } from "./src/types/api";
+import type {
+  MealAnalysisSummary,
+  MealLog,
+  MenuAnalysisResponse,
+} from "./src/types/api";
 
-type MealInputMode = "photo" | "text";
+type MealInputMode = "photo" | "text" | "menuScan";
 type VisualMode = "dark" | "light";
 type ScannerMode = "food" | "barcode";
 type StatsView = "food" | "steps";
@@ -232,6 +236,281 @@ function RingProgress(props: {
   );
 }
 
+function ComingSoonPage(props: { view: PlaceholderView }) {
+  const { view } = props;
+  const config: {
+    eyebrow: string;
+    icon: ComponentProps<typeof Ionicons>["name"];
+    colors: readonly [string, string, string];
+    accent: string;
+    copy: string;
+    tagline: string;
+  } =
+    view === "steps"
+      ? {
+          eyebrow: "Pasos",
+          icon: "footsteps-outline" as const,
+          colors: ["#0F1115", "#181C22", "#101216"] as const,
+          accent: "#A7F86E",
+          copy: "Estamos preparando una vista de movimiento con progreso diario, metas y tendencias.",
+          tagline: "Cada paso cuenta",
+        }
+      : {
+          eyebrow: "Recomendaciones",
+          icon: "sparkles-outline" as const,
+          colors: ["#151110", "#211A17", "#130F0E"] as const,
+          accent: "#FFB866",
+          copy: "Aqui vas a ver recomendaciones inteligentes y accionables, con el mismo look limpio.",
+          tagline: "Tu proximo nivel te espera",
+        };
+
+  // Animation values for coming soon page
+  const comingSoonFloatY = useRef(new Animated.Value(0)).current;
+  const comingSoonIconScale = useRef(new Animated.Value(1)).current;
+  const comingSoonIconRotate = useRef(new Animated.Value(0)).current;
+  const comingSoonTaglineOpacity = useRef(new Animated.Value(0)).current;
+  const comingSoonTaglineScale = useRef(new Animated.Value(0.92)).current;
+  const comingSoonDotsPulse = useRef(new Animated.Value(0)).current;
+  const comingSoonGlowOpacity = useRef(new Animated.Value(0)).current;
+
+  // Float animation
+  useEffect(() => {
+    const floatAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(comingSoonFloatY, {
+          toValue: -8,
+          duration: 2200,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(comingSoonFloatY, {
+          toValue: 8,
+          duration: 2200,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    // Icon breathing scale + rotation
+    const iconAnim = Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(comingSoonIconScale, {
+            toValue: 1.06,
+            duration: 2800,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(comingSoonIconRotate, {
+            toValue: 6,
+            duration: 2800,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(comingSoonIconScale, {
+            toValue: 1,
+            duration: 2800,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(comingSoonIconRotate, {
+            toValue: -6,
+            duration: 2800,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+    );
+
+    // Tagline entrance
+    const taglineAnim = Animated.sequence([
+      Animated.delay(400),
+      Animated.parallel([
+        Animated.timing(comingSoonTaglineOpacity, {
+          toValue: 1,
+          duration: 600,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.spring(comingSoonTaglineScale, {
+          toValue: 1,
+          friction: 6,
+          tension: 100,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]);
+
+    // Dots pulse
+    const dotsAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(comingSoonDotsPulse, {
+          toValue: 1,
+          duration: 1200,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(comingSoonDotsPulse, {
+          toValue: 0,
+          duration: 1200,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    // Glow pulse
+    const glowAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(comingSoonGlowOpacity, {
+          toValue: 1,
+          duration: 3000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(comingSoonGlowOpacity, {
+          toValue: 0,
+          duration: 3000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    floatAnim.start();
+    iconAnim.start();
+    taglineAnim.start();
+    dotsAnim.start();
+    glowAnim.start();
+
+    return () => {
+      floatAnim.stop();
+      iconAnim.stop();
+      taglineAnim.stop();
+      dotsAnim.stop();
+      glowAnim.stop();
+    };
+  }, []);
+
+  const dotInterpolate = comingSoonDotsPulse.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.3, 1, 0.3],
+  });
+
+  const dot1Opacity = dotInterpolate;
+  const dot2Opacity = comingSoonDotsPulse.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.6, 0.3, 0.6],
+  });
+  const dot3Opacity = comingSoonDotsPulse.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [1, 0.6, 1],
+  });
+  const iconRotate = comingSoonIconRotate.interpolate({
+    inputRange: [-6, 6],
+    outputRange: ["-6deg", "6deg"],
+  });
+
+  return (
+    <LinearGradient
+      colors={config.colors}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.comingSoonCard}
+    >
+      {/* Glow background */}
+      <Animated.View
+        style={[
+          styles.comingSoonGlow,
+          {
+            opacity: comingSoonGlowOpacity,
+            borderColor: `${config.accent}18`,
+          },
+        ]}
+      />
+
+      {/* Floating icon */}
+      <Animated.View style={{ transform: [{ translateY: comingSoonFloatY }] }}>
+        <Animated.View
+          style={[
+            styles.comingSoonIconWrap,
+            {
+              borderColor: `${config.accent}33`,
+              transform: [
+                { scale: comingSoonIconScale },
+                { rotate: iconRotate },
+              ],
+            },
+          ]}
+        >
+          <Ionicons name={config.icon} size={28} color={config.accent} />
+        </Animated.View>
+      </Animated.View>
+
+      <Text style={[styles.comingSoonEyebrow, { color: config.accent }]}>
+        {config.eyebrow}
+      </Text>
+      <Text style={styles.comingSoonTitle}>Muy Pronto</Text>
+
+      {/* Tagline with spring entrance */}
+      <Animated.View
+        style={[
+          styles.comingSoonTaglineWrap,
+          {
+            opacity: comingSoonTaglineOpacity,
+            transform: [{ scale: comingSoonTaglineScale }],
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.comingSoonTaglinePill,
+            { backgroundColor: `${config.accent}14` },
+          ]}
+        >
+          <Ionicons
+            name="rocket-outline"
+            size={13}
+            color={config.accent}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={[styles.comingSoonTagline, { color: config.accent }]}>
+            {config.tagline}
+          </Text>
+        </View>
+      </Animated.View>
+
+      <Text style={styles.comingSoonText}>{config.copy}</Text>
+
+      {/* Animated loading dots */}
+      <View style={styles.comingSoonDots}>
+        <Animated.View
+          style={[
+            styles.comingSoonDot,
+            { backgroundColor: config.accent, opacity: dot1Opacity },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.comingSoonDot,
+            { backgroundColor: config.accent, opacity: dot2Opacity },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.comingSoonDot,
+            { backgroundColor: config.accent, opacity: dot3Opacity },
+          ]}
+        />
+      </View>
+    </LinearGradient>
+  );
+}
+
 export default function App() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
@@ -280,8 +559,14 @@ export default function App() {
   const [imageAsset, setImageAsset] =
     useState<ImagePicker.ImagePickerAsset | null>(null);
   const [analysis, setAnalysis] = useState<MealAnalysisSummary | null>(null);
+  const [menuAnalysis, setMenuAnalysis] = useState<MenuAnalysisResponse | null>(
+    null,
+  );
+  const [menuImage, setMenuImage] =
+    useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [menuAnalysisLoading, setMenuAnalysisLoading] = useState(false);
   const [nutritionView, setNutritionView] = useState<
-    "camera" | "history" | "text"
+    "camera" | "history" | "text" | "menuScan"
   >("camera");
   const [cameraReturnTab, setCameraReturnTab] = useState<AppTab>("home");
   const [statsView, setStatsView] = useState<StatsView>("food");
@@ -1004,6 +1289,22 @@ export default function App() {
     );
   }
 
+  function openMenuScanNutritionFlow(originTab: AppTab = activeTab) {
+    setNutritionQuickMenuOpen(false);
+    setCameraReturnTab(originTab);
+    setMealMode("menuScan");
+    setScannerMode("food");
+    setBarcodeResult(null);
+    setImageAsset(null);
+    setAnalysis(null);
+    setMenuAnalysis(null);
+    setNutritionView("menuScan");
+    setActiveTab("nutrition");
+    setStatusMessage(
+      "Apunta la camara al menu del restaurante y la IA te recomendara los mejores platos.",
+    );
+  }
+
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -1400,6 +1701,10 @@ export default function App() {
     return renderTextOnlyScreen();
   }
 
+  if (activeTab === "nutrition" && nutritionView === "menuScan") {
+    return renderMenuScanScreen();
+  }
+
   // ─── Welcome / Auth flow ─────────────────────────────────────────
   if (authFlow === "welcome") {
     return (
@@ -1635,6 +1940,43 @@ export default function App() {
                   </Text>
                   <Text style={styles.nutritionQuickMenuActionText}>
                     Describe tu comida
+                  </Text>
+                </View>
+              </LinearGradient>
+            </Pressable>
+
+            <Pressable
+              onPress={() => openMenuScanNutritionFlow(activeTab)}
+              style={styles.nutritionQuickMenuActionWrap}
+            >
+              <LinearGradient
+                colors={
+                  visualMode === "light"
+                    ? ["#6366F1", "#4F46E5"]
+                    : ["#4F46E5", "#3730A3"]
+                }
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.nutritionQuickMenuAction}
+              >
+                <View
+                  style={[
+                    styles.nutritionQuickMenuIconBadge,
+                    styles.nutritionQuickMenuIconBadgeMuted,
+                  ]}
+                >
+                  <Ionicons
+                    name="restaurant-outline"
+                    size={20}
+                    color={theme.accent}
+                  />
+                </View>
+                <View style={styles.nutritionQuickMenuActionTextBlock}>
+                  <Text style={styles.nutritionQuickMenuActionTitle}>
+                    Escanear menu
+                  </Text>
+                  <Text style={styles.nutritionQuickMenuActionText}>
+                    Analiza la carta de un restaurante
                   </Text>
                 </View>
               </LinearGradient>
@@ -2845,54 +3187,6 @@ export default function App() {
     );
   }
 
-  function renderComingSoonPage(view: PlaceholderView) {
-    const config: {
-      eyebrow: string;
-      icon: ComponentProps<typeof Ionicons>["name"];
-      colors: readonly [string, string, string];
-      accent: string;
-      copy: string;
-    } =
-      view === "steps"
-        ? {
-            eyebrow: "Pasos",
-            icon: "footsteps-outline" as const,
-            colors: ["#0F1115", "#181C22", "#101216"] as const,
-            accent: "#A7F86E",
-            copy: "Estamos preparando una vista de movimiento con progreso diario, metas y tendencias.",
-          }
-        : {
-            eyebrow: "Recomendaciones",
-            icon: "sparkles-outline" as const,
-            colors: ["#151110", "#211A17", "#130F0E"] as const,
-            accent: "#FFB866",
-            copy: "Aqui vas a ver recomendaciones inteligentes y accionables, con el mismo look limpio.",
-          };
-
-    return (
-      <LinearGradient
-        colors={config.colors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.comingSoonCard}
-      >
-        <View
-          style={[
-            styles.comingSoonIconWrap,
-            { borderColor: `${config.accent}33` },
-          ]}
-        >
-          <Ionicons name={config.icon} size={28} color={config.accent} />
-        </View>
-        <Text style={[styles.comingSoonEyebrow, { color: config.accent }]}>
-          {config.eyebrow}
-        </Text>
-        <Text style={styles.comingSoonTitle}>Coming Soon</Text>
-        <Text style={styles.comingSoonText}>{config.copy}</Text>
-      </LinearGradient>
-    );
-  }
-
   function renderStatsScreen() {
     return (
       <View style={styles.screen}>
@@ -2992,13 +3286,440 @@ export default function App() {
               style={[styles.statsPage, { width: statsPageWidth }]}
             >
               <Animated.View style={getStatsPageMotion(index)}>
-                {tab.key === "food"
-                  ? renderFoodStatsPage()
-                  : renderComingSoonPage(tab.key)}
+                {tab.key === "food" ? (
+                  renderFoodStatsPage()
+                ) : (
+                  <ComingSoonPage view={tab.key} />
+                )}
               </Animated.View>
             </View>
           ))}
         </Animated.ScrollView>
+      </View>
+    );
+  }
+
+  function renderMenuScanScreen() {
+    const captureMenuPhoto = async () => {
+      if (!cameraReady || !cameraRef.current) return;
+      try {
+        const picture = await cameraRef.current.takePictureAsync({
+          quality: 0.85,
+          base64: false,
+        });
+        setMenuImage(picture);
+      } catch (err) {
+        console.error("[MenuScan] Error capturing photo:", err);
+      }
+    };
+
+    const analyzeMenu = async () => {
+      if (!menuImage || !userId) return;
+      setMenuAnalysisLoading(true);
+      try {
+        // Upload image to get signed URL
+        const uploadResponse = await biomaApi.createMealUploadUrl({
+          userId,
+          fileName: `menu-${Date.now()}.jpg`,
+          contentType: "image/jpeg",
+        });
+
+        // Upload the image
+        const response = await fetch(menuImage.uri);
+        const blob = await response.blob();
+        await fetch(uploadResponse.uploadUrl, {
+          method: "PUT",
+          body: blob,
+          headers: { "Content-Type": "image/jpeg" },
+        });
+
+        // Call menu analysis endpoint with the public URL
+        const result = await biomaApi.analyzeMenuImage(
+          uploadResponse.fileUrl,
+          userId,
+        );
+        setMenuAnalysis(result);
+      } catch (err) {
+        console.error("[MenuScan] Error analyzing menu:", err);
+        Alert.alert(
+          "Error",
+          "No se pudo analizar el menu. Intentalo de nuevo.",
+        );
+      } finally {
+        setMenuAnalysisLoading(false);
+      }
+    };
+
+    if (menuAnalysis && menuAnalysis.recommendedDishes.length > 0) {
+      return (
+        <SafeAreaView
+          style={[styles.menuScanRoot, { backgroundColor: theme.background }]}
+        >
+          <StatusBar
+            barStyle={visualMode === "light" ? "dark-content" : "light-content"}
+          />
+          <ScrollView
+            contentContainerStyle={styles.menuScanContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Back button */}
+            <Pressable
+              style={[
+                styles.menuScanBackButton,
+                { backgroundColor: theme.card, borderColor: theme.stroke },
+              ]}
+              onPress={() => {
+                setMenuImage(null);
+                setMenuAnalysis(null);
+                setNutritionView("camera");
+              }}
+            >
+              <Ionicons name="arrow-back" size={20} color={theme.text} />
+            </Pressable>
+
+            {/* Header */}
+            <View style={styles.menuScanHeader}>
+              <View
+                style={[
+                  styles.menuScanIconWrap,
+                  { backgroundColor: `${theme.accent}18` },
+                ]}
+              >
+                <Ionicons name="sparkles" size={24} color={theme.accent} />
+              </View>
+              <Text style={[styles.menuScanTitle, { color: theme.text }]}>
+                Menu analizado
+              </Text>
+              <Text style={[styles.menuScanSubtitle, { color: theme.muted }]}>
+                Basado en tus macros de hoy, estas son las mejores opciones
+              </Text>
+            </View>
+
+            {/* Summary Card */}
+            <View
+              style={[
+                styles.menuSummaryCard,
+                { backgroundColor: theme.card, borderColor: theme.stroke },
+              ]}
+            >
+              <Text style={[styles.menuSummaryTitle, { color: theme.text }]}>
+                Resumen del dia
+              </Text>
+              <View style={styles.menuSummaryRow}>
+                <View style={styles.menuSummaryMetric}>
+                  <Text
+                    style={[styles.menuSummaryValue, { color: theme.accent }]}
+                  >
+                    {menuAnalysis.totalCaloriesRemaining}
+                  </Text>
+                  <Text
+                    style={[styles.menuSummaryLabel, { color: theme.muted }]}
+                  >
+                    kcal restantes
+                  </Text>
+                </View>
+                <View style={styles.menuSummaryMetric}>
+                  <Text style={[styles.menuSummaryValue, { color: "#76EFE5" }]}>
+                    {menuAnalysis.proteinTarget}g
+                  </Text>
+                  <Text
+                    style={[styles.menuSummaryLabel, { color: theme.muted }]}
+                  >
+                    proteina
+                  </Text>
+                </View>
+                <View style={styles.menuSummaryMetric}>
+                  <Text style={[styles.menuSummaryValue, { color: "#E8FF54" }]}>
+                    {menuAnalysis.carbsTarget}g
+                  </Text>
+                  <Text
+                    style={[styles.menuSummaryLabel, { color: theme.muted }]}
+                  >
+                    carbs
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Recommended Dishes */}
+            <Text style={[styles.menuSectionTitle, { color: theme.text }]}>
+              Recomendados
+            </Text>
+            {menuAnalysis.recommendedDishes.map((dish, i) => (
+              <View
+                key={`rec-${i}`}
+                style={[
+                  styles.menuDishCard,
+                  { backgroundColor: theme.card, borderColor: theme.stroke },
+                ]}
+              >
+                <View style={styles.menuDishHeader}>
+                  <View
+                    style={[
+                      styles.menuDishScore,
+                      { backgroundColor: theme.accent },
+                    ]}
+                  >
+                    <Text style={styles.menuDishScoreText}>
+                      {dish.matchScore}
+                    </Text>
+                  </View>
+                  <View style={styles.menuDishInfo}>
+                    <Text style={[styles.menuDishName, { color: theme.text }]}>
+                      {dish.name}
+                    </Text>
+                    <Text style={[styles.menuDishDesc, { color: theme.muted }]}>
+                      {dish.description}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.menuDishMacros}>
+                  <Text style={[styles.menuDishMacro, { color: theme.text }]}>
+                    {dish.estimatedCalories} kcal
+                  </Text>
+                  <Text style={[styles.menuDishMacro, { color: "#76EFE5" }]}>
+                    P: {dish.estimatedProteinGrams}g
+                  </Text>
+                  <Text style={[styles.menuDishMacro, { color: "#E8FF54" }]}>
+                    C: {dish.estimatedCarbsGrams}g
+                  </Text>
+                  <Text style={[styles.menuDishMacro, { color: "#FF9A5C" }]}>
+                    G: {dish.estimatedFatGrams}g
+                  </Text>
+                </View>
+                <Text style={[styles.menuDishReason, { color: theme.muted }]}>
+                  💡 {dish.reason}
+                </Text>
+              </View>
+            ))}
+
+            {/* Dishes to Avoid */}
+            {menuAnalysis.dishesToAvoid.length > 0 && (
+              <>
+                <Text style={[styles.menuSectionTitle, { color: theme.text }]}>
+                  Mejor evitar hoy
+                </Text>
+                {menuAnalysis.dishesToAvoid.map((dish, i) => (
+                  <View
+                    key={`avoid-${i}`}
+                    style={[
+                      styles.menuAvoidCard,
+                      {
+                        backgroundColor: theme.card,
+                        borderColor: theme.stroke,
+                      },
+                    ]}
+                  >
+                    <View style={styles.menuAvoidHeader}>
+                      <Ionicons
+                        name="warning-outline"
+                        size={20}
+                        color="#F87171"
+                      />
+                      <Text
+                        style={[styles.menuAvoidName, { color: theme.text }]}
+                      >
+                        {dish.name}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[styles.menuAvoidReason, { color: theme.muted }]}
+                    >
+                      ⚠️ {dish.reason}
+                    </Text>
+                    <Text
+                      style={[styles.menuAvoidCalories, { color: "#F87171" }]}
+                    >
+                      ~{dish.estimatedCalories} kcal
+                    </Text>
+                  </View>
+                ))}
+              </>
+            )}
+
+            {/* Summary */}
+            <View
+              style={[
+                styles.menuSummaryFullCard,
+                { backgroundColor: theme.card, borderColor: theme.stroke },
+              ]}
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={20}
+                color={theme.accent}
+              />
+              <Text
+                style={[styles.menuSummaryFullText, { color: theme.muted }]}
+              >
+                {menuAnalysis.summary}
+              </Text>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.menuScanActions}>
+              <Pressable
+                style={[
+                  styles.menuScanActionButton,
+                  { backgroundColor: theme.accent },
+                ]}
+                onPress={() => {
+                  setMenuImage(null);
+                  setMenuAnalysis(null);
+                }}
+              >
+                <Ionicons name="scan-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.menuScanActionText}>
+                  Escanear otro menu
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.menuScanBackToCameraButton,
+                  { borderColor: theme.stroke },
+                ]}
+                onPress={() => {
+                  setMenuImage(null);
+                  setMenuAnalysis(null);
+                  setNutritionView("camera");
+                }}
+              >
+                <Ionicons name="camera-outline" size={20} color={theme.text} />
+                <Text
+                  style={[
+                    styles.menuScanBackToCameraText,
+                    { color: theme.text },
+                  ]}
+                >
+                  Volver a camara
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        </SafeAreaView>
+      );
+    }
+
+    // Camera / capture view
+    return (
+      <View style={styles.menuScanRoot}>
+        <StatusBar hidden />
+        <Pressable
+          style={styles.menuScanBackButtonNav}
+          onPress={() => {
+            setMenuImage(null);
+            setMenuAnalysis(null);
+            setNutritionView("camera");
+          }}
+        >
+          <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+        </Pressable>
+
+        {cameraPermission?.granted ? (
+          menuImage ? (
+            <Pressable
+              style={styles.menuScanPreview}
+              onPress={() => setMenuImage(null)}
+            >
+              <Image
+                source={{ uri: menuImage.uri }}
+                style={styles.menuScanPreview}
+              />
+            </Pressable>
+          ) : (
+            <View style={styles.menuScanPreview}>
+              <CameraView
+                ref={cameraRef}
+                style={styles.menuScanPreview}
+                facing="back"
+                onCameraReady={() => setCameraReady(true)}
+              />
+            </View>
+          )
+        ) : (
+          <View style={styles.menuScanPreview} />
+        )}
+
+        {/* Overlay frame */}
+        <View pointerEvents="none" style={styles.cameraOverlay}>
+          <View style={[styles.cameraOverlayBlock, styles.cameraOverlayTop]} />
+          <View
+            style={[styles.cameraOverlayBlock, styles.cameraOverlayBottom]}
+          />
+          <View style={[styles.cameraOverlayBlock, styles.cameraOverlayLeft]} />
+          <View
+            style={[styles.cameraOverlayBlock, styles.cameraOverlayRight]}
+          />
+          <View style={styles.cameraScanFrame}>
+            <View
+              style={[styles.cameraScanCorner, styles.cameraScanCornerTopLeft]}
+            />
+            <View
+              style={[styles.cameraScanCorner, styles.cameraScanCornerTopRight]}
+            />
+            <View
+              style={[
+                styles.cameraScanCorner,
+                styles.cameraScanCornerBottomLeft,
+              ]}
+            />
+            <View
+              style={[
+                styles.cameraScanCorner,
+                styles.cameraScanCornerBottomRight,
+              ]}
+            />
+          </View>
+        </View>
+
+        {/* Capture / Analyze buttons */}
+        {menuImage ? (
+          <View style={styles.menuScanPostCaptureActions}>
+            <Pressable
+              style={styles.menuScanRetakeButton}
+              onPress={() => setMenuImage(null)}
+            >
+              <Ionicons
+                name="camera-reverse-outline"
+                size={20}
+                color="#FFFFFF"
+              />
+              <Text style={styles.menuScanRetakeButtonText}>Retomar</Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.menuScanAnalyzeButton,
+                menuAnalysisLoading && styles.buttonDisabled,
+              ]}
+              onPress={analyzeMenu}
+              disabled={menuAnalysisLoading}
+            >
+              {menuAnalysisLoading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.menuScanAnalyzeButtonText}>
+                  Analizar menu
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            style={styles.menuScanCaptureButton}
+            onPress={captureMenuPhoto}
+            disabled={!cameraReady}
+          >
+            <View style={styles.menuScanCaptureButtonInner} />
+          </Pressable>
+        )}
+
+        {/* Bottom tab indicator */}
+        <View style={styles.menuScanBottomTab}>
+          <Ionicons name="restaurant-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.menuScanBottomTabText}>Escanear menu</Text>
+        </View>
       </View>
     );
   }
@@ -3871,7 +4592,7 @@ export default function App() {
   function renderTipsScreen() {
     return (
       <View style={styles.screen}>
-        {renderComingSoonPage("recommendations")}
+        <ComingSoonPage view="recommendations" />
       </View>
     );
   }
@@ -5819,6 +6540,41 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     textAlign: "center",
   },
+  comingSoonGlow: {
+    position: "absolute",
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    borderWidth: 2,
+    top: "50%",
+    marginTop: -130,
+  },
+  comingSoonTaglineWrap: {
+    marginTop: 16,
+  },
+  comingSoonTaglinePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  comingSoonTagline: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    letterSpacing: 0.3,
+  },
+  comingSoonDots: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 28,
+    alignItems: "center",
+  },
+  comingSoonDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
   inlineUnit: {
     color: fitnessColors.muted,
     fontFamily: "Inter_500Medium",
@@ -6079,5 +6835,305 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_800ExtraBold",
     fontSize: 18,
     lineHeight: 24,
+  },
+
+  // Menu Scan styles
+  menuScanRoot: {
+    flex: 1,
+    backgroundColor: "#0A0A0A",
+  },
+  menuScanBackButtonNav: {
+    position: "absolute",
+    top: 48,
+    left: 20,
+    zIndex: 100,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuScanPreview: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  menuScanPostCaptureActions: {
+    position: "absolute",
+    bottom: 120,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 16,
+    paddingHorizontal: 20,
+  },
+  menuScanRetakeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.15)",
+  },
+  menuScanRetakeButtonText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: "#FFFFFF",
+  },
+  menuScanAnalyzeButton: {
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 999,
+    backgroundColor: "#00C897",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  menuScanAnalyzeButtonText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#FFFFFF",
+  },
+  menuScanCaptureButton: {
+    position: "absolute",
+    bottom: 120,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuScanCaptureButtonInner: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 4,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  menuScanBottomTab: {
+    position: "absolute",
+    bottom: 40,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  menuScanBottomTabText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: "#FFFFFF",
+  },
+
+  // Menu analysis result styles
+  menuScanContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    gap: 20,
+  },
+  menuScanBackButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "flex-start",
+  },
+  menuScanHeader: {
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+  },
+  menuScanIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuScanTitle: {
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 26,
+    lineHeight: 32,
+  },
+  menuScanSubtitle: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: "center",
+    paddingHorizontal: 12,
+  },
+  menuSummaryCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    gap: 12,
+  },
+  menuSummaryTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  menuSummaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    gap: 8,
+  },
+  menuSummaryMetric: {
+    alignItems: "center",
+    flex: 1,
+  },
+  menuSummaryValue: {
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 20,
+    lineHeight: 26,
+  },
+  menuSummaryLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    lineHeight: 16,
+    textTransform: "uppercase",
+    marginTop: 2,
+  },
+  menuSectionTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    lineHeight: 24,
+    marginTop: 8,
+  },
+  menuDishCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    gap: 12,
+  },
+  menuDishHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  menuDishScore: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  menuDishScoreText: {
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 16,
+    color: "#FFFFFF",
+  },
+  menuDishInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  menuDishName: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  menuDishDesc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  menuDishMacros: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    paddingTop: 4,
+  },
+  menuDishMacro: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  menuDishReason: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 18,
+    paddingTop: 4,
+  },
+  menuAvoidCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    gap: 10,
+  },
+  menuAvoidHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  menuAvoidName: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    lineHeight: 20,
+    flex: 1,
+  },
+  menuAvoidReason: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 18,
+    paddingLeft: 30,
+  },
+  menuAvoidCalories: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    lineHeight: 20,
+    paddingLeft: 30,
+  },
+  menuSummaryFullCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  menuSummaryFullText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 20,
+    flex: 1,
+  },
+  menuScanActions: {
+    gap: 12,
+    marginTop: 8,
+  },
+  menuScanActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 16,
+    borderRadius: 999,
+  },
+  menuScanActionText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#FFFFFF",
+  },
+  menuScanBackToCameraButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  menuScanBackToCameraText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
   },
 });
