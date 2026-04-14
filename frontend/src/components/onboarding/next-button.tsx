@@ -1,6 +1,12 @@
-import React from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import React, { useRef } from "react";
+import {
+  ActivityIndicator,
+  Animated,
+  Easing,
+  Pressable,
+  StyleSheet,
+  Text,
+} from "react-native";
 import type { FitnessTheme } from "../fitness-ui";
 
 interface NextButtonProps {
@@ -18,68 +24,78 @@ export function NextButton({
   loading,
   theme,
 }: NextButtonProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.timing(scale, {
+      toValue: 0.97,
+      duration: 80,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.timing(scale, {
+      toValue: 1,
+      duration: 120,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  };
+
   const isActive = enabled && !loading;
 
-  if (isActive) {
-    return (
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-      >
-        <LinearGradient
-          colors={[theme.accent, "#009E7A"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradient}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#0D0F16" />
-          ) : (
-            <Text style={[styles.text, { color: "#0D0F16" }]}>{label}</Text>
-          )}
-        </LinearGradient>
-      </Pressable>
-    );
-  }
-
   return (
-    <Pressable style={[styles.button, styles.buttonDisabled]} disabled>
-      {loading ? (
-        <ActivityIndicator size="small" color="#555870" />
-      ) : (
-        <Text style={[styles.text, styles.textDisabled]}>{label}</Text>
-      )}
+    <Pressable
+      onPress={isActive ? onPress : undefined}
+      onPressIn={isActive ? handlePressIn : undefined}
+      onPressOut={isActive ? handlePressOut : undefined}
+      disabled={!isActive}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !isActive }}
+    >
+      <Animated.View
+        style={[
+          styles.button,
+          isActive
+            ? { backgroundColor: theme.accent }
+            : styles.buttonDisabled,
+          { transform: [{ scale }] },
+        ]}
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color={isActive ? "#0A0A0F" : "#3A3D52"} />
+        ) : (
+          <Text
+            style={[
+              styles.text,
+              { color: isActive ? "#0A0A0F" : "#3A3D52" },
+            ]}
+          >
+            {label}
+          </Text>
+        )}
+      </Animated.View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 60,
-    borderRadius: 16,
-    overflow: "hidden",
-  },
-  buttonPressed: {
-    opacity: 0.88,
-  },
-  gradient: {
-    flex: 1,
-    minHeight: 60,
+    height: 62,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
   },
   buttonDisabled: {
-    backgroundColor: "#1A1C26",
+    backgroundColor: "#131520",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.05)",
-    alignItems: "center",
-    justifyContent: "center",
   },
   text: {
     fontFamily: "Inter_700Bold",
     fontSize: 17,
-  },
-  textDisabled: {
-    color: "#3A3D4E",
+    letterSpacing: 0.2,
   },
 });

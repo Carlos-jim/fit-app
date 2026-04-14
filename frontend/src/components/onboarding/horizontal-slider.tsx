@@ -1,15 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
   Animated,
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   Vibration,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import type { FitnessTheme } from "../fitness-ui";
 
 interface HorizontalSliderProps {
@@ -28,8 +28,10 @@ interface HorizontalSliderProps {
   centerBand?: boolean;
 }
 
-const STEP_WIDTH = 22;
-const MIN_MAJOR_TICKS = 4;
+const ITEM_H = 52;
+const VISIBLE = 5;
+const PICKER_H = ITEM_H * VISIBLE;
+const CARD_BG = "#111318";
 
 export function HorizontalSlider({
   value,
@@ -42,17 +44,13 @@ export function HorizontalSlider({
   onChange,
   headerRight,
   formatValue,
-  majorStep,
   centerHint,
-  centerBand = false,
 }: HorizontalSliderProps) {
-  const { width: windowWidth } = useWindowDimensions();
   const scrollRef = useRef<ScrollView | null>(null);
-  const [trackWidth, setTrackWidth] = useState(0);
   const scrollingRef = useRef(false);
+  const hasMomentumRef = useRef(false);
   const lastValueRef = useRef(value);
   const pulse = useRef(new Animated.Value(1)).current;
-  const glowPulse = useRef(new Animated.Value(0.5)).current;
 
   const precision = useMemo(() => {
     const text = `${step}`;
@@ -60,31 +58,18 @@ export function HorizontalSlider({
     return dot === -1 ? 0 : text.length - dot - 1;
   }, [step]);
 
-  const totalSteps = useMemo(() => {
-    return Math.max(1, Math.round((max - min) / step));
-  }, [max, min, step]);
+  const totalSteps = useMemo(
+    () => Math.max(1, Math.round((max - min) / step)),
+    [max, min, step],
+  );
 
   const values = useMemo(() => {
     const result: number[] = [];
-    for (let i = 0; i <= totalSteps; i += 1) {
+    for (let i = 0; i <= totalSteps; i++) {
       result.push(Number((min + i * step).toFixed(precision)));
     }
     return result;
   }, [min, precision, step, totalSteps]);
-
-  const resolvedMajorStep = useMemo(() => {
-    if (majorStep && majorStep > 0) {
-      return majorStep;
-    }
-    const range = max - min;
-    const raw = range / MIN_MAJOR_TICKS;
-    if (raw <= 1) return 1;
-    if (raw <= 2) return 2;
-    if (raw <= 5) return 5;
-    if (raw <= 10) return 10;
-    if (raw <= 20) return 20;
-    return 25;
-  }, [majorStep, max, min]);
 
   const currentIndex = useMemo(() => {
     const index = Math.round((value - min) / step);
@@ -92,83 +77,58 @@ export function HorizontalSlider({
   }, [min, step, totalSteps, value]);
 
   const displayValue = useMemo(() => {
-    if (formatValue) {
-      return formatValue(value);
-    }
+    if (formatValue) return formatValue(value);
     return `${value.toFixed(precision)}${unit}`;
   }, [formatValue, precision, unit, value]);
 
-  const sidePadding = useMemo(() => {
-    return Math.max((windowWidth - 40) / 2, 80);
-  }, [windowWidth]);
+  const sidePad = (PICKER_H - ITEM_H) / 2;
 
+  // Sync scroll position when value changes programmatically
   useEffect(() => {
-    if (!scrollRef.current || trackWidth <= 0 || scrollingRef.current) {
-      return;
-    }
-    const x = currentIndex * STEP_WIDTH;
-    scrollRef.current.scrollTo({ x, animated: false });
-  }, [currentIndex, trackWidth]);
+    if (!scrollRef.current || scrollingRef.current) return;
+    scrollRef.current.scrollTo({ y: currentIndex * ITEM_H, animated: false });
+  }, [currentIndex]);
 
+  // Pulse on value change
   useEffect(() => {
-    if (lastValueRef.current === value) {
-      return;
-    }
+    if (lastValueRef.current === value) return;
     lastValueRef.current = value;
     Animated.sequence([
-      Animated.timing(pulse, {
-        toValue: 1.07,
-        duration: 75,
-        useNativeDriver: true,
-      }),
-      Animated.timing(pulse, {
-        toValue: 1,
-        duration: 130,
-        useNativeDriver: true,
-      }),
+      Animated.timing(pulse, { toValue: 1.06, duration: 70, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 1, duration: 120, useNativeDriver: true }),
     ]).start();
-    Animated.sequence([
-      Animated.timing(glowPulse, {
-        toValue: 1,
-        duration: 60,
-        useNativeDriver: true,
-      }),
-      Animated.timing(glowPulse, {
-        toValue: 0.5,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [pulse, glowPulse, value]);
+  }, [pulse, value]);
 
-  const applyOffset = (offsetX: number) => {
-    const rawIndex = Math.round(offsetX / STEP_WIDTH);
+  const applyOffset = (offsetY: number) => {
+    const rawIndex = Math.round(offsetY / ITEM_H);
     const index = Math.max(0, Math.min(totalSteps, rawIndex));
     const next = values[index];
-    if (next !== lastValueRef.current) {
+    if (next !== undefined && next !== lastValueRef.current) {
       lastValueRef.current = next;
-      Vibration.vibrate(8);
+      Vibration.vibrate(6);
       onChange(next);
     }
   };
 
-  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    applyOffset(event.nativeEvent.contentOffset.x);
-  };
-
-  const handleScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const snapAndApply = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     scrollingRef.current = false;
-    const rawX = event.nativeEvent.contentOffset.x;
-    const snappedX = Math.round(rawX / STEP_WIDTH) * STEP_WIDTH;
-    scrollRef.current?.scrollTo({ x: snappedX, animated: true });
-    applyOffset(snappedX);
+    hasMomentumRef.current = false;
+    const rawY = event.nativeEvent.contentOffset.y;
+    const snappedY = Math.round(rawY / ITEM_H) * ITEM_H;
+    scrollRef.current?.scrollTo({ y: snappedY, animated: true });
+    applyOffset(snappedY);
   };
 
-  const getTickLabel = (tickValue: number) => {
-    if (precision > 0) {
-      return tickValue.toFixed(precision);
-    }
-    return `${Math.round(tickValue)}`;
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    applyOffset(event.nativeEvent.contentOffset.y);
+  };
+
+  const handleScrollEndDrag = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!hasMomentumRef.current) snapAndApply(event);
+  };
+
+  const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    snapAndApply(event);
   };
 
   const accent = theme.accent;
@@ -176,102 +136,88 @@ export function HorizontalSlider({
   return (
     <View style={styles.card}>
       {(label || headerRight) && (
-        <View style={styles.header}>
-          {label ? (
-            <Text style={styles.label}>{label}</Text>
-          ) : (
-            <View />
-          )}
+        <View style={styles.cardHeader}>
+          {label ? <Text style={styles.label}>{label}</Text> : <View />}
           {headerRight ?? null}
         </View>
       )}
 
-      <View style={styles.valueRow}>
-        <Animated.Text
-          style={[
-            styles.valueText,
-            { color: accent, transform: [{ scale: pulse }] },
-          ]}
-        >
-          {displayValue}
-        </Animated.Text>
-        <Animated.View
-          style={[
-            styles.valueDot,
-            { backgroundColor: accent, opacity: glowPulse },
-          ]}
-        />
-      </View>
+      <Animated.Text
+        style={[styles.displayValue, { color: accent, transform: [{ scale: pulse }] }]}
+      >
+        {displayValue}
+      </Animated.Text>
 
-      <View style={styles.sliderShell}>
-        {centerBand ? (
-          <View
-            style={[styles.centerBand, { backgroundColor: `${accent}18` }]}
-            pointerEvents="none"
-          />
-        ) : null}
+      <View style={[styles.pickerWrap, { height: PICKER_H }]}>
+        {/* Center selection highlight */}
+        <View
+          style={[
+            styles.selectionBar,
+            {
+              top: sidePad,
+              borderColor: `${accent}28`,
+              backgroundColor: `${accent}0A`,
+            },
+          ]}
+          pointerEvents="none"
+        />
 
         <ScrollView
           ref={scrollRef}
-          horizontal
+          showsVerticalScrollIndicator={false}
           decelerationRate="fast"
-          snapToInterval={STEP_WIDTH}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingHorizontal: sidePadding },
-          ]}
-          onLayout={(event) => {
-            setTrackWidth(event.nativeEvent.layout.width);
-          }}
+          snapToInterval={ITEM_H}
+          contentContainerStyle={[styles.scrollContent, { paddingVertical: sidePad }]}
           onScrollBeginDrag={() => {
             scrollingRef.current = true;
+            hasMomentumRef.current = false;
+          }}
+          onMomentumScrollBegin={() => {
+            hasMomentumRef.current = true;
           }}
           onScroll={handleScroll}
-          onMomentumScrollEnd={handleScrollEnd}
-          onScrollEndDrag={handleScrollEnd}
+          onScrollEndDrag={handleScrollEndDrag}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
           scrollEventThrottle={16}
         >
           {values.map((tickValue, index) => {
-            const isMajor =
-              Math.round((tickValue - min) / resolvedMajorStep) ===
-              (tickValue - min) / resolvedMajorStep;
+            const isSelected = index === currentIndex;
             return (
               <View key={index} style={styles.tickItem}>
-                <View
+                <Text
                   style={[
-                    styles.tick,
-                    isMajor
-                      ? [styles.tickMajor, { backgroundColor: accent }]
-                      : styles.tickMinor,
+                    styles.tickText,
+                    isSelected
+                      ? [styles.tickSelected, { color: accent }]
+                      : styles.tickDefault,
                   ]}
-                />
-                {isMajor ? (
-                  <Text style={styles.tickLabel}>
-                    {getTickLabel(tickValue)}
-                  </Text>
-                ) : (
-                  <View style={styles.tickLabelPlaceholder} />
-                )}
+                >
+                  {precision > 0
+                    ? tickValue.toFixed(precision)
+                    : `${Math.round(tickValue)}`}
+                </Text>
               </View>
             );
           })}
         </ScrollView>
 
-        <View style={styles.centerIndicator} pointerEvents="none">
-          <View
-            style={[styles.centerTriangle, { borderTopColor: accent }]}
+        {/* Fade overlays — pass-through touches */}
+        <View style={styles.fadeTop} pointerEvents="none">
+          <LinearGradient
+            colors={[CARD_BG, `${CARD_BG}00`]}
+            style={StyleSheet.absoluteFill}
           />
-          <View
-            style={[styles.centerLine, { backgroundColor: accent }]}
+        </View>
+        <View style={styles.fadeBottom} pointerEvents="none">
+          <LinearGradient
+            colors={[`${CARD_BG}00`, CARD_BG]}
+            style={StyleSheet.absoluteFill}
           />
         </View>
       </View>
 
       {centerHint ? (
-        <Text style={[styles.centerHint, { color: theme.muted }]}>
-          {centerHint}
-        </Text>
+        <Text style={[styles.centerHint, { color: theme.muted }]}>{centerHint}</Text>
       ) : null}
     </View>
   );
@@ -279,119 +225,89 @@ export function HorizontalSlider({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#13151E",
-    borderRadius: 24,
-    paddingTop: 20,
-    paddingBottom: 8,
-    gap: 0,
+    backgroundColor: CARD_BG,
+    borderRadius: 22,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
+    borderColor: "rgba(255,255,255,0.06)",
   },
-  header: {
+  cardHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
     paddingHorizontal: 20,
-    marginBottom: 8,
+    paddingTop: 18,
+    gap: 12,
   },
   label: {
-    color: "#555870",
+    color: "#484B5E",
     fontFamily: "Inter_700Bold",
     fontSize: 12,
     letterSpacing: 0.9,
     textTransform: "uppercase",
   },
-  valueRow: {
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 20,
-    marginBottom: 6,
-  },
-  valueText: {
+  displayValue: {
     fontFamily: "Manrope_800ExtraBold",
     fontSize: 52,
-    lineHeight: 58,
+    lineHeight: 60,
     textAlign: "center",
+    paddingTop: 14,
+    paddingBottom: 4,
   },
-  valueDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 12,
+  pickerWrap: {
+    position: "relative",
   },
-  sliderShell: {
-    height: 156,
-    justifyContent: "center",
-  },
-  centerBand: {
+  selectionBar: {
     position: "absolute",
-    width: 92,
-    top: 48,
-    bottom: 52,
-    alignSelf: "center",
-    borderRadius: 4,
+    left: 16,
+    right: 16,
+    height: ITEM_H,
+    borderRadius: 14,
+    borderWidth: 1,
     zIndex: 1,
   },
   scrollContent: {
-    alignItems: "flex-start",
+    alignItems: "center",
   },
   tickItem: {
-    width: STEP_WIDTH,
+    height: ITEM_H,
+    justifyContent: "center",
     alignItems: "center",
+    width: "100%",
   },
-  tick: {
-    width: 2,
-    borderRadius: 2,
+  tickText: {
+    textAlign: "center",
   },
-  tickMinor: {
-    height: 44,
-    backgroundColor: "#252836",
-  },
-  tickMajor: {
-    height: 56,
-  },
-  tickLabel: {
-    marginTop: 8,
-    color: "#404357",
+  tickDefault: {
     fontFamily: "Inter_500Medium",
-    fontSize: 12,
+    fontSize: 17,
+    color: "#2E3044",
   },
-  tickLabelPlaceholder: {
-    marginTop: 8,
-    height: 22,
+  tickSelected: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
   },
-  centerIndicator: {
+  fadeTop: {
     position: "absolute",
-    top: 44,
-    alignSelf: "center",
-    alignItems: "center",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: ITEM_H * 2,
     zIndex: 2,
   },
-  centerTriangle: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderTopWidth: 12,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-  },
-  centerLine: {
-    width: 3,
-    height: 62,
-    marginTop: -1,
-    borderRadius: 2,
+  fadeBottom: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: ITEM_H * 2,
+    zIndex: 2,
   },
   centerHint: {
-    marginTop: -6,
     textAlign: "center",
     fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
+    fontSize: 13,
+    paddingBottom: 14,
+    paddingTop: 6,
   },
 });

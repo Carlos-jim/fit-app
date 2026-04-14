@@ -93,7 +93,6 @@ export function OnboardingGoalScreen({
 
 const styles = StyleSheet.create({
   optionsContainer: {
-    marginTop: 320,
-    gap: 2,
+    gap: 10,
   },
 });
