@@ -67,6 +67,11 @@ export function OnboardingShell({
       style={styles.container}
       behavior={keyboardAware && Platform.OS === "ios" ? "padding" : undefined}
     >
+      {/* Decorative glow orbs */}
+      <View style={styles.glowTopRight} pointerEvents="none" />
+      <View style={styles.glowBottomLeft} pointerEvents="none" />
+
+      {/* Progress badge */}
       <View style={styles.topBadge}>
         <View style={styles.topBadgeDot} />
         <Text style={styles.topBadgeText}>{progressPercent}</Text>
@@ -79,7 +84,7 @@ export function OnboardingShell({
           accessibilityRole="button"
           accessibilityLabel="Volver"
         >
-          <Ionicons name="arrow-back" size={30} color="#101115" />
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </Pressable>
         <View style={styles.progressWrap}>
           <ProgressBar currentStep={step} totalSteps={totalSteps} theme={_theme} />
@@ -101,6 +106,11 @@ export function OnboardingShell({
             },
           ]}
         >
+          <View style={styles.stepPill}>
+            <Text style={styles.stepPillText}>
+              {step} / {totalSteps}
+            </Text>
+          </View>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
 
@@ -119,7 +129,25 @@ export function OnboardingShell({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F3F3F5",
+    backgroundColor: "#0D0F16",
+  },
+  glowTopRight: {
+    position: "absolute",
+    top: -80,
+    right: -60,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: "rgba(0,200,151,0.07)",
+  },
+  glowBottomLeft: {
+    position: "absolute",
+    bottom: 160,
+    left: -80,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: "rgba(232,255,84,0.04)",
   },
   topBadge: {
     position: "absolute",
@@ -138,7 +166,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFC612",
   },
   topBadgeText: {
-    color: "#3A3B40",
+    color: "#FFFFFF",
     fontFamily: "Inter_700Bold",
     fontSize: 36,
     lineHeight: 36,
@@ -156,7 +184,9 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#E5E6EA",
+    backgroundColor: "#1A1C26",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
   },
   progressWrap: {
     flex: 1,
@@ -170,15 +200,31 @@ const styles = StyleSheet.create({
   body: {
     flexGrow: 1,
   },
+  stepPill: {
+    alignSelf: "flex-start",
+    backgroundColor: "#1A1C26",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  stepPillText: {
+    color: "#555870",
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    letterSpacing: 0.5,
+  },
   title: {
-    color: "#111318",
+    color: "#FFFFFF",
     fontFamily: "Manrope_800ExtraBold",
     fontSize: 32,
     lineHeight: 40,
   },
   subtitle: {
-    marginTop: 12,
-    color: "#27292D",
+    marginTop: 10,
+    color: "#7A7D8E",
     fontFamily: "Inter_500Medium",
     fontSize: 16,
     lineHeight: 24,
@@ -193,7 +239,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   note: {
-    color: "#9FA2A9",
+    color: "#353748",
     fontFamily: "Inter_500Medium",
     fontSize: 13,
     lineHeight: 20,

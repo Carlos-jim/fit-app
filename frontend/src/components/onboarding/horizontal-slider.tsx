@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   useWindowDimensions,
+  Vibration,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -37,7 +38,7 @@ export function HorizontalSlider({
   step = 1,
   unit,
   label,
-  theme: _theme,
+  theme,
   onChange,
   headerRight,
   formatValue,
@@ -51,6 +52,7 @@ export function HorizontalSlider({
   const scrollingRef = useRef(false);
   const lastValueRef = useRef(value);
   const pulse = useRef(new Animated.Value(1)).current;
+  const glowPulse = useRef(new Animated.Value(0.5)).current;
 
   const precision = useMemo(() => {
     const text = `${step}`;
@@ -115,17 +117,29 @@ export function HorizontalSlider({
     lastValueRef.current = value;
     Animated.sequence([
       Animated.timing(pulse, {
-        toValue: 1.04,
-        duration: 90,
+        toValue: 1.07,
+        duration: 75,
         useNativeDriver: true,
       }),
       Animated.timing(pulse, {
         toValue: 1,
-        duration: 120,
+        duration: 130,
         useNativeDriver: true,
       }),
     ]).start();
-  }, [pulse, value]);
+    Animated.sequence([
+      Animated.timing(glowPulse, {
+        toValue: 1,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(glowPulse, {
+        toValue: 0.5,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [pulse, glowPulse, value]);
 
   const applyOffset = (offsetX: number) => {
     const rawIndex = Math.round(offsetX / STEP_WIDTH);
@@ -133,6 +147,7 @@ export function HorizontalSlider({
     const next = values[index];
     if (next !== lastValueRef.current) {
       lastValueRef.current = next;
+      Vibration.vibrate(8);
       onChange(next);
     }
   };
@@ -156,21 +171,45 @@ export function HorizontalSlider({
     return `${Math.round(tickValue)}`;
   };
 
+  const accent = theme.accent;
+
   return (
-    <View style={styles.container}>
+    <View style={styles.card}>
       {(label || headerRight) && (
         <View style={styles.header}>
-          {label ? <Text style={styles.label}>{label}</Text> : <View />}
+          {label ? (
+            <Text style={styles.label}>{label}</Text>
+          ) : (
+            <View />
+          )}
           {headerRight ?? null}
         </View>
       )}
 
-      <Animated.Text style={[styles.valueText, { transform: [{ scale: pulse }] }]}>
-        {displayValue}
-      </Animated.Text>
+      <View style={styles.valueRow}>
+        <Animated.Text
+          style={[
+            styles.valueText,
+            { color: accent, transform: [{ scale: pulse }] },
+          ]}
+        >
+          {displayValue}
+        </Animated.Text>
+        <Animated.View
+          style={[
+            styles.valueDot,
+            { backgroundColor: accent, opacity: glowPulse },
+          ]}
+        />
+      </View>
 
       <View style={styles.sliderShell}>
-        {centerBand ? <View style={styles.centerBand} pointerEvents="none" /> : null}
+        {centerBand ? (
+          <View
+            style={[styles.centerBand, { backgroundColor: `${accent}18` }]}
+            pointerEvents="none"
+          />
+        ) : null}
 
         <ScrollView
           ref={scrollRef}
@@ -199,9 +238,18 @@ export function HorizontalSlider({
               (tickValue - min) / resolvedMajorStep;
             return (
               <View key={index} style={styles.tickItem}>
-                <View style={[styles.tick, isMajor ? styles.tickMajor : styles.tickMinor]} />
+                <View
+                  style={[
+                    styles.tick,
+                    isMajor
+                      ? [styles.tickMajor, { backgroundColor: accent }]
+                      : styles.tickMinor,
+                  ]}
+                />
                 {isMajor ? (
-                  <Text style={styles.tickLabel}>{getTickLabel(tickValue)}</Text>
+                  <Text style={styles.tickLabel}>
+                    {getTickLabel(tickValue)}
+                  </Text>
                 ) : (
                   <View style={styles.tickLabelPlaceholder} />
                 )}
@@ -211,37 +259,69 @@ export function HorizontalSlider({
         </ScrollView>
 
         <View style={styles.centerIndicator} pointerEvents="none">
-          <View style={styles.centerTriangle} />
-          <View style={styles.centerLine} />
+          <View
+            style={[styles.centerTriangle, { borderTopColor: accent }]}
+          />
+          <View
+            style={[styles.centerLine, { backgroundColor: accent }]}
+          />
         </View>
       </View>
 
-      {centerHint ? <Text style={styles.centerHint}>{centerHint}</Text> : null}
+      {centerHint ? (
+        <Text style={[styles.centerHint, { color: theme.muted }]}>
+          {centerHint}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    gap: 8,
+  card: {
+    backgroundColor: "#13151E",
+    borderRadius: 24,
+    paddingTop: 20,
+    paddingBottom: 8,
+    gap: 0,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+    paddingHorizontal: 20,
+    marginBottom: 8,
   },
   label: {
-    color: "#111318",
+    color: "#555870",
     fontFamily: "Inter_700Bold",
-    fontSize: 16,
+    fontSize: 12,
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+  },
+  valueRow: {
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 20,
+    marginBottom: 6,
   },
   valueText: {
-    color: "#111318",
-    textAlign: "center",
     fontFamily: "Manrope_800ExtraBold",
-    fontSize: 46,
-    lineHeight: 52,
+    fontSize: 52,
+    lineHeight: 58,
+    textAlign: "center",
+  },
+  valueDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 12,
   },
   sliderShell: {
     height: 156,
@@ -253,7 +333,6 @@ const styles = StyleSheet.create({
     top: 48,
     bottom: 52,
     alignSelf: "center",
-    backgroundColor: "#E1E2E6",
     borderRadius: 4,
     zIndex: 1,
   },
@@ -267,17 +346,17 @@ const styles = StyleSheet.create({
   tick: {
     width: 2,
     borderRadius: 2,
-    backgroundColor: "#C5C7CC",
   },
   tickMinor: {
     height: 44,
+    backgroundColor: "#252836",
   },
   tickMajor: {
     height: 56,
   },
   tickLabel: {
     marginTop: 8,
-    color: "#858890",
+    color: "#404357",
     fontFamily: "Inter_500Medium",
     fontSize: 12,
   },
@@ -300,20 +379,19 @@ const styles = StyleSheet.create({
     borderTopWidth: 12,
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
-    borderTopColor: "#101115",
   },
   centerLine: {
-    width: 4,
+    width: 3,
     height: 62,
-    backgroundColor: "#101115",
     marginTop: -1,
     borderRadius: 2,
   },
   centerHint: {
-    marginTop: -14,
+    marginTop: -6,
     textAlign: "center",
-    color: "#2D2F33",
     fontFamily: "Inter_500Medium",
     fontSize: 14,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
   },
 });

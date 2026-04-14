@@ -107,9 +107,9 @@ const styles = StyleSheet.create({
   },
   goalLabel: {
     textAlign: "center",
-    color: "#23252B",
+    color: "#7A7D8E",
     fontFamily: "Inter_500Medium",
-    fontSize: 22,
+    fontSize: 18,
     marginBottom: 8,
   },
 });

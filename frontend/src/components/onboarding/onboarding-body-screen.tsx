@@ -194,33 +194,36 @@ function UnitToggle({
 
 const styles = StyleSheet.create({
   formFields: {
-    gap: 44,
+    gap: 16,
     marginTop: 8,
   },
   toggleWrap: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#DCDDE2",
+    backgroundColor: "#0D0F16",
     borderRadius: 999,
-    padding: 4,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
   toggleButton: {
-    minWidth: 74,
+    minWidth: 64,
     borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     alignItems: "center",
     justifyContent: "center",
   },
   toggleButtonActive: {
-    backgroundColor: "#0F1014",
+    backgroundColor: "#00C897",
   },
   toggleText: {
-    color: "#24262A",
+    color: "#454860",
     fontFamily: "Inter_500Medium",
-    fontSize: 18,
+    fontSize: 14,
   },
   toggleTextActive: {
-    color: "#FFFFFF",
+    color: "#0D0F16",
+    fontFamily: "Inter_700Bold",
   },
 });

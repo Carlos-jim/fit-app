@@ -1,5 +1,6 @@
 import React from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import type { FitnessTheme } from "../fitness-ui";
 
 interface NextButtonProps {
@@ -15,25 +16,38 @@ export function NextButton({
   enabled,
   onPress,
   loading,
-  theme: _theme,
+  theme,
 }: NextButtonProps) {
   const isActive = enabled && !loading;
 
+  if (isActive) {
+    return (
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+      >
+        <LinearGradient
+          colors={[theme.accent, "#009E7A"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradient}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#0D0F16" />
+          ) : (
+            <Text style={[styles.text, { color: "#0D0F16" }]}>{label}</Text>
+          )}
+        </LinearGradient>
+      </Pressable>
+    );
+  }
+
   return (
-    <Pressable
-      onPress={isActive ? onPress : undefined}
-      style={[
-        styles.button,
-        {
-          backgroundColor: isActive ? "#101115" : "#B3B5BA",
-        },
-      ]}
-      disabled={!isActive}
-    >
+    <Pressable style={[styles.button, styles.buttonDisabled]} disabled>
       {loading ? (
-        <ActivityIndicator size="small" color="#FFFFFF" />
+        <ActivityIndicator size="small" color="#555870" />
       ) : (
-        <Text style={styles.text}>{label}</Text>
+        <Text style={[styles.text, styles.textDisabled]}>{label}</Text>
       )}
     </Pressable>
   );
@@ -42,14 +56,30 @@ export function NextButton({
 const styles = StyleSheet.create({
   button: {
     minHeight: 60,
-    borderRadius: 10,
-    paddingHorizontal: 16,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  buttonPressed: {
+    opacity: 0.88,
+  },
+  gradient: {
+    flex: 1,
+    minHeight: 60,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonDisabled: {
+    backgroundColor: "#1A1C26",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
     alignItems: "center",
     justifyContent: "center",
   },
   text: {
     fontFamily: "Inter_700Bold",
-    fontSize: 19,
-    color: "#FFFFFF",
+    fontSize: 17,
+  },
+  textDisabled: {
+    color: "#3A3D4E",
   },
 });

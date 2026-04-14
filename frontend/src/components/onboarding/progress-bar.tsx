@@ -11,7 +11,7 @@ interface ProgressBarProps {
 export function ProgressBar({
   currentStep,
   totalSteps,
-  theme: _theme,
+  theme,
 }: ProgressBarProps) {
   const progress = useMemo(() => {
     return Math.min(Math.max(currentStep / totalSteps, 0), 1);
@@ -19,15 +19,23 @@ export function ProgressBar({
 
   return (
     <View style={styles.container}>
-      <View style={[styles.track]} />
-      <View style={[styles.fill, { width: `${progress * 100}%` }]} />
+      <View style={styles.track} />
+      <View
+        style={[
+          styles.fill,
+          {
+            width: `${progress * 100}%`,
+            backgroundColor: theme.accent,
+          },
+        ]}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    height: 7,
+    height: 5,
     width: "100%",
     borderRadius: 999,
     overflow: "hidden",
@@ -35,14 +43,13 @@ const styles = StyleSheet.create({
   },
   track: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#C2C4C9",
+    backgroundColor: "#1E2030",
   },
   fill: {
     position: "absolute",
     left: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: "#101115",
     borderRadius: 999,
   },
 });

@@ -67,8 +67,8 @@ export function OnboardingAgeScreen({
         onChange={setAge}
       />
 
-      <View style={[styles.hintCard, { backgroundColor: theme.cardMuted }]}>
-        <Text style={[styles.hintText, { color: theme.muted }]}>
+      <View style={styles.hintCard}>
+        <Text style={styles.hintText}>
           Si eres menor de edad, consulta con un profesional de salud para un
           plan nutricional supervisado.
         </Text>
@@ -82,10 +82,14 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
+    backgroundColor: "#13151E",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
   },
   hintText: {
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     lineHeight: 18,
+    color: "#555870",
   },
 });
