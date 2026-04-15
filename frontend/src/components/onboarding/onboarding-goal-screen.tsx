@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { Alert, View } from "react-native";
 import type { FitnessTheme } from "../fitness-ui";
 import { biomaApi, type GoalType } from "../../services/bioma-api";
 import { NextButton, OnboardingOptionCard, OnboardingShell } from "../onboarding";
@@ -7,21 +7,37 @@ import { NextButton, OnboardingOptionCard, OnboardingShell } from "../onboarding
 const TOTAL_STEPS = 7;
 const STEP = 1;
 
-const OPTIONS: { value: GoalType; label: string; subtitle: string }[] = [
+const OPTIONS: {
+  value: GoalType;
+  label: string;
+  subtitle: string;
+  icon: "trending-down" | "remove-circle-outline" | "trending-up";
+  iconColor: string;
+  iconBg: string;
+}[] = [
   {
     value: "LOSE_WEIGHT",
     label: "Perder peso",
-    subtitle: "",
+    subtitle: "Calcula tu déficit calórico ideal",
+    icon: "trending-down",
+    iconColor: "#4B9FFF",
+    iconBg: "rgba(75,159,255,0.12)",
   },
   {
     value: "MAINTAIN",
-    label: "Mantener",
-    subtitle: "",
+    label: "Mantener peso",
+    subtitle: "Equilibra tu ingesta energética",
+    icon: "remove-circle-outline",
+    iconColor: "#F5B700",
+    iconBg: "rgba(245,183,0,0.12)",
   },
   {
     value: "GAIN_WEIGHT",
-    label: "Aumentar de peso",
-    subtitle: "",
+    label: "Ganar peso",
+    subtitle: "Incrementa masa de forma saludable",
+    icon: "trending-up",
+    iconColor: "#00C897",
+    iconBg: "rgba(0,200,151,0.12)",
   },
 ];
 
@@ -62,8 +78,8 @@ export function OnboardingGoalScreen({
       theme={theme}
       step={STEP}
       totalSteps={TOTAL_STEPS}
-      title="¿Cuál es su objetivo?"
-      subtitle="Esto nos ayuda a generar un plan para su ingesta de calorías."
+      title="¿Cuál es tu objetivo?"
+      subtitle="Esto nos ayuda a generar un plan de calorías adaptado a ti."
       onBack={onBack}
       footer={
         <NextButton
@@ -75,12 +91,15 @@ export function OnboardingGoalScreen({
         />
       }
     >
-      <View style={styles.optionsContainer}>
+      <View>
         {OPTIONS.map((option) => (
           <OnboardingOptionCard
             key={option.value}
             option={{ value: option.value, label: option.label }}
             subtitle={option.subtitle}
+            icon={option.icon}
+            iconColor={option.iconColor}
+            iconBg={option.iconBg}
             selected={selected === option.value}
             onPress={setSelected}
             theme={theme}
@@ -90,10 +109,3 @@ export function OnboardingGoalScreen({
     </OnboardingShell>
   );
 }
-
-const styles = StyleSheet.create({
-  optionsContainer: {
-    marginTop: 320,
-    gap: 2,
-  },
-});

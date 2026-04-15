@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import type { FitnessTheme } from "../fitness-ui";
 import type { GoalType } from "../../services/bioma-api";
 import { biomaApi } from "../../services/bioma-api";
@@ -8,10 +9,28 @@ import { HorizontalSlider, NextButton, OnboardingShell } from "../onboarding";
 const TOTAL_STEPS = 7;
 const STEP = 4;
 
-const goalText: Record<GoalType, string> = {
-  LOSE_WEIGHT: "Perder de peso",
-  MAINTAIN: "Mantener peso",
-  GAIN_WEIGHT: "Aumentar de peso",
+const GOAL_CONFIG: Record<
+  GoalType,
+  { label: string; icon: "trending-down" | "remove-circle-outline" | "trending-up"; color: string; bg: string }
+> = {
+  LOSE_WEIGHT: {
+    label: "Perder peso",
+    icon: "trending-down",
+    color: "#4B9FFF",
+    bg: "rgba(75,159,255,0.1)",
+  },
+  MAINTAIN: {
+    label: "Mantener peso",
+    icon: "remove-circle-outline",
+    color: "#F5B700",
+    bg: "rgba(245,183,0,0.1)",
+  },
+  GAIN_WEIGHT: {
+    label: "Ganar peso",
+    icon: "trending-up",
+    color: "#00C897",
+    bg: "rgba(0,200,151,0.1)",
+  },
 };
 
 interface OnboardingTargetWeightProps {
@@ -45,8 +64,15 @@ export function OnboardingTargetWeightScreen({
     if (goal === "GAIN_WEIGHT") {
       return { min: Math.max(40, currentWeightKg - 2), max: 180 };
     }
-    return { min: Math.max(35, currentWeightKg - 15), max: currentWeightKg + 15 };
+    return {
+      min: Math.max(35, currentWeightKg - 15),
+      max: currentWeightKg + 15,
+    };
   }, [currentWeightKg, goal]);
+
+  const diff = Math.round(desiredWeightKg - currentWeightKg);
+  const diffLabel =
+    diff === 0 ? "Sin cambio" : diff > 0 ? `+${diff} kg` : `${diff} kg`;
 
   const handleNext = async () => {
     setLoading(true);
@@ -63,13 +89,15 @@ export function OnboardingTargetWeightScreen({
     }
   };
 
+  const cfg = GOAL_CONFIG[goal];
+
   return (
     <OnboardingShell
       theme={theme}
       step={STEP}
       totalSteps={TOTAL_STEPS}
-      title="¿Cual es su peso deseado?"
-      subtitle="Esto se utilizara para calibrar su plan personalizado."
+      title="¿Cuál es tu peso objetivo?"
+      subtitle="Ajusta el deslizador a tu meta personal."
       onBack={onBack}
       footer={
         <NextButton
@@ -81,35 +109,89 @@ export function OnboardingTargetWeightScreen({
         />
       }
     >
-      <View style={styles.contentBlock}>
-        <Text style={styles.goalLabel}>{goalText[goal]}</Text>
-        <HorizontalSlider
-          value={desiredWeightKg}
-          min={range.min}
-          max={range.max}
-          step={0.5}
-          unit="kg"
-          majorStep={10}
-          centerBand
-          formatValue={(current) => `${Math.round(current)}kg`}
-          centerHint={`${Math.round(currentWeightKg)}kg`}
-          theme={theme}
-          onChange={setDesiredWeightKg}
-        />
+      {/* Goal pill */}
+      <View style={[styles.goalPill, { backgroundColor: cfg.bg }]}>
+        <Ionicons name={cfg.icon} size={15} color={cfg.color} />
+        <Text style={[styles.goalPillText, { color: cfg.color }]}>{cfg.label}</Text>
+      </View>
+
+      <HorizontalSlider
+        value={desiredWeightKg}
+        min={range.min}
+        max={range.max}
+        step={0.5}
+        unit="kg"
+        majorStep={10}
+        centerBand
+        formatValue={(current) => `${Math.round(current)}kg`}
+        centerHint={`Actual: ${Math.round(currentWeightKg)}kg`}
+        theme={theme}
+        onChange={setDesiredWeightKg}
+      />
+
+      {/* Diff indicator */}
+      <View style={styles.diffRow}>
+        <View style={styles.diffItem}>
+          <Text style={styles.diffLabel}>Peso actual</Text>
+          <Text style={styles.diffValue}>{Math.round(currentWeightKg)} kg</Text>
+        </View>
+        <View style={styles.diffSep} />
+        <View style={styles.diffItem}>
+          <Text style={styles.diffLabel}>Diferencia</Text>
+          <Text style={[styles.diffValue, { color: diff < 0 ? "#4B9FFF" : diff > 0 ? "#00C897" : "#4B4E65" }]}>
+            {diffLabel}
+          </Text>
+        </View>
+        <View style={styles.diffSep} />
+        <View style={styles.diffItem}>
+          <Text style={styles.diffLabel}>Objetivo</Text>
+          <Text style={styles.diffValue}>{Math.round(desiredWeightKg)} kg</Text>
+        </View>
       </View>
     </OnboardingShell>
   );
 }
 
 const styles = StyleSheet.create({
-  contentBlock: {
-    marginTop: 168,
+  goalPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginBottom: 4,
   },
-  goalLabel: {
-    textAlign: "center",
-    color: "#7A7D8E",
+  goalPillText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  diffRow: {
+    flexDirection: "row",
+    backgroundColor: "#111219",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    paddingVertical: 16,
+  },
+  diffItem: {
+    flex: 1,
+    alignItems: "center",
+    gap: 4,
+  },
+  diffSep: {
+    width: 1,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  diffLabel: {
+    color: "#3E4259",
     fontFamily: "Inter_500Medium",
-    fontSize: 18,
-    marginBottom: 8,
+    fontSize: 12,
+  },
+  diffValue: {
+    color: "#FFFFFF",
+    fontFamily: "Manrope_800ExtraBold",
+    fontSize: 20,
   },
 });

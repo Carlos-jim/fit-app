@@ -2035,42 +2035,6 @@ export default function App() {
               </LinearGradient>
             </Pressable>
 
-            <Pressable
-              onPress={() => openMenuScanNutritionFlow(activeTab)}
-              style={styles.nutritionQuickMenuActionWrap}
-            >
-              <LinearGradient
-                colors={
-                  visualMode === "light"
-                    ? ["#6366F1", "#4F46E5"]
-                    : ["#4F46E5", "#3730A3"]
-                }
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.nutritionQuickMenuAction}
-              >
-                <View
-                  style={[
-                    styles.nutritionQuickMenuIconBadge,
-                    styles.nutritionQuickMenuIconBadgeMuted,
-                  ]}
-                >
-                  <Ionicons
-                    name="restaurant-outline"
-                    size={20}
-                    color={theme.accent}
-                  />
-                </View>
-                <View style={styles.nutritionQuickMenuActionTextBlock}>
-                  <Text style={styles.nutritionQuickMenuActionTitle}>
-                    Escanear menu
-                  </Text>
-                  <Text style={styles.nutritionQuickMenuActionText}>
-                    Analiza la carta de un restaurante
-                  </Text>
-                </View>
-              </LinearGradient>
-            </Pressable>
           </View>
         </LinearGradient>
       </Animated.View>
@@ -3942,6 +3906,7 @@ export default function App() {
               scannerMode === "food" && styles.cameraOnlyTabActive,
             ]}
             onPress={() => {
+              setNutritionQuickMenuOpen(false);
               setScannerMode("food");
               setBarcodeResult(null);
             }}
@@ -3958,7 +3923,7 @@ export default function App() {
               ]}
               numberOfLines={1}
             >
-              Escaner comida
+              Comida
             </Text>
           </Pressable>
           <Pressable
@@ -3967,6 +3932,7 @@ export default function App() {
               scannerMode === "barcode" && styles.cameraOnlyTabActive,
             ]}
             onPress={() => {
+              setNutritionQuickMenuOpen(false);
               setScannerMode("barcode");
               setBarcodeResult(null);
               setImageAsset(null);
@@ -3984,7 +3950,30 @@ export default function App() {
               ]}
               numberOfLines={1}
             >
-              Escanear barcode
+              Barcode
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.cameraOnlyTab,
+            ]}
+            onPress={() => {
+              setNutritionQuickMenuOpen(false);
+              setMenuImage(null);
+              setMenuAnalysis(null);
+              setNutritionView("menuScan");
+            }}
+          >
+            <Ionicons
+              name="restaurant-outline"
+              size={19}
+              color="#FFFFFF"
+            />
+            <Text
+              style={[styles.cameraOnlyTabText]}
+              numberOfLines={1}
+            >
+              Menu
             </Text>
           </Pressable>
         </View>
@@ -4509,6 +4498,7 @@ export default function App() {
                   },
                 ]}
                 onPress={() => {
+                  setNutritionQuickMenuOpen(false);
                   setScannerMode("food");
                   setBarcodeResult(null);
                 }}
@@ -4522,7 +4512,7 @@ export default function App() {
                     },
                   ]}
                 >
-                  Escaner comida
+                  Comida
                 </Text>
               </Pressable>
               <Pressable
@@ -4534,6 +4524,7 @@ export default function App() {
                   },
                 ]}
                 onPress={() => {
+                  setNutritionQuickMenuOpen(false);
                   setScannerMode("barcode");
                   setBarcodeResult(null);
                 }}
@@ -4549,7 +4540,31 @@ export default function App() {
                     },
                   ]}
                 >
-                  Escanear barcode
+                  Barcode
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.scannerTab,
+                  {
+                    backgroundColor: theme.card,
+                  },
+                ]}
+                onPress={() => {
+                  setNutritionQuickMenuOpen(false);
+                  setMenuImage(null);
+                  setMenuAnalysis(null);
+                  setNutritionView("menuScan");
+                  setActiveTab("nutrition");
+                }}
+              >
+                <Text
+                  style={[
+                    styles.scannerTabText,
+                    { color: theme.text },
+                  ]}
+                >
+                  Menu
                 </Text>
               </Pressable>
             </View>

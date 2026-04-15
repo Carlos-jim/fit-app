@@ -12,7 +12,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { FitnessTheme } from "../fitness-ui";
-import { ProgressBar } from "./progress-bar";
 
 interface OnboardingShellProps {
   theme: FitnessTheme;
@@ -36,47 +35,47 @@ export function OnboardingShell({
   onBack,
   children,
   footer,
-  note = "* Su informacion se eliminara despues de generar un plan.",
+  note = "* Tu información se elimina tras generar el plan.",
   keyboardAware = false,
 }: OnboardingShellProps) {
   const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(18)).current;
-  const progressPercent = Math.round((step / Math.max(totalSteps, 1)) * 100);
+  const translateY = useRef(new Animated.Value(20)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     opacity.setValue(0);
-    translateY.setValue(18);
+    translateY.setValue(20);
+    const target = step / Math.max(totalSteps, 1);
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 1,
-        duration: 280,
+        duration: 300,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.timing(translateY, {
         toValue: 0,
-        duration: 300,
+        duration: 320,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
+      Animated.timing(progressAnim, {
+        toValue: target,
+        duration: 500,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: false,
+      }),
     ]).start();
-  }, [opacity, step, translateY]);
+  }, [step, totalSteps]);
+
+  const stepStr = `${String(step).padStart(2, "0")} / ${String(totalSteps).padStart(2, "0")}`;
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={keyboardAware && Platform.OS === "ios" ? "padding" : undefined}
     >
-      {/* Decorative glow orbs */}
-      <View style={styles.glowTopRight} pointerEvents="none" />
-      <View style={styles.glowBottomLeft} pointerEvents="none" />
-
-      {/* Progress badge */}
-      <View style={styles.topBadge}>
-        <View style={styles.topBadgeDot} />
-        <Text style={styles.topBadgeText}>{progressPercent}</Text>
-      </View>
-
+      {/* Header */}
       <View style={styles.header}>
         <Pressable
           onPress={onBack}
@@ -84,11 +83,24 @@ export function OnboardingShell({
           accessibilityRole="button"
           accessibilityLabel="Volver"
         >
-          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
         </Pressable>
-        <View style={styles.progressWrap}>
-          <ProgressBar currentStep={step} totalSteps={totalSteps} theme={_theme} />
-        </View>
+        <Text style={styles.stepCounter}>{stepStr}</Text>
+      </View>
+
+      {/* Progress bar */}
+      <View style={styles.progressTrack}>
+        <Animated.View
+          style={[
+            styles.progressFill,
+            {
+              width: progressAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ["0%", "100%"],
+              }),
+            },
+          ]}
+        />
       </View>
 
       <ScrollView
@@ -99,23 +111,15 @@ export function OnboardingShell({
       >
         <Animated.View
           style={[
-            styles.body,
-            {
-              opacity,
-              transform: [{ translateY }],
-            },
+            styles.titleBlock,
+            { opacity, transform: [{ translateY }] },
           ]}
         >
-          <View style={styles.stepPill}>
-            <Text style={styles.stepPillText}>
-              {step} / {totalSteps}
-            </Text>
-          </View>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
-
-          <View style={styles.content}>{children}</View>
         </Animated.View>
+
+        <View style={styles.content}>{children}</View>
 
         <View style={styles.footer}>
           <Text style={styles.note}>{note}</Text>
@@ -129,120 +133,79 @@ export function OnboardingShell({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0D0F16",
-  },
-  glowTopRight: {
-    position: "absolute",
-    top: -80,
-    right: -60,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: "rgba(0,200,151,0.07)",
-  },
-  glowBottomLeft: {
-    position: "absolute",
-    bottom: 160,
-    left: -80,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: "rgba(232,255,84,0.04)",
-  },
-  topBadge: {
-    position: "absolute",
-    top: 20,
-    right: 20,
-    zIndex: 3,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-  },
-  topBadgeDot: {
-    width: 6,
-    height: 18,
-    borderTopLeftRadius: 6,
-    borderBottomLeftRadius: 6,
-    backgroundColor: "#FFC612",
-  },
-  topBadgeText: {
-    color: "#FFFFFF",
-    fontFamily: "Inter_700Bold",
-    fontSize: 36,
-    lineHeight: 36,
+    backgroundColor: "#09090E",
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 72,
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 16,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#1A1C26",
+    backgroundColor: "#141520",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.07)",
   },
-  progressWrap: {
-    flex: 1,
+  stepCounter: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    letterSpacing: 1.4,
+    color: "#3E4159",
+  },
+  progressTrack: {
+    height: 3,
+    backgroundColor: "#181922",
+    borderRadius: 999,
+    marginHorizontal: 20,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "#00C897",
+    borderRadius: 999,
   },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 22,
+    paddingTop: 36,
+    paddingBottom: 24,
   },
-  body: {
-    flexGrow: 1,
-  },
-  stepPill: {
-    alignSelf: "flex-start",
-    backgroundColor: "#1A1C26",
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-  },
-  stepPillText: {
-    color: "#555870",
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
-    letterSpacing: 0.5,
+  titleBlock: {
+    marginBottom: 32,
   },
   title: {
     color: "#FFFFFF",
     fontFamily: "Manrope_800ExtraBold",
-    fontSize: 32,
-    lineHeight: 40,
+    fontSize: 30,
+    lineHeight: 38,
   },
   subtitle: {
-    marginTop: 10,
-    color: "#7A7D8E",
+    marginTop: 8,
+    color: "#767894",
     fontFamily: "Inter_500Medium",
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 22,
   },
   content: {
-    marginTop: 24,
-    gap: 18,
+    gap: 10,
   },
   footer: {
     marginTop: "auto",
-    paddingTop: 26,
-    gap: 16,
+    paddingTop: 28,
+    gap: 14,
   },
   note: {
-    color: "#353748",
+    color: "#2C2E45",
     fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 18,
     textAlign: "center",
   },
 });

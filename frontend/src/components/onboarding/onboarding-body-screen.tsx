@@ -36,21 +36,24 @@ export function OnboardingBodyScreen({
     const totalInches = heightCm / 2.54;
     const feet = Math.floor(totalInches / 12);
     const inches = Math.round(totalInches - feet * 12);
-    return `${feet}ft,${inches}in`;
+    return `${feet}ft ${inches}in`;
   }, [heightCm, heightUnit]);
 
   const weightDisplayValue = useMemo(() => {
     if (weightUnit === "KG") {
       return `${Math.round(weightKg)}kg`;
     }
-    const pounds = Math.round(weightKg * 2.20462);
-    return `${pounds}lbs`;
+    return `${Math.round(weightKg * 2.20462)}lbs`;
   }, [weightKg, weightUnit]);
 
   const handleNext = async () => {
     setLoading(true);
     try {
-      await biomaApi.onboardingStep3(userId, Number(weightKg.toFixed(1)), Number(heightCm.toFixed(1)));
+      await biomaApi.onboardingStep3(
+        userId,
+        Number(weightKg.toFixed(1)),
+        Number(heightCm.toFixed(1)),
+      );
       onNext(weightKg);
     } catch (err) {
       Alert.alert(
@@ -68,7 +71,7 @@ export function OnboardingBodyScreen({
       step={STEP}
       totalSteps={TOTAL_STEPS}
       title="Altura y peso"
-      subtitle="Esto se utilizara para calibrar su plan personalizado."
+      subtitle="Calibramos tu plan personalizado con estos datos."
       onBack={onBack}
       footer={
         <NextButton
@@ -80,7 +83,7 @@ export function OnboardingBodyScreen({
         />
       }
     >
-      <View style={styles.formFields}>
+      <View style={styles.fields}>
         <HorizontalSlider
           value={heightUnit === "CM" ? heightCm : heightCm / 30.48}
           min={heightUnit === "CM" ? 140 : 4}
@@ -155,18 +158,15 @@ function UnitToggle({
   onPressRight: () => void;
 }) {
   return (
-    <View style={styles.toggleWrap}>
+    <View style={styles.toggle}>
       <Pressable
         onPress={onPressLeft}
-        style={[
-          styles.toggleButton,
-          activeSide === "left" ? styles.toggleButtonActive : null,
-        ]}
+        style={[styles.toggleBtn, activeSide === "left" && styles.toggleBtnActive]}
       >
         <Text
           style={[
             styles.toggleText,
-            activeSide === "left" ? styles.toggleTextActive : null,
+            activeSide === "left" && styles.toggleTextActive,
           ]}
         >
           {leftLabel}
@@ -174,15 +174,12 @@ function UnitToggle({
       </Pressable>
       <Pressable
         onPress={onPressRight}
-        style={[
-          styles.toggleButton,
-          activeSide === "right" ? styles.toggleButtonActive : null,
-        ]}
+        style={[styles.toggleBtn, activeSide === "right" && styles.toggleBtnActive]}
       >
         <Text
           style={[
             styles.toggleText,
-            activeSide === "right" ? styles.toggleTextActive : null,
+            activeSide === "right" && styles.toggleTextActive,
           ]}
         >
           {rightLabel}
@@ -193,37 +190,35 @@ function UnitToggle({
 }
 
 const styles = StyleSheet.create({
-  formFields: {
-    gap: 16,
-    marginTop: 8,
+  fields: {
+    gap: 14,
   },
-  toggleWrap: {
+  toggle: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#0D0F16",
+    backgroundColor: "#09090E",
     borderRadius: 999,
     padding: 3,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(255,255,255,0.07)",
   },
-  toggleButton: {
-    minWidth: 64,
+  toggleBtn: {
+    minWidth: 58,
     borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
     alignItems: "center",
     justifyContent: "center",
   },
-  toggleButtonActive: {
+  toggleBtnActive: {
     backgroundColor: "#00C897",
   },
   toggleText: {
-    color: "#454860",
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
+    color: "#3E4259",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
   },
   toggleTextActive: {
-    color: "#0D0F16",
+    color: "#09090E",
     fontFamily: "Inter_700Bold",
   },
 });

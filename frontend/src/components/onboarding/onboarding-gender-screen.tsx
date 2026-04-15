@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { Alert, View } from "react-native";
 import type { FitnessTheme } from "../fitness-ui";
 import type { Gender } from "../../services/bioma-api";
 import { biomaApi } from "../../services/bioma-api";
@@ -8,13 +8,37 @@ import { NextButton, OnboardingOptionCard, OnboardingShell } from "../onboarding
 const TOTAL_STEPS = 7;
 const STEP = 5;
 
-const OPTIONS: { value: Gender; label: string; subtitle: string }[] = [
-  { value: "MALE", label: "Masculino", subtitle: "Referencia fisiologica masculina." },
-  { value: "FEMALE", label: "Femenino", subtitle: "Referencia fisiologica femenina." },
+const OPTIONS: {
+  value: Gender;
+  label: string;
+  subtitle: string;
+  icon: "male" | "female" | "male-female";
+  iconColor: string;
+  iconBg: string;
+}[] = [
+  {
+    value: "MALE",
+    label: "Masculino",
+    subtitle: "Referencia fisiológica masculina",
+    icon: "male",
+    iconColor: "#4B9FFF",
+    iconBg: "rgba(75,159,255,0.12)",
+  },
+  {
+    value: "FEMALE",
+    label: "Femenino",
+    subtitle: "Referencia fisiológica femenina",
+    icon: "female",
+    iconColor: "#FF7BAC",
+    iconBg: "rgba(255,123,172,0.12)",
+  },
   {
     value: "NON_BINARY",
-    label: "No Binario",
-    subtitle: "Configuracion inclusiva y personalizada.",
+    label: "No binario",
+    subtitle: "Configuración inclusiva y personalizada",
+    icon: "male-female",
+    iconColor: "#A78FFF",
+    iconBg: "rgba(167,143,255,0.12)",
   },
 ];
 
@@ -55,8 +79,8 @@ export function OnboardingGenderScreen({
       theme={theme}
       step={STEP}
       totalSteps={TOTAL_STEPS}
-      title="Como te identificas?"
-      subtitle="Este dato nos ayuda a afinar estimaciones fisiologicas base."
+      title="¿Cómo te identificas?"
+      subtitle="Lo usamos para afinar estimaciones fisiológicas de base."
       onBack={onBack}
       footer={
         <NextButton
@@ -68,12 +92,15 @@ export function OnboardingGenderScreen({
         />
       }
     >
-      <View style={styles.optionsContainer}>
+      <View>
         {OPTIONS.map((option) => (
           <OnboardingOptionCard
             key={option.value}
             option={{ value: option.value, label: option.label }}
             subtitle={option.subtitle}
+            icon={option.icon}
+            iconColor={option.iconColor}
+            iconBg={option.iconBg}
             selected={selected === option.value}
             onPress={setSelected}
             theme={theme}
@@ -83,9 +110,3 @@ export function OnboardingGenderScreen({
     </OnboardingShell>
   );
 }
-
-const styles = StyleSheet.create({
-  optionsContainer: {
-    gap: 2,
-  },
-});

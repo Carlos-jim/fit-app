@@ -25,17 +25,17 @@ const COUNTRIES = [
   "Cuba",
   "Ecuador",
   "El Salvador",
-  "Espana",
+  "España",
   "Estados Unidos",
   "Guatemala",
   "Honduras",
-  "Mexico",
+  "México",
   "Nicaragua",
-  "Panama",
+  "Panamá",
   "Paraguay",
-  "Peru",
+  "Perú",
   "Puerto Rico",
-  "Republica Dominicana",
+  "República Dominicana",
   "Uruguay",
   "Venezuela",
 ];
@@ -57,13 +57,10 @@ export function OnboardingCountryScreen({
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const filteredCountries = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) {
-      return COUNTRIES;
-    }
-
-    return COUNTRIES.filter((country) => country.toLowerCase().includes(query));
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return COUNTRIES;
+    return COUNTRIES.filter((c) => c.toLowerCase().includes(q));
   }, [search]);
 
   const handleFinish = async () => {
@@ -88,8 +85,8 @@ export function OnboardingCountryScreen({
       theme={theme}
       step={STEP}
       totalSteps={TOTAL_STEPS}
-      title="De que pais eres?"
-      subtitle="Nos ayuda a mostrar referencias y recomendaciones mas relevantes."
+      title="¿De qué país eres?"
+      subtitle="Personalizamos referencias y recomendaciones según tu región."
       onBack={onBack}
       keyboardAware
       footer={
@@ -102,58 +99,55 @@ export function OnboardingCountryScreen({
         />
       }
     >
-      <View style={[styles.searchBar, { backgroundColor: theme.cardMuted }]}>
-        <Ionicons name="search" size={18} color={theme.muted} />
+      {/* Search */}
+      <View style={styles.searchBar}>
+        <Ionicons name="search-outline" size={17} color="#3E4259" />
         <TextInput
-          style={[styles.searchInput, { color: theme.text }]}
-          placeholder="Buscar pais"
-          placeholderTextColor={theme.muted}
+          style={styles.searchInput}
+          placeholder="Buscar país..."
+          placeholderTextColor="#3E4259"
           value={search}
           onChangeText={setSearch}
           autoCorrect={false}
           autoCapitalize="words"
           returnKeyType="search"
         />
+        {search.length > 0 ? (
+          <Pressable onPress={() => setSearch("")}>
+            <Ionicons name="close-circle" size={17} color="#3E4259" />
+          </Pressable>
+        ) : null}
       </View>
 
-      <View style={styles.countryList}>
-        {filteredCountries.length > 0 ? (
-          filteredCountries.map((country) => {
+      {/* List */}
+      <View style={styles.list}>
+        {filtered.length > 0 ? (
+          filtered.map((country) => {
             const active = selected === country;
             return (
               <Pressable
                 key={country}
                 onPress={() => setSelected(country)}
-                style={[
-                  styles.countryRow,
-                  {
-                    backgroundColor: active ? theme.accent : theme.cardMuted,
-                    borderColor: active ? theme.accent : theme.stroke,
-                  },
-                ]}
+                style={[styles.row, active && styles.rowActive]}
               >
-                <Text
-                  style={[
-                    styles.countryLabel,
-                    { color: active ? theme.background : theme.text },
-                  ]}
-                >
+                <Text style={[styles.rowLabel, active && styles.rowLabelActive]}>
                   {country}
                 </Text>
                 {active ? (
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={18}
-                    color={theme.background}
-                  />
-                ) : null}
+                  <View style={styles.checkCircle}>
+                    <Ionicons name="checkmark" size={13} color="#09090E" />
+                  </View>
+                ) : (
+                  <View style={styles.emptyCircle} />
+                )}
               </Pressable>
             );
           })
         ) : (
-          <View style={[styles.emptyCard, { backgroundColor: theme.cardMuted }]}>
-            <Text style={[styles.emptyText, { color: theme.muted }]}>
-              No encontramos resultados para "{search}".
+          <View style={styles.emptyState}>
+            <Ionicons name="search-outline" size={28} color="#2A2C40" />
+            <Text style={styles.emptyText}>
+              Sin resultados para "{search}"
             </Text>
           </View>
         )}
@@ -164,45 +158,80 @@ export function OnboardingCountryScreen({
 
 const styles = StyleSheet.create({
   searchBar: {
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    backgroundColor: "#111219",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    paddingHorizontal: 14,
+    paddingVertical: 13,
   },
   searchInput: {
     flex: 1,
+    color: "#FFFFFF",
     fontFamily: "Inter_500Medium",
     fontSize: 15,
     paddingVertical: 0,
   },
-  countryList: {
-    gap: 8,
+  list: {
+    gap: 6,
   },
-  countryRow: {
-    borderRadius: 14,
-    borderWidth: 1,
-    minHeight: 48,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
+  row: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 10,
+    backgroundColor: "#111219",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    gap: 12,
   },
-  countryLabel: {
+  rowActive: {
+    backgroundColor: "rgba(0,200,151,0.07)",
+    borderColor: "rgba(0,200,151,0.45)",
+  },
+  rowLabel: {
     flex: 1,
+    color: "#8E92A8",
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
   },
-  emptyCard: {
+  rowLabelActive: {
+    color: "#FFFFFF",
+  },
+  checkCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#00C897",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  emptyCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.1)",
+    flexShrink: 0,
+  },
+  emptyState: {
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 32,
+    backgroundColor: "#111219",
     borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.04)",
   },
   emptyText: {
+    color: "#3E4259",
     fontFamily: "Inter_500Medium",
-    fontSize: 13,
+    fontSize: 14,
   },
 });
