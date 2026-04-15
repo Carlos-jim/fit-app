@@ -43,8 +43,6 @@ export function OnboardingShell({
   const progressAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const dir = step >= prevStepRef.current ? 1 : -1;
-    prevStepRef.current = step;
     opacity.setValue(0);
     translateY.setValue(20);
     const target = step / Math.max(totalSteps, 1);
@@ -55,7 +53,7 @@ export function OnboardingShell({
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
-      Animated.timing(translateX, {
+      Animated.timing(translateY, {
         toValue: 0,
         duration: 320,
         easing: Easing.out(Easing.cubic),
@@ -81,7 +79,7 @@ export function OnboardingShell({
       <View style={styles.header}>
         <Pressable
           onPress={onBack}
-          style={styles.backBtn}
+          style={styles.backButton}
           accessibilityRole="button"
           accessibilityLabel="Volver"
           hitSlop={16}
@@ -192,8 +190,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 15,
     lineHeight: 22,
-    fontSize: 15,
-    lineHeight: 22,
   },
   content: {
     gap: 10,
@@ -206,8 +202,6 @@ const styles = StyleSheet.create({
   note: {
     color: "#2C2E45",
     fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    lineHeight: 18,
     fontSize: 12,
     lineHeight: 18,
     textAlign: "center",

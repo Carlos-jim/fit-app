@@ -31,46 +31,6 @@ export function OnboardingOptionCard<T extends string>({
   iconColor = "#00C897",
   iconBg = "rgba(0,200,151,0.12)",
 }: OnboardingOptionCardProps<T>) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const borderOpacity = useRef(new Animated.Value(selected ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.timing(borderOpacity, {
-      toValue: selected ? 1 : 0,
-      duration: 180,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: false,
-    }).start();
-  }, [borderOpacity, selected]);
-
-  const handlePress = () => {
-    Animated.sequence([
-      Animated.timing(scale, {
-        toValue: 0.97,
-        duration: 80,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scale, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    onPress(option.value);
-  };
-
-  const accent = theme.accent;
-
-  const bgColor = borderOpacity.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["#111318", `${accent}12`],
-  });
-
-  const borderColor = borderOpacity.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["rgba(255,255,255,0.07)", accent],
-  });
-
   return (
     <Pressable
       onPress={() => onPress(option.value)}

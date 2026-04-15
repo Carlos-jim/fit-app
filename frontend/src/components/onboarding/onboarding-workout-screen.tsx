@@ -87,9 +87,6 @@ export function OnboardingWorkoutScreen({
     }
   };
 
-  const accent = theme.accent;
-  const thumbLeft = trackWidth > 0 ? ratio * trackWidth - 15 : 0;
-
   return (
     <OnboardingShell
       theme={theme}
