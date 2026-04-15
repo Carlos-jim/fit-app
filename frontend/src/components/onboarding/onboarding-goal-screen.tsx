@@ -2,7 +2,11 @@ import React, { useState } from "react";
 import { Alert, View } from "react-native";
 import type { FitnessTheme } from "../fitness-ui";
 import { biomaApi, type GoalType } from "../../services/bioma-api";
-import { NextButton, OnboardingOptionCard, OnboardingShell } from "../onboarding";
+import {
+  NextButton,
+  OnboardingOptionCard,
+  OnboardingShell,
+} from "../onboarding";
 
 const TOTAL_STEPS = 7;
 const STEP = 1;

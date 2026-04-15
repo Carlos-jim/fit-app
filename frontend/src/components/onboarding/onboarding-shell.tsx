@@ -43,6 +43,8 @@ export function OnboardingShell({
   const progressAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    const dir = step >= prevStepRef.current ? 1 : -1;
+    prevStepRef.current = step;
     opacity.setValue(0);
     translateY.setValue(20);
     const target = step / Math.max(totalSteps, 1);
@@ -53,7 +55,7 @@ export function OnboardingShell({
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
-      Animated.timing(translateY, {
+      Animated.timing(translateX, {
         toValue: 0,
         duration: 320,
         easing: Easing.out(Easing.cubic),
@@ -79,9 +81,10 @@ export function OnboardingShell({
       <View style={styles.header}>
         <Pressable
           onPress={onBack}
-          style={styles.backButton}
+          style={styles.backBtn}
           accessibilityRole="button"
           accessibilityLabel="Volver"
+          hitSlop={16}
         >
           <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
         </Pressable>
@@ -110,10 +113,7 @@ export function OnboardingShell({
         showsVerticalScrollIndicator={false}
       >
         <Animated.View
-          style={[
-            styles.titleBlock,
-            { opacity, transform: [{ translateY }] },
-          ]}
+          style={[styles.titleBlock, { opacity, transform: [{ translateY }] }]}
         >
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
@@ -192,6 +192,8 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 15,
     lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 22,
   },
   content: {
     gap: 10,
@@ -204,6 +206,8 @@ const styles = StyleSheet.create({
   note: {
     color: "#2C2E45",
     fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 18,
     fontSize: 12,
     lineHeight: 18,
     textAlign: "center",

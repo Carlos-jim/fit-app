@@ -1,8 +1,16 @@
 import React, { useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import type { FitnessTheme } from "../fitness-ui";
-import { biomaApi, type GoalType, type WorkoutFrequency } from "../../services/bioma-api";
-import { NextButton, OnboardingOptionCard, OnboardingShell } from "../onboarding";
+import {
+  biomaApi,
+  type GoalType,
+  type WorkoutFrequency,
+} from "../../services/bioma-api";
+import {
+  NextButton,
+  OnboardingOptionCard,
+  OnboardingShell,
+} from "../onboarding";
 
 const TOTAL_STEPS = 7;
 const STEP = 2;
@@ -78,6 +86,9 @@ export function OnboardingWorkoutScreen({
       setLoading(false);
     }
   };
+
+  const accent = theme.accent;
+  const thumbLeft = trackWidth > 0 ? ratio * trackWidth - 15 : 0;
 
   return (
     <OnboardingShell
