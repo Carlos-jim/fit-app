@@ -17,7 +17,7 @@ import { biomaApi } from "../../services/bioma-api";
 
 interface AuthScreenProps {
   theme: FitnessTheme;
-  onLoginSuccess: (userId: string) => void;
+  onLoginSuccess: (user: { id: string; email: string; fullName?: string | null }) => void;
   onBack: () => void;
   onShowRegister: () => void;
 }
@@ -58,7 +58,7 @@ export function AuthScreen({
         email: emailTrimmed,
         password: password.trim(),
       });
-      onLoginSuccess(result.id);
+      onLoginSuccess(result);
     } catch (err) {
       Alert.alert(
         "No se pudo iniciar sesion",

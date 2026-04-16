@@ -17,7 +17,7 @@ import { biomaApi } from "../../services/bioma-api";
 
 interface RegisterScreenProps {
   theme: FitnessTheme;
-  onRegisterSuccess: (userId: string) => void;
+  onRegisterSuccess: (user: { id: string; email: string; fullName?: string | null }) => void;
   onBack: () => void;
   onShowLogin: () => void;
 }
@@ -74,7 +74,7 @@ export function RegisterScreen({
         email: emailTrimmed,
         password: passwordTrimmed,
       });
-      onRegisterSuccess(result.id);
+      onRegisterSuccess(result);
     } catch (err) {
       Alert.alert(
         "No se pudo crear la cuenta",

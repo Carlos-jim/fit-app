@@ -22,7 +22,6 @@ interface OnboardingShellProps {
   onBack: () => void;
   children: ReactNode;
   footer: ReactNode;
-  note?: string;
   keyboardAware?: boolean;
 }
 
@@ -35,7 +34,6 @@ export function OnboardingShell({
   onBack,
   children,
   footer,
-  note = "* Tu información se elimina tras generar el plan.",
   keyboardAware = false,
 }: OnboardingShellProps) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -120,7 +118,6 @@ export function OnboardingShell({
         <View style={styles.content}>{children}</View>
 
         <View style={styles.footer}>
-          <Text style={styles.note}>{note}</Text>
           {footer}
         </View>
       </ScrollView>
@@ -198,12 +195,5 @@ const styles = StyleSheet.create({
     marginTop: "auto",
     paddingTop: 28,
     gap: 14,
-  },
-  note: {
-    color: "#2C2E45",
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: "center",
   },
 });

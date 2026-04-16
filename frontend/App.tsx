@@ -1500,6 +1500,8 @@ export default function App() {
     if (currentIndex > 1) {
       setOnboardingStep(stepOrder[currentIndex - 1]);
     } else {
+      setUserId(null);
+      setAuthFlow("welcome");
       setOnboardingStep("idle");
     }
   };
@@ -1514,27 +1516,18 @@ export default function App() {
   };
 
   // ─── Auth handlers ───────────────────────────────────────────────
-  const handleAuthSuccess = (newUserId: string) => {
-    setUserId(newUserId);
+  const handleAuthSuccess = (user: { id: string; email: string; fullName?: string | null }) => {
+    setUserId(user.id);
+    setEmail(user.email);
+    if (user.fullName) {
+      setFullName(user.fullName);
+    }
     setAuthFlow("onboarding");
     setOnboardingStep("goal");
   };
 
-  const handleWelcomeContinue = async () => {
-    if (bootstrapLoading) {
-      return;
-    }
-
-    const resolvedUserId = userId ?? (await connectProfile());
-    if (!resolvedUserId) {
-      return;
-    }
-
-    setUserId(resolvedUserId);
-    setAuthFlow("onboarding");
-    setOnboardingStep((currentStep) =>
-      currentStep === "idle" ? "goal" : currentStep,
-    );
+  const handleWelcomeContinue = () => {
+    setAuthFlow("register");
   };
 
   const renderOnboardingFlow = () => {

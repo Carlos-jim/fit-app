@@ -35,6 +35,7 @@ export function OnboardingAgeScreen({
   const [loading, setLoading] = useState(false);
   const pulse = useRef(new Animated.Value(1)).current;
   const holdTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const triggerPulse = useCallback(() => {
     Animated.sequence([
@@ -57,10 +58,16 @@ export function OnboardingAgeScreen({
 
   const startHold = (delta: number) => {
     changeAge(delta);
-    holdTimer.current = setInterval(() => changeAge(delta), 100);
+    timeoutTimer.current = setTimeout(() => {
+      holdTimer.current = setInterval(() => changeAge(delta), 100);
+    }, 400); // Wait 400ms before starting rapid interval
   };
 
   const endHold = () => {
+    if (timeoutTimer.current) {
+      clearTimeout(timeoutTimer.current);
+      timeoutTimer.current = null;
+    }
     if (holdTimer.current) {
       clearInterval(holdTimer.current);
       holdTimer.current = null;

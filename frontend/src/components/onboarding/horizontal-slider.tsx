@@ -47,8 +47,6 @@ export function HorizontalSlider({
   centerHint,
 }: HorizontalSliderProps) {
   const scrollRef = useRef<ScrollView | null>(null);
-  const scrollingRef = useRef(false);
-  const hasMomentumRef = useRef(false);
   const lastValueRef = useRef(value);
   const pulse = useRef(new Animated.Value(1)).current;
 
@@ -76,6 +74,8 @@ export function HorizontalSlider({
     return Math.max(0, Math.min(totalSteps, index));
   }, [min, step, totalSteps, value]);
 
+  const scrollIndexRef = useRef(currentIndex);
+
   const displayValue = useMemo(() => {
     if (formatValue) return formatValue(value);
     return `${value.toFixed(precision)}${unit}`;
@@ -85,7 +85,9 @@ export function HorizontalSlider({
 
   // Sync scroll position when value changes programmatically
   useEffect(() => {
-    if (!scrollRef.current || scrollingRef.current) return;
+    if (currentIndex === scrollIndexRef.current) return;
+    if (!scrollRef.current) return;
+    scrollIndexRef.current = currentIndex;
     scrollRef.current.scrollTo({ y: currentIndex * ITEM_H, animated: false });
   }, [currentIndex]);
 
@@ -102,6 +104,7 @@ export function HorizontalSlider({
   const applyOffset = (offsetY: number) => {
     const rawIndex = Math.round(offsetY / ITEM_H);
     const index = Math.max(0, Math.min(totalSteps, rawIndex));
+    scrollIndexRef.current = index;
     const next = values[index];
     if (next !== undefined && next !== lastValueRef.current) {
       lastValueRef.current = next;
@@ -110,25 +113,8 @@ export function HorizontalSlider({
     }
   };
 
-  const snapAndApply = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    scrollingRef.current = false;
-    hasMomentumRef.current = false;
-    const rawY = event.nativeEvent.contentOffset.y;
-    const snappedY = Math.round(rawY / ITEM_H) * ITEM_H;
-    scrollRef.current?.scrollTo({ y: snappedY, animated: true });
-    applyOffset(snappedY);
-  };
-
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     applyOffset(event.nativeEvent.contentOffset.y);
-  };
-
-  const handleScrollEndDrag = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (!hasMomentumRef.current) snapAndApply(event);
-  };
-
-  const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    snapAndApply(event);
   };
 
   const accent = theme.accent;
@@ -168,17 +154,9 @@ export function HorizontalSlider({
           decelerationRate="fast"
           snapToInterval={ITEM_H}
           contentContainerStyle={[styles.scrollContent, { paddingVertical: sidePad }]}
-          onScrollBeginDrag={() => {
-            scrollingRef.current = true;
-            hasMomentumRef.current = false;
-          }}
-          onMomentumScrollBegin={() => {
-            hasMomentumRef.current = true;
-          }}
           onScroll={handleScroll}
-          onScrollEndDrag={handleScrollEndDrag}
-          onMomentumScrollEnd={handleMomentumScrollEnd}
           scrollEventThrottle={16}
+          nestedScrollEnabled={true}
         >
           {values.map((tickValue, index) => {
             const isSelected = index === currentIndex;
