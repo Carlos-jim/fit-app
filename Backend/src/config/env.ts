@@ -17,6 +17,7 @@ const envSchema = z.object({
     .optional()
     .transform((value) => (value ? Number(value) : 3000))
     .pipe(z.number().int().positive().max(65535)),
+  GOOGLE_CLIENT_IDS: z.string().optional().default(""),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

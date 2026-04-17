@@ -7,7 +7,8 @@ export class UserRepository {
     email: string;
     fullName?: string;
   }): Promise<User> {
-    return this.db.user.upsert({
+    console.log(`[Database] Syncing user: ${input.email}`);
+    const user = await this.db.user.upsert({
       where: {
         email: input.email,
       },
@@ -19,6 +20,8 @@ export class UserRepository {
         fullName: input.fullName,
       },
     });
+    console.log(`[Database] User synced: ${user.id}`);
+    return user;
   }
 
   async exists(userId: string): Promise<boolean> {

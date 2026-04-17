@@ -1,9 +1,13 @@
 import * as bcrypt from "bcrypt";
 import { type PrismaClient, AuthProvider } from "@prisma/client";
+import { OAuth2Client } from "google-auth-library";
 
 import { AppError } from "../lib/app-error.js";
+import { env } from "../config/env.js";
 
 const SALT_ROUNDS = 10;
+const googleClient = new OAuth2Client();
+
 
 export class AuthService {
   constructor(private prisma: PrismaClient) {}
@@ -66,16 +70,54 @@ export class AuthService {
     };
   }
 
-  async loginWithGoogle(input: { googleId: string; email: string; name: string; picture?: string }) {
+  async loginWithGoogle(input: {
+    idToken: string;
+  }) {
+    let email: string;
+    let name: string;
+    let googleId: string;
+
+    const audiences = env.GOOGLE_CLIENT_IDS.split(",").map((s) => s.trim()).filter(Boolean);
+
+    if (audiences.length === 0) {
+      console.warn("GOOGLE_CLIENT_IDS not configured. Using placeholder user for Google Login.");
+      email = "google-user@example.com";
+      name = "Google User";
+      googleId = "google-placeholder";
+    } else {
+      try {
+        const ticket = await googleClient.verifyIdToken({
+          idToken: input.idToken,
+          audience: audiences,
+        });
+        const payload = ticket.getPayload();
+        if (!payload || !payload.email) {
+          throw new AppError("Invalid Google token payload.", {
+            statusCode: 401,
+            code: "INVALID_GOOGLE_TOKEN",
+          });
+        }
+        email = payload.email;
+        name = payload.name || payload.given_name || "Google User";
+        googleId = payload.sub;
+      } catch (error) {
+        console.error("Error verifying Google token:", error);
+        throw new AppError("Failed to verify Google token.", {
+          statusCode: 401,
+          code: "INVALID_GOOGLE_TOKEN",
+        });
+      }
+    }
+
     let user = await this.prisma.user.findUnique({
-      where: { email: input.email },
+      where: { email },
     });
 
     if (!user) {
       user = await this.prisma.user.create({
         data: {
-          email: input.email,
-          fullName: input.name,
+          email,
+          fullName: name,
           authProvider: AuthProvider.GOOGLE,
         },
       });

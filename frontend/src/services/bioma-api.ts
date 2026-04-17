@@ -343,6 +343,8 @@ class BiomaApi {
       throw new Error("EXPO_PUBLIC_API_BASE_URL is not configured.");
     }
 
+    console.log(`[API Request] ${init.method ?? "GET"} ${path}`, init.body ? JSON.parse(init.body as string) : "");
+
     const response = await fetch(`${env.apiBaseUrl}${path}`, {
       ...init,
       headers: {
@@ -355,14 +357,18 @@ class BiomaApi {
     const payload = text ? (JSON.parse(text) as ApiEnvelope<T>) : null;
 
     if (!response.ok) {
+      console.error(`[API Error] ${init.method ?? "GET"} ${path}:`, payload?.message ?? response.status);
       throw new Error(
         payload?.message ?? `Request failed with status ${response.status}.`,
       );
     }
 
     if (!payload) {
+      console.error(`[API Error] ${init.method ?? "GET"} ${path}: Empty response`);
       throw new Error("Empty API response.");
     }
+
+    console.log(`[API Response] ${init.method ?? "GET"} ${path}:`, payload.data);
 
     return payload;
   }

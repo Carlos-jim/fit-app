@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -12,8 +12,14 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
+import * as AuthSession from "expo-auth-session";
 import type { FitnessTheme } from "../fitness-ui";
 import { biomaApi } from "../../services/bioma-api";
+import { env } from "../../config/env";
+
+WebBrowser.maybeCompleteAuthSession();
 
 interface AuthScreenProps {
   theme: FitnessTheme;
@@ -34,6 +40,44 @@ export function AuthScreen({
   const [showPassword, setShowPassword] = useState(false);
   const passwordRef = useRef<TextInput | null>(null);
 
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: env.googleWebClientId || undefined,
+    iosClientId: env.googleIosClientId || undefined,
+    androidClientId: env.googleAndroidClientId || undefined,
+    redirectUri: AuthSession.makeRedirectUri({
+      scheme: "bioma",
+    }),
+  });
+
+  useEffect(() => {
+    console.log("[Auth] Google Client ID:", env.googleWebClientId ? "Configurado" : "VACÍO");
+  }, []);
+
+  useEffect(() => {
+    if (response?.type === "success") {
+      const { id_token } = response.params;
+      handleGoogleAuth(id_token);
+    }
+  }, [response]);
+
+  const handleGoogleAuth = async (idToken: string) => {
+    console.log("[Auth] Starting Google Auth with ID Token...");
+    setLoading(true);
+    try {
+      const user = await biomaApi.loginWithGoogle(idToken);
+      console.log("[Auth] Google Login Success:", user);
+      onLoginSuccess(user);
+    } catch (err) {
+      console.error("[Auth] Google Login Error:", err);
+      Alert.alert(
+        "Error de Google",
+        err instanceof Error ? err.message : "No se pudo iniciar sesion con Google.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const darkMode = theme.background === "#050505";
   const canSubmit = email.trim().length > 4 && password.trim().length > 0;
   const gradient: readonly [string, string, string] = darkMode
@@ -52,14 +96,17 @@ export function AuthScreen({
       return;
     }
 
+    console.log("[Auth] Starting Email Login for:", emailTrimmed);
     setLoading(true);
     try {
       const result = await biomaApi.loginWithEmail({
         email: emailTrimmed,
         password: password.trim(),
       });
+      console.log("[Auth] Email Login Success:", result);
       onLoginSuccess(result);
     } catch (err) {
+      console.error("[Auth] Email Login Error:", err);
       Alert.alert(
         "No se pudo iniciar sesion",
         err instanceof Error ? err.message : "Intenta de nuevo.",
@@ -70,7 +117,14 @@ export function AuthScreen({
   };
 
   const handleGoogleLogin = async () => {
-    Alert.alert("Google Sign-In", "Configura Google OAuth para habilitarlo.");
+    if (!env.googleWebClientId) {
+      Alert.alert(
+        "OAuth no configurado",
+        "Configura las variables de entorno EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID en el frontend para habilitar Google Sign-In.",
+      );
+      return;
+    }
+    promptAsync();
   };
 
   return (

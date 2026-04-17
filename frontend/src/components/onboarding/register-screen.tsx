@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -12,8 +12,14 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
+import * as AuthSession from "expo-auth-session";
 import type { FitnessTheme } from "../fitness-ui";
 import { biomaApi } from "../../services/bioma-api";
+import { env } from "../../config/env";
+
+WebBrowser.maybeCompleteAuthSession();
 
 interface RegisterScreenProps {
   theme: FitnessTheme;
@@ -39,6 +45,56 @@ export function RegisterScreen({
   const emailRef = useRef<TextInput | null>(null);
   const passwordRef = useRef<TextInput | null>(null);
   const confirmRef = useRef<TextInput | null>(null);
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: env.googleWebClientId || undefined,
+    iosClientId: env.googleIosClientId || undefined,
+    androidClientId: env.googleAndroidClientId || undefined,
+    redirectUri: AuthSession.makeRedirectUri({
+      scheme: "bioma",
+    }),
+  });
+
+  useEffect(() => {
+    console.log("[Register] Google Client ID:", env.googleWebClientId ? "Configurado" : "VACÍO");
+  }, []);
+
+  useEffect(() => {
+    if (response?.type === "success") {
+      const { id_token } = response.params;
+      handleGoogleAuth(id_token);
+    }
+  }, [response]);
+
+  const handleGoogleAuth = async (idToken: string) => {
+    console.log("[Register] Starting Google Registration...");
+    setLoading(true);
+    try {
+      const user = await biomaApi.loginWithGoogle(idToken);
+      console.log("[Register] Google Success:", user);
+      onRegisterSuccess(user);
+    } catch (err) {
+      console.error("[Register] Google Error:", err);
+      Alert.alert(
+        "Error de Google",
+        err instanceof Error ? err.message : "No se pudo registrar con Google.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    if (!env.googleWebClientId) {
+      Alert.alert(
+        "OAuth no configurado",
+        "Configura las variables de entorno EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID en el frontend para habilitar Google Sign-In.",
+      );
+      return;
+    }
+    console.log("[Register] Launching Google Login Prompt...");
+    promptAsync();
+  };
 
   const darkMode = theme.background === "#050505";
   const gradient: readonly [string, string, string] = darkMode
@@ -67,6 +123,7 @@ export function RegisterScreen({
       return;
     }
 
+    console.log("[Register] Starting Email Registration for:", emailTrimmed);
     setLoading(true);
     try {
       const result = await biomaApi.registerWithEmail({
@@ -74,8 +131,10 @@ export function RegisterScreen({
         email: emailTrimmed,
         password: passwordTrimmed,
       });
+      console.log("[Register] Email Success:", result);
       onRegisterSuccess(result);
     } catch (err) {
+      console.error("[Register] Email Error:", err);
       Alert.alert(
         "No se pudo crear la cuenta",
         err instanceof Error ? err.message : "Intenta de nuevo.",
@@ -117,9 +176,7 @@ export function RegisterScreen({
 
             <Pressable
               style={[styles.socialButton, { backgroundColor: theme.cardMuted }]}
-              onPress={() =>
-                Alert.alert("Google Sign-In", "Configura Google OAuth para habilitarlo.")
-              }
+              onPress={handleGoogleLogin}
             >
               <Ionicons name="logo-google" size={18} color="#DB4437" />
               <Text style={[styles.socialButtonText, { color: theme.text }]}>

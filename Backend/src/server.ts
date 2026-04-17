@@ -98,9 +98,7 @@ app.post("/auth/google", async (req, res) => {
     // For now, we'll create/login the user directly
     // You would normally use google-auth-library to verify the token
     const user = await authService.loginWithGoogle({
-      googleId: "google-placeholder",
-      email: "google-user@example.com",
-      name: "Google User",
+      idToken: request.idToken,
     });
     res.status(200).json({ data: user });
   } catch (error) {
