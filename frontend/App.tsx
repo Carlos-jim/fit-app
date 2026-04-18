@@ -253,21 +253,21 @@ function ComingSoonPage(props: { view: PlaceholderView }) {
   } =
     view === "steps"
       ? {
-          eyebrow: "Pasos",
-          icon: "footsteps-outline" as const,
-          colors: ["#0F1115", "#181C22", "#101216"] as const,
-          accent: "#A7F86E",
-          copy: "Estamos preparando una vista de movimiento con progreso diario, metas y tendencias.",
-          tagline: "Cada paso cuenta",
-        }
+        eyebrow: "Pasos",
+        icon: "footsteps-outline" as const,
+        colors: ["#0F1115", "#181C22", "#101216"] as const,
+        accent: "#A7F86E",
+        copy: "Estamos preparando una vista de movimiento con progreso diario, metas y tendencias.",
+        tagline: "Cada paso cuenta",
+      }
       : {
-          eyebrow: "Recomendaciones",
-          icon: "sparkles-outline" as const,
-          colors: ["#151110", "#211A17", "#130F0E"] as const,
-          accent: "#FFB866",
-          copy: "Aqui vas a ver recomendaciones inteligentes y accionables, con el mismo look limpio.",
-          tagline: "Tu proximo nivel te espera",
-        };
+        eyebrow: "Recomendaciones",
+        icon: "sparkles-outline" as const,
+        colors: ["#151110", "#211A17", "#130F0E"] as const,
+        accent: "#FFB866",
+        copy: "Aqui vas a ver recomendaciones inteligentes y accionables, con el mismo look limpio.",
+        tagline: "Tu proximo nivel te espera",
+      };
 
   // Animation values for coming soon page
   const comingSoonFloatY = useRef(new Animated.Value(0)).current;
@@ -616,7 +616,7 @@ function AppContent() {
   const [nutritionQuickMenuOpen, setNutritionQuickMenuOpen] = useState(false);
   const [initialMealForDetail, setInitialMealForDetail] =
     useState<MealLog | null>(null);
-  
+
   const dailyWaterGlasses = useWaterStore((state) => state.waterGlasses);
   const waterGoal = useWaterStore((state) => state.waterGoal);
   const incrementWater = useWaterStore((state) => state.increment);
@@ -1492,7 +1492,23 @@ function AppContent() {
     }
   };
 
-  // ─── Onboarding navigation ───────────────────────────────────────
+  const handleLogout = async () => {
+    try {
+      setBootstrapLoading(true);
+      await biomaApi.logout();
+    } catch (error) {
+      console.warn("Logout endpoint failed, ignoring", error);
+    } finally {
+      setUserId(null);
+      setFullName("");
+      setEmail("");
+      setAuthFlow("welcome");
+      setActiveTab("home");
+      setBootstrapLoading(false);
+    }
+  };
+
+  // ─── Animations ──────────────────────────────────────────────────
   const handleOnboardingBack = () => {
     const stepOrder: (typeof onboardingStep)[] = [
       "idle",
@@ -1750,6 +1766,7 @@ function AppContent() {
             setEmail={setEmail}
             userId={userId}
             onConnectProfile={connectProfile}
+            onLogout={handleLogout}
             bootstrapLoading={bootstrapLoading}
             onToggleMode={() =>
               setVisualMode((cur) => (cur === "light" ? "dark" : "light"))
@@ -4351,7 +4368,7 @@ function AppContent() {
                 styles.textModePrimaryButton,
                 { backgroundColor: theme.accent },
                 (loading || mealDescription.trim().length < 5) &&
-                  styles.buttonDisabled,
+                styles.buttonDisabled,
               ]}
               onPress={analyzeCurrentMeal}
               disabled={loading || mealDescription.trim().length < 5}
