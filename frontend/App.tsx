@@ -42,7 +42,7 @@ import {
   Manrope_800ExtraBold,
 } from "@expo-google-fonts/manrope";
 import { Ionicons } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import {
   AppTab,
@@ -517,6 +517,14 @@ function ComingSoonPage(props: { view: PlaceholderView }) {
 }
 
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
+  );
+}
+
+function AppContent() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
