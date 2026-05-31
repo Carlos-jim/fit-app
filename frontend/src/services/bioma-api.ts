@@ -11,8 +11,10 @@ import type {
 
 export interface AnalyzeMealPayload {
   userId: string;
-  path: string;
+  path?: string;
   bucket?: string;
+  base64Image?: string;
+  localImageUrl?: string;
   mealLabel?: string;
   notes?: string;
   consumedAt?: string;

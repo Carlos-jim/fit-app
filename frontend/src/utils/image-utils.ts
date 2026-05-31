@@ -18,6 +18,7 @@ export interface CompressedImage {
   mimeType: "image/jpeg";
   /** Suggested file name with .jpg extension. */
   fileName: string;
+  base64?: string;
 }
 
 /**
@@ -46,7 +47,7 @@ export async function compressForUpload(
     {
       compress: UPLOAD_QUALITY,
       format: ImageManipulator.SaveFormat.JPEG,
-      base64: false,
+      base64: true,
     },
   );
 
@@ -60,5 +61,6 @@ export async function compressForUpload(
     height: result.height,
     mimeType: "image/jpeg",
     fileName: `${baseName}.jpg`,
+    base64: result.base64,
   };
 }

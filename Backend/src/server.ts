@@ -261,23 +261,47 @@ app.post("/logs/analyze-meal-image", async (req, res) => {
       path: request.path,
       mealLabel: request.mealLabel,
       consumedAt: request.consumedAt,
+      isLocal: !!request.base64Image,
     });
 
-    const imageAsset = await storageService.getImage({
-      bucket: request.bucket,
-      path: request.path,
-    });
+    let imageDataUrl: string;
+    let imageBucket: string | undefined = undefined;
+    let imageKey: string | undefined = undefined;
+    let imageUrl: string | undefined = undefined;
 
-    console.log("[analyze-meal-image] Image fetched from storage:", {
-      bucket: imageAsset.bucket,
-      path: imageAsset.path,
-      contentType: imageAsset.contentType,
-      bytes: imageAsset.bytes.length,
-      publicUrl: imageAsset.publicUrl,
-    });
+    if (request.base64Image) {
+      imageDataUrl = request.base64Image.startsWith("data:") 
+        ? request.base64Image 
+        : `data:image/jpeg;base64,${request.base64Image}`;
+      imageUrl = request.localImageUrl;
+      
+      console.log("[analyze-meal-image] Using provided base64 image (length:", request.base64Image.length, ")");
+    } else {
+      if (!request.path) {
+        throw new AppError("Path is required when base64Image is not provided.", { statusCode: 400, code: "MISSING_PATH" });
+      }
+      
+      const imageAsset = await storageService.getImage({
+        bucket: request.bucket,
+        path: request.path,
+      });
+
+      console.log("[analyze-meal-image] Image fetched from storage:", {
+        bucket: imageAsset.bucket,
+        path: imageAsset.path,
+        contentType: imageAsset.contentType,
+        bytes: imageAsset.bytes.length,
+        publicUrl: imageAsset.publicUrl,
+      });
+      
+      imageBucket = imageAsset.bucket;
+      imageKey = imageAsset.path;
+      imageUrl = imageAsset.publicUrl;
+      imageDataUrl = storageService.toDataUrl(imageAsset);
+    }
 
     const analysisResult = await nutritionAnalysisService.analyzeFromImage({
-      imageDataUrl: storageService.toDataUrl(imageAsset),
+      imageDataUrl,
       mealLabel: request.mealLabel,
       notes: request.notes,
     });
@@ -295,9 +319,9 @@ app.post("/logs/analyze-meal-image", async (req, res) => {
       mealLabel: request.mealLabel,
       notes: request.notes,
       consumedAt: request.consumedAt,
-      imageBucket: imageAsset.bucket,
-      imageKey: imageAsset.path,
-      imageUrl: imageAsset.publicUrl,
+      imageBucket,
+      imageKey,
+      imageUrl,
       analysis: analysisResult.parsed,
       aiModel: analysisResult.model,
     });

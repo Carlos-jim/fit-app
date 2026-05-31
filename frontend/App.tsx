@@ -22,6 +22,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
+import * as FileSystem from "expo-file-system";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   CameraView,
@@ -1650,25 +1651,22 @@ export default function App() {
           imageAsset.fileName,
         );
 
-        setStatusMessage("Solicitando URL firmada...");
-        const upload = await biomaApi.createMealUploadUrl({
-          userId: resolvedUserId,
-          fileName: compressed.fileName,
-          contentType: compressed.mimeType,
-        });
-
-        setStatusMessage("Subiendo imagen al storage...");
-        await biomaApi.uploadImageToStorage(
-          upload.uploadUrl,
-          compressed.uri,
-          upload.requiredHeaders,
-        );
+        setStatusMessage("Guardando imagen localmente...");
+        const localImageUrl = `${FileSystem.documentDirectory}${compressed.fileName}`;
+        try {
+          await FileSystem.copyAsync({
+            from: compressed.uri,
+            to: localImageUrl,
+          });
+        } catch (e) {
+          console.error("Error copiando imagen a documentDirectory", e);
+        }
 
         setStatusMessage("Analizando comida por vision...");
         const result = await biomaApi.analyzeMealImage({
           userId: resolvedUserId,
-          path: upload.path,
-          bucket: upload.bucket,
+          base64Image: compressed.base64,
+          localImageUrl,
           mealLabel: mealLabel.trim() || undefined,
           notes: mealDescription.trim() || undefined,
           consumedAt: new Date().toISOString(),
