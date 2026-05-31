@@ -26,6 +26,7 @@ export interface ProfileScreenProps {
   setEmail: (v: string) => void;
   userId: string | null;
   onConnectProfile: () => Promise<string | null>;
+  onLogout: () => void;
   bootstrapLoading: boolean;
   onToggleMode: () => void;
   ambientPulse: Animated.Value;
@@ -46,6 +47,7 @@ export function ProfileScreen(props: ProfileScreenProps) {
     setEmail,
     userId,
     onConnectProfile,
+    onLogout,
     bootstrapLoading,
     onToggleMode,
     ambientPulse,
@@ -348,6 +350,24 @@ export function ProfileScreen(props: ProfileScreenProps) {
               </Text>
             </View>
           ) : null}
+
+          {/* Logout button */}
+          <Pressable
+            style={[
+              styles.primaryBtn,
+              { backgroundColor: isDark ? "#2A181C" : "#FFE5E5", marginTop: 12 },
+            ]}
+            onPress={onLogout}
+          >
+            <Ionicons
+              name="log-out-outline"
+              size={18}
+              color="#F43F5E"
+            />
+            <Text style={[styles.primaryBtnText, { color: "#F43F5E" }]}>
+              Cerrar sesión
+            </Text>
+          </Pressable>
         </LinearGradient>
       </Animated.View>
 

@@ -86,6 +86,12 @@ class BiomaApi {
     return response.data;
   }
 
+  async logout(): Promise<void> {
+    await this.request<void>("/auth/logout", {
+      method: "POST",
+    });
+  }
+
   async createMealUploadUrl(input: {
     userId: string;
     fileName: string;

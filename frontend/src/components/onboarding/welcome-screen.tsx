@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import type { FitnessTheme } from "../fitness-ui";
@@ -26,6 +27,7 @@ export function WelcomeScreen({
   onLogin,
   loading = false,
 }: WelcomeScreenProps) {
+  const insets = useSafeAreaInsets();
   const darkMode = theme.background === "#050505";
   const gradient: readonly [string, string, string] = darkMode
     ? ["#04100D", "#0B1F18", "#050505"]
@@ -63,7 +65,10 @@ export function WelcomeScreen({
         />
 
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: Math.max(insets.top, 24) }
+          ]}
           showsVerticalScrollIndicator={false}
         >
           <View

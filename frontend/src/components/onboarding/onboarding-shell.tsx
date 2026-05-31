@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { FitnessTheme } from "../fitness-ui";
 
 interface OnboardingShellProps {
@@ -36,6 +37,7 @@ export function OnboardingShell({
   footer,
   keyboardAware = false,
 }: OnboardingShellProps) {
+  const insets = useSafeAreaInsets();
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(20)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -74,7 +76,7 @@ export function OnboardingShell({
       behavior={keyboardAware && Platform.OS === "ios" ? "padding" : undefined}
     >
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
         <Pressable
           onPress={onBack}
           style={styles.backButton}

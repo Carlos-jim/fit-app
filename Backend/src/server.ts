@@ -106,6 +106,16 @@ app.post("/auth/google", async (req, res) => {
   }
 });
 
+app.post("/auth/logout", async (req, res) => {
+  try {
+    // In a mature app, you'd invalidate tokens or sessions here.
+    // We just return a success payload for now.
+    res.status(200).json({ data: { success: true } });
+  } catch (error) {
+    handleError(res, error, "logging out");
+  }
+});
+
 // ─── Onboarding endpoints ─────────────────────────────────────────
 
 app.post("/onboarding/step/1", async (req, res) => {
