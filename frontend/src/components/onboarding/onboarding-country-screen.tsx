@@ -40,18 +40,24 @@ const COUNTRIES = [
   "Venezuela",
 ];
 
+type VisualMode = "dark" | "light";
+
 interface OnboardingCountryProps {
   userId: string;
   theme: FitnessTheme;
+  visualMode: VisualMode;
   onBack: () => void;
   onFinish: () => void;
+  onToggleMode: () => void;
 }
 
 export function OnboardingCountryScreen({
   userId,
   theme,
+  visualMode,
   onBack,
   onFinish,
+  onToggleMode,
 }: OnboardingCountryProps) {
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -80,14 +86,18 @@ export function OnboardingCountryScreen({
     }
   };
 
+  const s = getStyles(theme);
+
   return (
     <OnboardingShell
       theme={theme}
+      visualMode={visualMode}
       step={STEP}
       totalSteps={TOTAL_STEPS}
       title="¿De qué país eres?"
       subtitle="Personalizamos referencias y recomendaciones según tu región."
       onBack={onBack}
+      onToggleMode={onToggleMode}
       keyboardAware
       footer={
         <NextButton
@@ -100,12 +110,12 @@ export function OnboardingCountryScreen({
       }
     >
       {/* Search */}
-      <View style={styles.searchBar}>
-        <Ionicons name="search-outline" size={17} color="#3E4259" />
+      <View style={s.searchBar}>
+        <Ionicons name="search-outline" size={17} color={theme.muted} />
         <TextInput
-          style={styles.searchInput}
+          style={s.searchInput}
           placeholder="Buscar país..."
-          placeholderTextColor="#3E4259"
+          placeholderTextColor={theme.muted}
           value={search}
           onChangeText={setSearch}
           autoCorrect={false}
@@ -114,13 +124,13 @@ export function OnboardingCountryScreen({
         />
         {search.length > 0 ? (
           <Pressable onPress={() => setSearch("")}>
-            <Ionicons name="close-circle" size={17} color="#3E4259" />
+            <Ionicons name="close-circle" size={17} color={theme.muted} />
           </Pressable>
         ) : null}
       </View>
 
       {/* List */}
-      <View style={styles.list}>
+      <View style={s.list}>
         {filtered.length > 0 ? (
           filtered.map((country) => {
             const active = selected === country;
@@ -128,25 +138,25 @@ export function OnboardingCountryScreen({
               <Pressable
                 key={country}
                 onPress={() => setSelected(country)}
-                style={[styles.row, active && styles.rowActive]}
+                style={[s.row, active && { backgroundColor: "rgba(0,200,151,0.07)", borderColor: "rgba(0,200,151,0.45)" }]}
               >
-                <Text style={[styles.rowLabel, active && styles.rowLabelActive]}>
+                <Text style={[s.rowLabel, active && { color: theme.text }]}>
                   {country}
                 </Text>
                 {active ? (
-                  <View style={styles.checkCircle}>
-                    <Ionicons name="checkmark" size={13} color="#09090E" />
+                  <View style={[s.checkCircle, { backgroundColor: theme.accent }]}>
+                    <Ionicons name="checkmark" size={13} color={theme.background} />
                   </View>
                 ) : (
-                  <View style={styles.emptyCircle} />
+                  <View style={[s.emptyCircle, { borderColor: theme.stroke }]} />
                 )}
               </Pressable>
             );
           })
         ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="search-outline" size={28} color="#2A2C40" />
-            <Text style={styles.emptyText}>
+          <View style={s.emptyState}>
+            <Ionicons name="search-outline" size={28} color={theme.muted} />
+            <Text style={s.emptyText}>
               Sin resultados para "{search}"
             </Text>
           </View>
@@ -156,82 +166,75 @@ export function OnboardingCountryScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: "#111219",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  searchInput: {
-    flex: 1,
-    color: "#FFFFFF",
-    fontFamily: "Inter_500Medium",
-    fontSize: 15,
-    paddingVertical: 0,
-  },
-  list: {
-    gap: 6,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#111219",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-    gap: 12,
-  },
-  rowActive: {
-    backgroundColor: "rgba(0,200,151,0.07)",
-    borderColor: "rgba(0,200,151,0.45)",
-  },
-  rowLabel: {
-    flex: 1,
-    color: "#8E92A8",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-  },
-  rowLabelActive: {
-    color: "#FFFFFF",
-  },
-  checkCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "#00C897",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  emptyCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.1)",
-    flexShrink: 0,
-  },
-  emptyState: {
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 32,
-    backgroundColor: "#111219",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.04)",
-  },
-  emptyText: {
-    color: "#3E4259",
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-  },
-});
+function getStyles(theme: FitnessTheme) {
+  return StyleSheet.create({
+    searchBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      backgroundColor: theme.card,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.stroke,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+    },
+    searchInput: {
+      flex: 1,
+      color: theme.text,
+      fontFamily: "Inter_500Medium",
+      fontSize: 15,
+      paddingVertical: 0,
+    },
+    list: {
+      gap: 6,
+    },
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: theme.card,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.stroke,
+      paddingHorizontal: 16,
+      paddingVertical: 15,
+      gap: 12,
+    },
+    rowLabel: {
+      flex: 1,
+      color: theme.muted,
+      fontFamily: "Inter_600SemiBold",
+      fontSize: 15,
+    },
+    checkCircle: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+    },
+    emptyCircle: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 2,
+      flexShrink: 0,
+    },
+    emptyState: {
+      alignItems: "center",
+      gap: 10,
+      paddingVertical: 32,
+      backgroundColor: theme.card,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.stroke,
+    },
+    emptyText: {
+      color: theme.muted,
+      fontFamily: "Inter_500Medium",
+      fontSize: 14,
+    },
+  });
+}

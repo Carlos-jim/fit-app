@@ -45,18 +45,24 @@ const OPTIONS: {
   },
 ];
 
+type VisualMode = "dark" | "light";
+
 interface OnboardingGoalProps {
   userId: string;
   theme: FitnessTheme;
+  visualMode: VisualMode;
   onBack: () => void;
   onNext: (goal: GoalType) => void;
+  onToggleMode: () => void;
 }
 
 export function OnboardingGoalScreen({
   userId,
   theme,
+  visualMode,
   onBack,
   onNext,
+  onToggleMode,
 }: OnboardingGoalProps) {
   const [selected, setSelected] = useState<GoalType | null>(null);
   const [loading, setLoading] = useState(false);
@@ -80,11 +86,13 @@ export function OnboardingGoalScreen({
   return (
     <OnboardingShell
       theme={theme}
+      visualMode={visualMode}
       step={STEP}
       totalSteps={TOTAL_STEPS}
       title="¿Cuál es tu objetivo?"
       subtitle="Esto nos ayuda a generar un plan de calorías adaptado a ti."
       onBack={onBack}
+      onToggleMode={onToggleMode}
       footer={
         <NextButton
           enabled={!!selected}

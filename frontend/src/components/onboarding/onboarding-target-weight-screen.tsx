@@ -42,13 +42,17 @@ const GOAL_CONFIG: Record<
   },
 };
 
+type VisualMode = "dark" | "light";
+
 interface OnboardingTargetWeightProps {
   userId: string;
   goal: GoalType;
   currentWeightKg: number;
   theme: FitnessTheme;
+  visualMode: VisualMode;
   onBack: () => void;
   onNext: () => void;
+  onToggleMode: () => void;
 }
 
 export function OnboardingTargetWeightScreen({
@@ -56,8 +60,10 @@ export function OnboardingTargetWeightScreen({
   goal,
   currentWeightKg,
   theme,
+  visualMode,
   onBack,
   onNext,
+  onToggleMode,
 }: OnboardingTargetWeightProps) {
   const [desiredWeightKg, setDesiredWeightKg] = useState(() => {
     if (goal === "LOSE_WEIGHT") return Math.max(40, currentWeightKg - 5);
@@ -141,7 +147,7 @@ export function OnboardingTargetWeightScreen({
     diff === 0 ? "Sin cambio" : diff > 0 ? `+${diff} kg` : `${diff} kg`;
 
   const diffColor =
-    diff < 0 ? "#4B9FFF" : diff > 0 ? "#00C897" : "#4B4E65";
+    diff < 0 ? "#4B9FFF" : diff > 0 ? "#00C897" : theme.muted;
 
   const progress =
     ((desiredWeightKg - range.min) / (range.max - range.min)) * 100;
@@ -167,15 +173,18 @@ export function OnboardingTargetWeightScreen({
   };
 
   const accent = theme.accent;
+  const s = getStyles(theme);
 
   return (
     <OnboardingShell
       theme={theme}
+      visualMode={visualMode}
       step={STEP}
       totalSteps={TOTAL_STEPS}
       title="¿Cuál es tu peso objetivo?"
       subtitle="Ajusta el valor a tu meta personal."
       onBack={onBack}
+      onToggleMode={onToggleMode}
       footer={
         <NextButton
           enabled
@@ -186,37 +195,37 @@ export function OnboardingTargetWeightScreen({
         />
       }
     >
-      <View style={styles.content}>
-        <View style={[styles.goalPill, { backgroundColor: cfg.bg }]}>
+      <View style={s.content}>
+        <View style={[s.goalPill, { backgroundColor: cfg.bg }]}>
           <Ionicons name={cfg.icon} size={15} color={cfg.color} />
-          <Text style={[styles.goalPillText, { color: cfg.color }]}>{cfg.label}</Text>
+          <Text style={[s.goalPillText, { color: cfg.color }]}>{cfg.label}</Text>
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.labelRow}>
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <View style={s.labelRow}>
               <Ionicons name="scale-outline" size={15} color={accent} />
-              <Text style={styles.label}>PESO OBJETIVO</Text>
+              <Text style={s.label}>PESO OBJETIVO</Text>
             </View>
           </View>
 
-          <View style={styles.counterRow}>
+          <View style={s.counterRow}>
             <Pressable
               onPressIn={decDisabled ? undefined : () => startHold(() => changeWeight(-1))}
               onPressOut={endHold}
               disabled={decDisabled}
-              style={[styles.adjBtn, decDisabled && styles.adjBtnDisabled]}
+              style={[s.adjBtn, decDisabled && { backgroundColor: theme.cardMuted, borderColor: theme.stroke }]}
             >
-              <Ionicons name="remove" size={24} color={decDisabled ? "#2E3148" : accent} />
+              <Ionicons name="remove" size={24} color={decDisabled ? theme.muted : accent} />
             </Pressable>
 
             <Pressable
               onPress={() => { setDraft(String(Math.round(desiredWeightKg * 2) / 2)); setEditing(true); }}
-              style={styles.valueWrap}
+              style={s.valueWrap}
             >
               {editing ? (
                 <TextInput
-                  style={styles.bigNumberInput}
+                  style={s.bigNumberInput}
                   value={draft}
                   onChangeText={setDraft}
                   onSubmitEditing={() => commitEdit(draft)}
@@ -229,52 +238,52 @@ export function OnboardingTargetWeightScreen({
                 />
               ) : (
                 <Animated.Text
-                  style={[styles.bigNumber, { transform: [{ scale: pulse }] }]}
+                  style={[s.bigNumber, { transform: [{ scale: pulse }] }]}
                 >
                   {Number.isInteger(desiredWeightKg) ? desiredWeightKg : desiredWeightKg.toFixed(1)}
                 </Animated.Text>
               )}
-              <Text style={styles.unitLabel}>kg</Text>
+              <Text style={s.unitLabel}>kg</Text>
             </Pressable>
 
             <Pressable
               onPressIn={incDisabled ? undefined : () => startHold(() => changeWeight(1))}
               onPressOut={endHold}
               disabled={incDisabled}
-              style={[styles.adjBtn, incDisabled && styles.adjBtnDisabled]}
+              style={[s.adjBtn, incDisabled && { backgroundColor: theme.cardMuted, borderColor: theme.stroke }]}
             >
-              <Ionicons name="add" size={24} color={incDisabled ? "#2E3148" : accent} />
+              <Ionicons name="add" size={24} color={incDisabled ? theme.muted : accent} />
             </Pressable>
           </View>
 
-          <RangeBar progress={progress} minLabel={`${range.min}`} maxLabel={`${range.max}`} accent={accent} />
+          <RangeBar progress={progress} minLabel={`${range.min}`} maxLabel={`${range.max}`} accent={accent} theme={theme} />
         </View>
 
-        <View style={styles.diffCard}>
-          <View style={styles.diffRow}>
-            <View style={styles.diffItem}>
-              <Text style={styles.diffLabel}>Actual</Text>
-              <Text style={styles.diffValue}>{Math.round(currentWeightKg)} kg</Text>
+        <View style={s.diffCard}>
+          <View style={s.diffRow}>
+            <View style={s.diffItem}>
+              <Text style={s.diffLabel}>Actual</Text>
+              <Text style={s.diffValue}>{Math.round(currentWeightKg)} kg</Text>
             </View>
 
-            <View style={styles.diffArrowWrap}>
+            <View style={s.diffArrowWrap}>
               <Ionicons name={cfg.arrowIcon} size={14} color={diffColor} />
             </View>
 
-            <View style={styles.diffItem}>
-              <Text style={styles.diffLabel}>Diferencia</Text>
-              <Text style={[styles.diffValue, { color: diffColor }]}>
+            <View style={s.diffItem}>
+              <Text style={s.diffLabel}>Diferencia</Text>
+              <Text style={[s.diffValue, { color: diffColor }]}>
                 {diffLabel}
               </Text>
             </View>
 
-            <View style={styles.diffArrowWrap}>
-              <Ionicons name="flag-outline" size={14} color="#4B4E65" />
+            <View style={s.diffArrowWrap}>
+              <Ionicons name="flag-outline" size={14} color={theme.muted} />
             </View>
 
-            <View style={styles.diffItem}>
-              <Text style={styles.diffLabel}>Objetivo</Text>
-              <Text style={styles.diffValue}>
+            <View style={s.diffItem}>
+              <Text style={s.diffLabel}>Objetivo</Text>
+              <Text style={s.diffValue}>
                 {Number.isInteger(desiredWeightKg) ? desiredWeightKg : desiredWeightKg.toFixed(1)} kg
               </Text>
             </View>
@@ -290,118 +299,33 @@ function RangeBar({
   minLabel,
   maxLabel,
   accent,
+  theme,
 }: {
   progress: number;
   minLabel: string;
   maxLabel: string;
   accent: string;
+  theme: FitnessTheme;
 }) {
   const clamped = Math.min(100, Math.max(0, progress));
   return (
     <View style={styles.rangeRow}>
-      <Text style={styles.rangeText}>{minLabel}</Text>
-      <View style={styles.rangeLine}>
+      <Text style={[styles.rangeText, { color: theme.muted }]}>{minLabel}</Text>
+      <View style={[styles.rangeLine, { backgroundColor: theme.cardMuted }]}>
         <View style={[styles.rangeFill, { width: `${clamped}%`, backgroundColor: accent }]} />
       </View>
-      <Text style={styles.rangeText}>{maxLabel}</Text>
+      <Text style={[styles.rangeText, { color: theme.muted }]}>{maxLabel}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    gap: 16,
-  },
-  goalPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    alignSelf: "flex-start",
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  goalPillText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-  },
-  card: {
-    backgroundColor: "#111219",
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    paddingVertical: 28,
-    paddingHorizontal: 24,
-    gap: 28,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  labelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  label: {
-    color: "#484B5E",
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
-    letterSpacing: 0.9,
-    textTransform: "uppercase",
-  },
-  counterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  adjBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "rgba(0,200,151,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(0,200,151,0.2)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  adjBtnDisabled: {
-    backgroundColor: "#0F1018",
-    borderColor: "rgba(255,255,255,0.04)",
-  },
-  valueWrap: {
-    alignItems: "center",
-    gap: 2,
-  },
-  bigNumber: {
-    color: "#FFFFFF",
-    fontFamily: "Manrope_800ExtraBold",
-    fontSize: 64,
-    lineHeight: 72,
-  },
-  bigNumberInput: {
-    color: "#FFFFFF",
-    fontFamily: "Manrope_800ExtraBold",
-    fontSize: 64,
-    lineHeight: 72,
-    textAlign: "center",
-    padding: 0,
-    minWidth: 100,
-  },
-  unitLabel: {
-    color: "#4B4E65",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    letterSpacing: 0.5,
-  },
   rangeRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
   },
   rangeText: {
-    color: "#3A3D58",
     fontFamily: "Inter_600SemiBold",
     fontSize: 12,
     minWidth: 24,
@@ -410,7 +334,6 @@ const styles = StyleSheet.create({
   rangeLine: {
     flex: 1,
     height: 3,
-    backgroundColor: "#1E2030",
     borderRadius: 999,
     overflow: "hidden",
   },
@@ -418,39 +341,126 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 999,
   },
-  diffCard: {
-    backgroundColor: "#111219",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    paddingVertical: 20,
-    paddingHorizontal: 18,
-  },
-  diffRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  diffItem: {
-    alignItems: "center",
-    gap: 6,
-    flex: 1,
-  },
-  diffArrowWrap: {
-    width: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  diffLabel: {
-    color: "#3E4259",
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    letterSpacing: 0.3,
-  },
-  diffValue: {
-    color: "#FFFFFF",
-    fontFamily: "Manrope_800ExtraBold",
-    fontSize: 20,
-    lineHeight: 24,
-  },
 });
+
+function getStyles(theme: FitnessTheme) {
+  return StyleSheet.create({
+    content: {
+      gap: 16,
+    },
+    goalPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      alignSelf: "flex-start",
+      borderRadius: 999,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+    },
+    goalPillText: {
+      fontFamily: "Inter_600SemiBold",
+      fontSize: 13,
+    },
+    card: {
+      backgroundColor: theme.card,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.stroke,
+      paddingVertical: 28,
+      paddingHorizontal: 24,
+      gap: 28,
+    },
+    cardHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    labelRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    label: {
+      color: theme.muted,
+      fontFamily: "Inter_700Bold",
+      fontSize: 12,
+      letterSpacing: 0.9,
+      textTransform: "uppercase",
+    },
+    counterRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    adjBtn: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: "rgba(0,200,151,0.08)",
+      borderWidth: 1,
+      borderColor: "rgba(0,200,151,0.2)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    valueWrap: {
+      alignItems: "center",
+      gap: 2,
+    },
+    bigNumber: {
+      color: theme.text,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 64,
+      lineHeight: 72,
+    },
+    bigNumberInput: {
+      color: theme.text,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 64,
+      lineHeight: 72,
+      textAlign: "center",
+      padding: 0,
+      minWidth: 100,
+    },
+    unitLabel: {
+      color: theme.muted,
+      fontFamily: "Inter_600SemiBold",
+      fontSize: 15,
+      letterSpacing: 0.5,
+    },
+    diffCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: theme.stroke,
+      paddingVertical: 20,
+      paddingHorizontal: 18,
+    },
+    diffRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    diffItem: {
+      alignItems: "center",
+      gap: 6,
+      flex: 1,
+    },
+    diffArrowWrap: {
+      width: 24,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    diffLabel: {
+      color: theme.muted,
+      fontFamily: "Inter_500Medium",
+      fontSize: 12,
+      letterSpacing: 0.3,
+    },
+    diffValue: {
+      color: theme.text,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 20,
+      lineHeight: 24,
+    },
+  });
+}

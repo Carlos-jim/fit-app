@@ -39,6 +39,7 @@ export class AuthService {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
+      plan: user.plan,
     };
   }
 
@@ -67,6 +68,7 @@ export class AuthService {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
+      plan: user.plan,
     };
   }
 
@@ -127,6 +129,7 @@ export class AuthService {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
+      plan: user.plan,
     };
   }
 }

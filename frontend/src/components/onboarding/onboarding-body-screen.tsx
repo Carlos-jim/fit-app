@@ -28,18 +28,24 @@ const FT_MAX = 7;
 type HeightUnit = "FT" | "CM";
 type WeightUnit = "LBS" | "KG";
 
+type VisualMode = "dark" | "light";
+
 interface OnboardingBodyProps {
   userId: string;
   theme: FitnessTheme;
+  visualMode: VisualMode;
   onBack: () => void;
   onNext: (weightKg: number) => void;
+  onToggleMode: () => void;
 }
 
 export function OnboardingBodyScreen({
   userId,
   theme,
+  visualMode,
   onBack,
   onNext,
+  onToggleMode,
 }: OnboardingBodyProps) {
   const [weightKg, setWeightKg] = useState(54);
   const [heightCm, setHeightCm] = useState(168);
@@ -294,15 +300,18 @@ export function OnboardingBodyScreen({
   const isEditingHeightFt = editingField === "heightFt";
   const isEditingHeightIn = editingField === "heightIn";
   const isEditingWeight = editingField === "weight";
+  const s = getStyles(theme);
 
   return (
     <OnboardingShell
       theme={theme}
+      visualMode={visualMode}
       step={STEP}
       totalSteps={TOTAL_STEPS}
       title="Altura y peso"
       subtitle="Calibramos tu plan personalizado con estos datos."
       onBack={onBack}
+      onToggleMode={onToggleMode}
       footer={
         <NextButton
           enabled
@@ -313,12 +322,12 @@ export function OnboardingBodyScreen({
         />
       }
     >
-      <View style={styles.fields}>
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.labelRow}>
+      <View style={s.fields}>
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <View style={s.labelRow}>
               <Ionicons name="resize-outline" size={15} color={accent} />
-              <Text style={styles.label}>ALTURA</Text>
+              <Text style={s.label}>ALTURA</Text>
             </View>
             <UnitToggle
               leftLabel="ft/in"
@@ -327,26 +336,28 @@ export function OnboardingBodyScreen({
               onPressLeft={() => setHeightUnit("FT")}
               onPressRight={() => setHeightUnit("CM")}
               accent={accent}
+              theme={theme}
             />
           </View>
 
           {heightUnit === "CM" ? (
-            <View style={styles.counterRow}>
+            <View style={s.counterRow}>
               <AdjButton
                 icon="remove"
                 accent={accent}
                 disabled={cmDecDisabled}
                 onPressIn={() => startHold(() => changeCm(-1))}
                 onPressOut={endHold}
+                theme={theme}
               />
               <Pressable
                 onPress={() => startEditing("heightCm", String(Math.round(heightCm)))}
-                style={styles.valueWrap}
+                style={s.valueWrap}
               >
                 {isEditingHeightCm ? (
                   <TextInput
                     ref={cmInputRef}
-                    style={styles.bigNumberInput}
+                    style={s.bigNumberInput}
                     value={draft}
                     onChangeText={setDraft}
                     onSubmitEditing={() => commitHeightCm(draft)}
@@ -360,14 +371,14 @@ export function OnboardingBodyScreen({
                 ) : (
                   <Animated.Text
                     style={[
-                      styles.bigNumber,
+                      s.bigNumber,
                       { transform: [{ scale: heightPulse }] },
                     ]}
                   >
                     {Math.round(heightCm)}
                   </Animated.Text>
                 )}
-                <Text style={styles.unitLabel}>cm</Text>
+                <Text style={s.unitLabel}>cm</Text>
               </Pressable>
               <AdjButton
                 icon="add"
@@ -375,11 +386,12 @@ export function OnboardingBodyScreen({
                 disabled={cmIncDisabled}
                 onPressIn={() => startHold(() => changeCm(1))}
                 onPressOut={endHold}
+                theme={theme}
               />
             </View>
           ) : (
-            <View style={styles.dualCounter}>
-              <View style={styles.dualItem}>
+            <View style={s.dualCounter}>
+              <View style={s.dualItem}>
                 <AdjButton
                   icon="remove"
                   size="sm"
@@ -387,15 +399,16 @@ export function OnboardingBodyScreen({
                   disabled={ftDecDisabled}
                   onPressIn={() => startHold(() => changeFt(-1))}
                   onPressOut={endHold}
+                  theme={theme}
                 />
                 <Pressable
                   onPress={() => startEditing("heightFt", String(heightFt))}
-                  style={styles.valueWrap}
+                  style={s.valueWrap}
                 >
                   {isEditingHeightFt ? (
                     <TextInput
                       ref={ftInputRef}
-                      style={styles.medNumberInput}
+                      style={s.medNumberInput}
                       value={draft}
                       onChangeText={setDraft}
                       onSubmitEditing={() => commitHeightFt(draft)}
@@ -409,14 +422,14 @@ export function OnboardingBodyScreen({
                   ) : (
                     <Animated.Text
                       style={[
-                        styles.medNumber,
+                        s.medNumber,
                         { transform: [{ scale: heightPulse }] },
                       ]}
                     >
                       {heightFt}
                     </Animated.Text>
                   )}
-                  <Text style={styles.unitSmall}>ft</Text>
+                  <Text style={s.unitSmall}>ft</Text>
                 </Pressable>
                 <AdjButton
                   icon="add"
@@ -425,14 +438,15 @@ export function OnboardingBodyScreen({
                   disabled={ftIncDisabled}
                   onPressIn={() => startHold(() => changeFt(1))}
                   onPressOut={endHold}
+                  theme={theme}
                 />
               </View>
 
-              <View style={styles.dualSepWrap}>
-                <Text style={styles.dualSep}>&#x2032;</Text>
+              <View style={s.dualSepWrap}>
+                <Text style={s.dualSep}>&#x2032;</Text>
               </View>
 
-              <View style={styles.dualItem}>
+              <View style={s.dualItem}>
                 <AdjButton
                   icon="remove"
                   size="sm"
@@ -440,15 +454,16 @@ export function OnboardingBodyScreen({
                   disabled={inDecDisabled}
                   onPressIn={() => startHold(() => changeIn(-1))}
                   onPressOut={endHold}
+                  theme={theme}
                 />
                 <Pressable
                   onPress={() => startEditing("heightIn", String(heightIn))}
-                  style={styles.valueWrap}
+                  style={s.valueWrap}
                 >
                   {isEditingHeightIn ? (
                     <TextInput
                       ref={inInputRef}
-                      style={styles.medNumberInput}
+                      style={s.medNumberInput}
                       value={draft}
                       onChangeText={setDraft}
                       onSubmitEditing={() => commitHeightIn(draft)}
@@ -462,14 +477,14 @@ export function OnboardingBodyScreen({
                   ) : (
                     <Animated.Text
                       style={[
-                        styles.medNumber,
+                        s.medNumber,
                         { transform: [{ scale: heightPulse }] },
                       ]}
                     >
                       {heightIn}
                     </Animated.Text>
                   )}
-                  <Text style={styles.unitSmall}>in</Text>
+                  <Text style={s.unitSmall}>in</Text>
                 </Pressable>
                 <AdjButton
                   icon="add"
@@ -478,6 +493,7 @@ export function OnboardingBodyScreen({
                   disabled={inIncDisabled}
                   onPressIn={() => startHold(() => changeIn(1))}
                   onPressOut={endHold}
+                  theme={theme}
                 />
               </View>
             </View>
@@ -488,14 +504,15 @@ export function OnboardingBodyScreen({
             minLabel={heightUnit === "CM" ? "140" : "4\u20197\""}
             maxLabel={heightUnit === "CM" ? "220" : "7\u20196\""}
             accent={accent}
+            theme={theme}
           />
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.labelRow}>
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <View style={s.labelRow}>
               <Ionicons name="fitness-outline" size={15} color={accent} />
-              <Text style={styles.label}>PESO</Text>
+              <Text style={s.label}>PESO</Text>
             </View>
             <UnitToggle
               leftLabel="lbs"
@@ -504,25 +521,27 @@ export function OnboardingBodyScreen({
               onPressLeft={() => setWeightUnit("LBS")}
               onPressRight={() => setWeightUnit("KG")}
               accent={accent}
+              theme={theme}
             />
           </View>
 
-          <View style={styles.counterRow}>
+          <View style={s.counterRow}>
             <AdjButton
               icon="remove"
               accent={accent}
               disabled={wDecDisabled}
               onPressIn={() => startHold(() => changeWeight(-1))}
               onPressOut={endHold}
+              theme={theme}
             />
             <Pressable
               onPress={() => startEditing("weight", String(displayWeight))}
-              style={styles.valueWrap}
+              style={s.valueWrap}
             >
               {isEditingWeight ? (
                 <TextInput
                   ref={weightInputRef}
-                  style={styles.bigNumberInput}
+                  style={s.bigNumberInput}
                   value={draft}
                   onChangeText={setDraft}
                   onSubmitEditing={() => commitWeight(draft)}
@@ -536,14 +555,14 @@ export function OnboardingBodyScreen({
               ) : (
                 <Animated.Text
                   style={[
-                    styles.bigNumber,
+                    s.bigNumber,
                     { transform: [{ scale: weightPulse }] },
                   ]}
                 >
                   {displayWeight}
                 </Animated.Text>
               )}
-              <Text style={styles.unitLabel}>
+              <Text style={s.unitLabel}>
                 {weightUnit === "KG" ? "kg" : "lbs"}
               </Text>
             </Pressable>
@@ -553,6 +572,7 @@ export function OnboardingBodyScreen({
               disabled={wIncDisabled}
               onPressIn={() => startHold(() => changeWeight(1))}
               onPressOut={endHold}
+              theme={theme}
             />
           </View>
 
@@ -561,6 +581,7 @@ export function OnboardingBodyScreen({
             minLabel={weightUnit === "KG" ? "40" : "88"}
             maxLabel={weightUnit === "KG" ? "200" : "440"}
             accent={accent}
+            theme={theme}
           />
         </View>
       </View>
@@ -575,6 +596,7 @@ function UnitToggle({
   onPressLeft,
   onPressRight,
   accent,
+  theme,
 }: {
   leftLabel: string;
   rightLabel: string;
@@ -582,9 +604,10 @@ function UnitToggle({
   onPressLeft: () => void;
   onPressRight: () => void;
   accent: string;
+  theme: FitnessTheme;
 }) {
   return (
-    <View style={styles.toggle}>
+    <View style={[styles.toggle, { backgroundColor: theme.background, borderColor: theme.stroke }]}>
       <Pressable
         onPress={onPressLeft}
         style={[
@@ -595,7 +618,8 @@ function UnitToggle({
         <Text
           style={[
             styles.toggleText,
-            activeSide === "left" && styles.toggleTextActive,
+            { color: theme.muted },
+            activeSide === "left" && { color: theme.background, fontFamily: "Inter_700Bold" },
           ]}
         >
           {leftLabel}
@@ -611,7 +635,8 @@ function UnitToggle({
         <Text
           style={[
             styles.toggleText,
-            activeSide === "right" && styles.toggleTextActive,
+            { color: theme.muted },
+            activeSide === "right" && { color: theme.background, fontFamily: "Inter_700Bold" },
           ]}
         >
           {rightLabel}
@@ -628,6 +653,7 @@ function AdjButton({
   onPressIn,
   onPressOut,
   size = "md",
+  theme,
 }: {
   icon: "add" | "remove";
   accent: string;
@@ -635,6 +661,7 @@ function AdjButton({
   onPressIn: () => void;
   onPressOut: () => void;
   size?: "sm" | "md";
+  theme: FitnessTheme;
 }) {
   const isSm = size === "sm";
   return (
@@ -645,13 +672,13 @@ function AdjButton({
       style={[
         styles.adjBtn,
         isSm && styles.adjBtnSm,
-        disabled && styles.adjBtnDisabled,
+        disabled && { backgroundColor: theme.cardMuted, borderColor: theme.stroke },
       ]}
     >
       <Ionicons
         name={icon}
         size={isSm ? 20 : 24}
-        color={disabled ? "#2E3148" : accent}
+        color={disabled ? theme.muted : accent}
       />
     </Pressable>
   );
@@ -662,127 +689,46 @@ function RangeBar({
   minLabel,
   maxLabel,
   accent,
+  theme,
 }: {
   progress: number;
   minLabel: string;
   maxLabel: string;
   accent: string;
+  theme: FitnessTheme;
 }) {
   const clamped = Math.min(100, Math.max(0, progress));
   return (
     <View style={styles.rangeRow}>
-      <Text style={styles.rangeText}>{minLabel}</Text>
-      <View style={styles.rangeLine}>
+      <Text style={[styles.rangeText, { color: theme.muted }]}>{minLabel}</Text>
+      <View style={[styles.rangeLine, { backgroundColor: theme.cardMuted }]}>
         <View
           style={[styles.rangeFill, { width: `${clamped}%`, backgroundColor: accent }]}
         />
       </View>
-      <Text style={styles.rangeText}>{maxLabel}</Text>
+      <Text style={[styles.rangeText, { color: theme.muted }]}>{maxLabel}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  fields: {
-    gap: 16,
-  },
-  card: {
-    backgroundColor: "#111219",
-    borderRadius: 24,
+  toggle: {
+    flexDirection: "row",
+    borderRadius: 999,
+    padding: 3,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    paddingVertical: 28,
-    paddingHorizontal: 24,
-    gap: 28,
   },
-  cardHeader: {
-    flexDirection: "row",
+  toggleBtn: {
+    minWidth: 48,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
   },
-  labelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  label: {
-    color: "#484B5E",
-    fontFamily: "Inter_700Bold",
+  toggleText: {
+    fontFamily: "Inter_600SemiBold",
     fontSize: 12,
-    letterSpacing: 0.9,
-    textTransform: "uppercase",
-  },
-  counterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  valueWrap: {
-    alignItems: "center",
-    gap: 2,
-  },
-  bigNumber: {
-    color: "#FFFFFF",
-    fontFamily: "Manrope_800ExtraBold",
-    fontSize: 64,
-    lineHeight: 72,
-  },
-  bigNumberInput: {
-    color: "#FFFFFF",
-    fontFamily: "Manrope_800ExtraBold",
-    fontSize: 64,
-    lineHeight: 72,
-    textAlign: "center",
-    padding: 0,
-    minWidth: 100,
-  },
-  unitLabel: {
-    color: "#4B4E65",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    letterSpacing: 0.5,
-  },
-  medNumber: {
-    color: "#FFFFFF",
-    fontFamily: "Manrope_800ExtraBold",
-    fontSize: 44,
-    lineHeight: 52,
-  },
-  medNumberInput: {
-    color: "#FFFFFF",
-    fontFamily: "Manrope_800ExtraBold",
-    fontSize: 44,
-    lineHeight: 52,
-    textAlign: "center",
-    padding: 0,
-    minWidth: 60,
-  },
-  unitSmall: {
-    color: "#4B4E65",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-  },
-  dualCounter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-  },
-  dualItem: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  dualSepWrap: {
-    width: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dualSep: {
-    color: "#3E4259",
-    fontFamily: "Manrope_800ExtraBold",
-    fontSize: 28,
   },
   adjBtn: {
     width: 56,
@@ -799,17 +745,12 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
   },
-  adjBtnDisabled: {
-    backgroundColor: "#0F1018",
-    borderColor: "rgba(255,255,255,0.04)",
-  },
   rangeRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
   },
   rangeText: {
-    color: "#3A3D58",
     fontFamily: "Inter_600SemiBold",
     fontSize: 12,
     minWidth: 24,
@@ -818,7 +759,6 @@ const styles = StyleSheet.create({
   rangeLine: {
     flex: 1,
     height: 3,
-    backgroundColor: "#1E2030",
     borderRadius: 999,
     overflow: "hidden",
   },
@@ -826,29 +766,110 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 999,
   },
-  toggle: {
-    flexDirection: "row",
-    backgroundColor: "#09090E",
-    borderRadius: 999,
-    padding: 3,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
-  },
-  toggleBtn: {
-    minWidth: 48,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  toggleText: {
-    color: "#3E4259",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-  },
-  toggleTextActive: {
-    color: "#09090E",
-    fontFamily: "Inter_700Bold",
-  },
 });
+
+function getStyles(theme: FitnessTheme) {
+  return StyleSheet.create({
+    fields: {
+      gap: 16,
+    },
+    card: {
+      backgroundColor: theme.card,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.stroke,
+      paddingVertical: 28,
+      paddingHorizontal: 24,
+      gap: 28,
+    },
+    cardHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    labelRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    label: {
+      color: theme.muted,
+      fontFamily: "Inter_700Bold",
+      fontSize: 12,
+      letterSpacing: 0.9,
+      textTransform: "uppercase",
+    },
+    counterRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    valueWrap: {
+      alignItems: "center",
+      gap: 2,
+    },
+    bigNumber: {
+      color: theme.text,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 64,
+      lineHeight: 72,
+    },
+    bigNumberInput: {
+      color: theme.text,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 64,
+      lineHeight: 72,
+      textAlign: "center",
+      padding: 0,
+      minWidth: 100,
+    },
+    unitLabel: {
+      color: theme.muted,
+      fontFamily: "Inter_600SemiBold",
+      fontSize: 15,
+      letterSpacing: 0.5,
+    },
+    medNumber: {
+      color: theme.text,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 44,
+      lineHeight: 52,
+    },
+    medNumberInput: {
+      color: theme.text,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 44,
+      lineHeight: 52,
+      textAlign: "center",
+      padding: 0,
+      minWidth: 60,
+    },
+    unitSmall: {
+      color: theme.muted,
+      fontFamily: "Inter_600SemiBold",
+      fontSize: 13,
+    },
+    dualCounter: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 4,
+    },
+    dualItem: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    dualSepWrap: {
+      width: 20,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    dualSep: {
+      color: theme.muted,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 28,
+    },
+  });
+}

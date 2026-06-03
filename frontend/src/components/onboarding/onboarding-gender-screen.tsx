@@ -42,18 +42,24 @@ const OPTIONS: {
   },
 ];
 
+type VisualMode = "dark" | "light";
+
 interface OnboardingGenderProps {
   userId: string;
   theme: FitnessTheme;
+  visualMode: VisualMode;
   onBack: () => void;
   onNext: () => void;
+  onToggleMode: () => void;
 }
 
 export function OnboardingGenderScreen({
   userId,
   theme,
+  visualMode,
   onBack,
   onNext,
+  onToggleMode,
 }: OnboardingGenderProps) {
   const [selected, setSelected] = useState<Gender | null>(null);
   const [loading, setLoading] = useState(false);
@@ -77,11 +83,13 @@ export function OnboardingGenderScreen({
   return (
     <OnboardingShell
       theme={theme}
+      visualMode={visualMode}
       step={STEP}
       totalSteps={TOTAL_STEPS}
       title="¿Cómo te identificas?"
       subtitle="Lo usamos para afinar estimaciones fisiológicas de base."
       onBack={onBack}
+      onToggleMode={onToggleMode}
       footer={
         <NextButton
           enabled={!!selected}

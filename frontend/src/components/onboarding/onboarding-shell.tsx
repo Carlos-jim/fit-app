@@ -14,25 +14,31 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { FitnessTheme } from "../fitness-ui";
 
+type VisualMode = "dark" | "light";
+
 interface OnboardingShellProps {
   theme: FitnessTheme;
+  visualMode: VisualMode;
   step: number;
   totalSteps: number;
   title: string;
   subtitle: string;
   onBack: () => void;
+  onToggleMode: () => void;
   children: ReactNode;
   footer: ReactNode;
   keyboardAware?: boolean;
 }
 
 export function OnboardingShell({
-  theme: _theme,
+  theme,
+  visualMode,
   step,
   totalSteps,
   title,
   subtitle,
   onBack,
+  onToggleMode,
   children,
   footer,
   keyboardAware = false,
@@ -69,28 +75,63 @@ export function OnboardingShell({
   }, [step, totalSteps]);
 
   const stepStr = `${String(step).padStart(2, "0")} / ${String(totalSteps).padStart(2, "0")}`;
+  const isDark = theme.background === "#050505";
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.background }]}
       behavior={keyboardAware && Platform.OS === "ios" ? "padding" : undefined}
     >
       {/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
         <Pressable
           onPress={onBack}
-          style={styles.backButton}
+          style={[
+            styles.backButton,
+            {
+              backgroundColor: isDark ? "#141520" : theme.cardMuted,
+              borderColor: isDark ? "rgba(255,255,255,0.07)" : theme.stroke,
+            },
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Volver"
           hitSlop={16}
         >
-          <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+          <Ionicons name="arrow-back" size={20} color={theme.text} />
         </Pressable>
-        <Text style={styles.stepCounter}>{stepStr}</Text>
+
+        <View style={styles.headerRight}>
+          <Text style={[styles.stepCounter, { color: theme.muted }]}>
+            {stepStr}
+          </Text>
+          <Pressable
+            onPress={onToggleMode}
+            style={[
+              styles.themeToggle,
+              {
+                backgroundColor: isDark ? "#141520" : theme.cardMuted,
+                borderColor: isDark ? "rgba(255,255,255,0.07)" : theme.stroke,
+              },
+            ]}
+            accessibilityLabel="Cambiar tema"
+            hitSlop={16}
+          >
+            <Ionicons
+              name={visualMode === "dark" ? "moon-outline" : "sunny-outline"}
+              size={18}
+              color={theme.text}
+            />
+          </Pressable>
+        </View>
       </View>
 
       {/* Progress bar */}
-      <View style={styles.progressTrack}>
+      <View
+        style={[
+          styles.progressTrack,
+          { backgroundColor: isDark ? "#181922" : theme.cardMuted },
+        ]}
+      >
         <Animated.View
           style={[
             styles.progressFill,
@@ -99,6 +140,7 @@ export function OnboardingShell({
                 inputRange: [0, 1],
                 outputRange: ["0%", "100%"],
               }),
+              backgroundColor: theme.accent,
             },
           ]}
         />
@@ -113,15 +155,15 @@ export function OnboardingShell({
         <Animated.View
           style={[styles.titleBlock, { opacity, transform: [{ translateY }] }]}
         >
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
+          <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
+          <Text style={[styles.subtitle, { color: theme.muted }]}>
+            {subtitle}
+          </Text>
         </Animated.View>
 
         <View style={styles.content}>{children}</View>
 
-        <View style={styles.footer}>
-          {footer}
-        </View>
+        <View style={styles.footer}>{footer}</View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -130,7 +172,6 @@ export function OnboardingShell({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#09090E",
   },
   header: {
     flexDirection: "row",
@@ -146,26 +187,34 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#141520",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
   stepCounter: {
     fontFamily: "Inter_700Bold",
     fontSize: 13,
     letterSpacing: 1.4,
-    color: "#3E4159",
+  },
+  themeToggle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
   },
   progressTrack: {
     height: 3,
-    backgroundColor: "#181922",
     borderRadius: 999,
     marginHorizontal: 20,
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
-    backgroundColor: "#00C897",
     borderRadius: 999,
   },
   scrollContent: {
@@ -178,14 +227,12 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   title: {
-    color: "#FFFFFF",
     fontFamily: "Manrope_800ExtraBold",
     fontSize: 30,
     lineHeight: 38,
   },
   subtitle: {
     marginTop: 8,
-    color: "#767894",
     fontFamily: "Inter_500Medium",
     fontSize: 15,
     lineHeight: 22,

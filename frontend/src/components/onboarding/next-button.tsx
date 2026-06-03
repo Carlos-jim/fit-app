@@ -60,17 +60,17 @@ export function NextButton({
           styles.button,
           isActive
             ? { backgroundColor: theme.accent }
-            : styles.buttonDisabled,
+            : { backgroundColor: theme.cardMuted, borderColor: theme.stroke },
           { transform: [{ scale }] },
         ]}
       >
         {loading ? (
-          <ActivityIndicator size="small" color={isActive ? "#0A0A0F" : "#3A3D52"} />
+          <ActivityIndicator size="small" color={isActive ? theme.background : theme.muted} />
         ) : (
           <Text
             style={[
               styles.text,
-              { color: isActive ? "#0A0A0F" : "#3A3D52" },
+              { color: isActive ? theme.background : theme.muted },
             ]}
           >
             {label}
@@ -87,11 +87,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-  },
-  buttonDisabled: {
-    backgroundColor: "#131520",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
   },
   text: {
     fontFamily: "Inter_700Bold",

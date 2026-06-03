@@ -1,7 +1,10 @@
+export type PlanType = "FREE" | "PRO" | "ULTRA";
+
 export interface BootstrapUserResponse {
   id: string;
   email: string;
   fullName?: string | null;
+  plan: PlanType;
 }
 
 export interface UploadMealImageResponse {

@@ -11,7 +11,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
@@ -22,24 +21,29 @@ import { env } from "../../config/env";
 
 WebBrowser.maybeCompleteAuthSession();
 
+type VisualMode = "dark" | "light";
+
 interface AuthScreenProps {
   theme: FitnessTheme;
-  onLoginSuccess: (user: { id: string; email: string; fullName?: string | null }) => void;
+  visualMode: VisualMode;
+  onLoginSuccess: (user: { id: string; email: string; fullName?: string | null; plan: string }) => void;
   onBack: () => void;
   onShowRegister: () => void;
+  onToggleMode: () => void;
 }
 
 export function AuthScreen({
   theme,
+  visualMode,
   onLoginSuccess,
   onBack,
   onShowRegister,
+  onToggleMode,
 }: AuthScreenProps) {
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const passwordRef = useRef<TextInput | null>(null);
 
   const [request, response, promptAsync] = Google.useAuthRequest({
@@ -82,13 +86,6 @@ export function AuthScreen({
 
   const darkMode = theme.background === "#050505";
   const canSubmit = email.trim().length > 4 && password.trim().length > 0;
-  const gradient: readonly [string, string, string] = darkMode
-    ? ["#061612", "#0A1F18", "#050505"]
-    : ["#FDF8EF", "#F2EADA", "#F7F4EE"];
-  const panelTone = darkMode ? "rgba(17,24,21,0.90)" : "rgba(255,255,255,0.88)";
-  const panelStroke = darkMode
-    ? "rgba(255,255,255,0.10)"
-    : "rgba(23,19,15,0.10)";
 
   const emailTrimmed = useMemo(() => email.trim().toLowerCase(), [email]);
 
@@ -134,117 +131,161 @@ export function AuthScreen({
       style={[styles.container, { backgroundColor: theme.background }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <LinearGradient colors={gradient} style={styles.container}>
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingTop: Math.max(insets.top, 16) }
+      <View style={styles.container}>
+        {/* Header Area */}
+        <View
+          style={[
+            styles.headerArea,
+            { paddingTop: Math.max(insets.top, 16) },
           ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
         >
           <Pressable
             onPress={onBack}
-            style={[styles.backButton, { backgroundColor: theme.cardMuted }]}
+            style={[styles.backButton, { top: Math.max(insets.top, 16) }]}
             accessibilityLabel="Volver"
           >
             <Ionicons name="arrow-back" size={20} color={theme.text} />
           </Pressable>
 
+          <Pressable
+            onPress={onToggleMode}
+            style={[styles.themeToggle, { top: Math.max(insets.top, 16) }]}
+            accessibilityLabel="Cambiar tema"
+          >
+            <Ionicons
+              name={visualMode === "dark" ? "moon-outline" : "sunny-outline"}
+              size={20}
+              color={theme.text}
+            />
+          </Pressable>
+
+          {/* Geometric shapes */}
           <View
             style={[
-              styles.panel,
-              { backgroundColor: panelTone, borderColor: panelStroke },
+              styles.shape,
+              styles.shape1,
+              {
+                backgroundColor: darkMode
+                  ? "rgba(255,255,255,0.03)"
+                  : "rgba(0,0,0,0.03)",
+              },
             ]}
+          />
+          <View
+            style={[
+              styles.shape,
+              styles.shape2,
+              {
+                backgroundColor: darkMode
+                  ? "rgba(255,255,255,0.02)"
+                  : "rgba(0,0,0,0.02)",
+              },
+            ]}
+          />
+          <View
+            style={[
+              styles.shape,
+              styles.shape3,
+              {
+                backgroundColor: darkMode
+                  ? "rgba(255,255,255,0.025)"
+                  : "rgba(0,0,0,0.025)",
+              },
+            ]}
+          />
+          <View
+            style={[
+              styles.shape,
+              styles.shape4,
+              {
+                backgroundColor: darkMode
+                  ? "rgba(0,200,151,0.06)"
+                  : "rgba(0,200,151,0.08)",
+              },
+            ]}
+          />
+
+          {/* Logo */}
+          <View style={styles.logoWrap}>
+            <View
+              style={[styles.logoBox, { backgroundColor: theme.text }]}
+            >
+              <Text
+                style={[styles.logoText, { color: theme.background }]}
+              >
+                B
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Form Card */}
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: darkMode ? "#111111" : "#FFFFFF" },
+          ]}
+        >
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
             <Text style={[styles.title, { color: theme.text }]}>
-              Bienvenido Otra Vez
+              Login
             </Text>
-            <Text style={[styles.subtitle, { color: theme.muted }]}>
-              Accede para continuar tu plan y tu progreso.
-            </Text>
-
-            <Pressable
-              style={[styles.socialButton, { backgroundColor: theme.cardMuted }]}
-              onPress={handleGoogleLogin}
-            >
-              <Ionicons name="logo-google" size={18} color="#DB4437" />
-              <Text style={[styles.socialButtonText, { color: theme.text }]}>
-                Continuar con Google
-              </Text>
-            </Pressable>
-
-            <View style={styles.divider}>
-              <View style={[styles.dividerLine, { backgroundColor: theme.stroke }]} />
-              <Text style={[styles.dividerText, { color: theme.muted }]}>o</Text>
-              <View style={[styles.dividerLine, { backgroundColor: theme.stroke }]} />
-            </View>
 
             <View style={styles.fields}>
               <View style={styles.fieldBlock}>
-                <Text style={[styles.fieldLabel, { color: theme.muted }]}>Correo</Text>
-                <View style={[styles.inputShell, { backgroundColor: theme.cardMuted }]}>
-                  <Ionicons name="mail-outline" size={16} color={theme.muted} />
-                  <TextInput
-                    style={[styles.input, { color: theme.text }]}
-                    placeholder="tu@email.com"
-                    placeholderTextColor={theme.muted}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="email"
-                    textContentType="emailAddress"
-                    value={email}
-                    onChangeText={setEmail}
-                    returnKeyType="next"
-                    onSubmitEditing={() => passwordRef.current?.focus()}
-                  />
-                </View>
+                <Text style={[styles.fieldLabel, { color: theme.muted }]}>
+                  Email
+                </Text>
+                <TextInput
+                  style={[styles.input, { color: theme.text }]}
+                  placeholder="tu@email.com"
+                  placeholderTextColor={theme.muted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                  value={email}
+                  onChangeText={setEmail}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                />
               </View>
 
               <View style={styles.fieldBlock}>
                 <Text style={[styles.fieldLabel, { color: theme.muted }]}>
                   Contrasena
                 </Text>
-                <View style={[styles.inputShell, { backgroundColor: theme.cardMuted }]}>
-                  <Ionicons
-                    name="lock-closed-outline"
-                    size={16}
-                    color={theme.muted}
-                  />
-                  <TextInput
-                    ref={passwordRef}
-                    style={[styles.input, { color: theme.text }]}
-                    placeholder="Tu contrasena"
-                    placeholderTextColor={theme.muted}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="password"
-                    textContentType="password"
-                    value={password}
-                    onChangeText={setPassword}
-                    returnKeyType="go"
-                    onSubmitEditing={handleEmailLogin}
-                  />
-                  <Pressable
-                    onPress={() => setShowPassword((current) => !current)}
-                    accessibilityLabel={showPassword ? "Ocultar contrasena" : "Ver contrasena"}
-                  >
-                    <Ionicons
-                      name={showPassword ? "eye-off-outline" : "eye-outline"}
-                      size={18}
-                      color={theme.muted}
-                    />
-                  </Pressable>
-                </View>
+                <TextInput
+                  ref={passwordRef}
+                  style={[styles.input, { color: theme.text }]}
+                  placeholder="Tu contrasena"
+                  placeholderTextColor={theme.muted}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="password"
+                  textContentType="password"
+                  value={password}
+                  onChangeText={setPassword}
+                  returnKeyType="go"
+                  onSubmitEditing={handleEmailLogin}
+                />
               </View>
             </View>
 
             <Pressable
               style={[
                 styles.primaryButton,
-                { backgroundColor: canSubmit ? theme.accent : theme.cardMuted },
+                {
+                  backgroundColor: canSubmit
+                    ? theme.accent
+                    : theme.cardMuted,
+                },
               ]}
               onPress={handleEmailLogin}
               disabled={loading || !canSubmit}
@@ -252,24 +293,46 @@ export function AuthScreen({
               <Text
                 style={[
                   styles.primaryButtonText,
-                  { color: canSubmit ? theme.background : theme.muted },
+                  {
+                    color: canSubmit ? "#FFFFFF" : theme.muted,
+                  },
                 ]}
               >
-                {loading ? "Ingresando..." : "Iniciar Sesion"}
+                {loading ? "Ingresando..." : "Log in"}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.socialButton,
+                { borderColor: theme.stroke },
+              ]}
+              onPress={handleGoogleLogin}
+            >
+              <Ionicons name="logo-google" size={18} color="#DB4437" />
+              <Text
+                style={[
+                  styles.socialButtonText,
+                  { color: theme.text },
+                ]}
+              >
+                Continuar con Google
               </Text>
             </Pressable>
 
             <Pressable onPress={onShowRegister} style={styles.linkWrap}>
               <Text style={[styles.linkText, { color: theme.muted }]}>
                 No tienes cuenta?{" "}
-                <Text style={[styles.linkAccent, { color: theme.accent }]}>
-                  Registrate
+                <Text
+                  style={[styles.linkAccent, { color: theme.accent }]}
+                >
+                  Sign Up
                 </Text>
               </Text>
             </Pressable>
-          </View>
-        </ScrollView>
-      </LinearGradient>
+          </ScrollView>
+        </View>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -278,93 +341,112 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-    gap: 14,
+  headerArea: {
+    height: "32%",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
   },
   backButton: {
+    position: "absolute",
+    left: 20,
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    zIndex: 10,
   },
-  panel: {
-    borderRadius: 28,
-    borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingTop: 20,
-    paddingBottom: 18,
+  themeToggle: {
+    position: "absolute",
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(128,128,128,0.12)",
+    zIndex: 10,
+  },
+  shape: {
+    position: "absolute",
+    borderRadius: 999,
+  },
+  shape1: {
+    width: 180,
+    height: 180,
+    top: 20,
+    left: -40,
+  },
+  shape2: {
+    width: 140,
+    height: 140,
+    top: 60,
+    right: -20,
+  },
+  shape3: {
+    width: 100,
+    height: 100,
+    bottom: 20,
+    left: 40,
+  },
+  shape4: {
+    width: 120,
+    height: 120,
+    top: 10,
+    right: 60,
+  },
+  logoWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoText: {
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 32,
+  },
+  card: {
+    flex: 1,
+    borderTopLeftRadius: 48,
+    paddingHorizontal: 28,
+    paddingTop: 32,
+    paddingBottom: 24,
+  },
+  scrollContent: {
+    gap: 24,
   },
   title: {
     fontFamily: "Manrope_800ExtraBold",
-    fontSize: 34,
-    lineHeight: 38,
-  },
-  subtitle: {
-    marginTop: 10,
-    fontFamily: "Inter_500Medium",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  socialButton: {
-    marginTop: 20,
-    borderRadius: 16,
-    minHeight: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-  socialButtonText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-  },
-  divider: {
-    marginTop: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
+    fontSize: 28,
+    textAlign: "center",
+    marginBottom: 8,
   },
   fields: {
-    marginTop: 16,
-    gap: 12,
+    gap: 20,
   },
   fieldBlock: {
     gap: 8,
   },
   fieldLabel: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-  },
-  inputShell: {
-    borderRadius: 14,
-    minHeight: 50,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+    fontSize: 13,
   },
   input: {
-    flex: 1,
     fontFamily: "Inter_500Medium",
     fontSize: 15,
-    paddingVertical: 0,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(128,128,128,0.2)",
   },
   primaryButton: {
-    marginTop: 22,
+    marginTop: 8,
     borderRadius: 16,
     minHeight: 54,
     alignItems: "center",
@@ -374,9 +456,22 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 16,
   },
-  linkWrap: {
-    marginTop: 16,
+  socialButton: {
+    borderRadius: 16,
+    minHeight: 52,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderWidth: 1,
+  },
+  socialButtonText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+  },
+  linkWrap: {
+    alignItems: "center",
+    paddingVertical: 8,
   },
   linkText: {
     fontFamily: "Inter_500Medium",

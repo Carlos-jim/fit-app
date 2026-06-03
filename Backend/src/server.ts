@@ -62,6 +62,7 @@ app.post("/users/bootstrap", async (req, res) => {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
+        plan: user.plan,
       },
     });
   } catch (error) {
@@ -454,6 +455,11 @@ app.use((_req, res) => {
 
 app.listen(env.PORT, () => {
   console.log(`Bioma backend listening on http://0.0.0.0:${env.PORT}`);
+  console.log("Registered routes:");
+  console.log("  POST /auth/register");
+  console.log("  POST /auth/login");
+  console.log("  POST /auth/google");
+  console.log("  POST /auth/logout");
 });
 
 function parseBody<TSchema extends z.ZodTypeAny>(

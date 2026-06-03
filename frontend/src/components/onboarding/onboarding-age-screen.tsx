@@ -18,18 +18,24 @@ const STEP = 6;
 const MIN_AGE = 13;
 const MAX_AGE = 100;
 
+type VisualMode = "dark" | "light";
+
 interface OnboardingAgeProps {
   userId: string;
   theme: FitnessTheme;
+  visualMode: VisualMode;
   onBack: () => void;
   onNext: () => void;
+  onToggleMode: () => void;
 }
 
 export function OnboardingAgeScreen({
   userId,
   theme,
+  visualMode,
   onBack,
   onNext,
+  onToggleMode,
 }: OnboardingAgeProps) {
   const [age, setAge] = useState(21);
   const [loading, setLoading] = useState(false);
@@ -60,7 +66,7 @@ export function OnboardingAgeScreen({
     changeAge(delta);
     timeoutTimer.current = setTimeout(() => {
       holdTimer.current = setInterval(() => changeAge(delta), 100);
-    }, 400); // Wait 400ms before starting rapid interval
+    }, 400);
   };
 
   const endHold = () => {
@@ -90,15 +96,18 @@ export function OnboardingAgeScreen({
   };
 
   const isMinor = age < 18;
+  const s = getStyles(theme);
 
   return (
     <OnboardingShell
       theme={theme}
+      visualMode={visualMode}
       step={STEP}
       totalSteps={TOTAL_STEPS}
       title="¿Cuántos años tienes?"
       subtitle="Lo usamos para definir objetivos y recomendaciones seguras."
       onBack={onBack}
+      onToggleMode={onToggleMode}
       footer={
         <NextButton
           label="Continuar"
@@ -109,11 +118,11 @@ export function OnboardingAgeScreen({
         />
       }
     >
-      <View style={styles.card}>
-        <View style={styles.counterRow}>
+      <View style={s.card}>
+        <View style={s.counterRow}>
           {/* Decrement */}
           <Pressable
-            style={[styles.adjBtn, age <= MIN_AGE && styles.adjBtnDisabled]}
+            style={[s.adjBtn, age <= MIN_AGE && { backgroundColor: theme.cardMuted, borderColor: theme.stroke }]}
             onPressIn={() => startHold(-1)}
             onPressOut={endHold}
             accessibilityLabel="Restar un año"
@@ -121,23 +130,23 @@ export function OnboardingAgeScreen({
             <Ionicons
               name="remove"
               size={26}
-              color={age <= MIN_AGE ? "#2E3148" : "#00C897"}
+              color={age <= MIN_AGE ? theme.muted : theme.accent}
             />
           </Pressable>
 
           {/* Display */}
-          <View style={styles.ageDisplay}>
+          <View style={s.ageDisplay}>
             <Animated.Text
-              style={[styles.ageNumber, { transform: [{ scale: pulse }] }]}
+              style={[s.ageNumber, { transform: [{ scale: pulse }] }]}
             >
               {age}
             </Animated.Text>
-            <Text style={styles.ageUnit}>años</Text>
+            <Text style={s.ageUnit}>años</Text>
           </View>
 
           {/* Increment */}
           <Pressable
-            style={[styles.adjBtn, age >= MAX_AGE && styles.adjBtnDisabled]}
+            style={[s.adjBtn, age >= MAX_AGE && { backgroundColor: theme.cardMuted, borderColor: theme.stroke }]}
             onPressIn={() => startHold(1)}
             onPressOut={endHold}
             accessibilityLabel="Sumar un año"
@@ -145,32 +154,33 @@ export function OnboardingAgeScreen({
             <Ionicons
               name="add"
               size={26}
-              color={age >= MAX_AGE ? "#2E3148" : "#00C897"}
+              color={age >= MAX_AGE ? theme.muted : theme.accent}
             />
           </Pressable>
         </View>
 
         {/* Range hint */}
-        <View style={styles.rangeRow}>
-          <Text style={styles.rangeText}>{MIN_AGE}</Text>
-          <View style={styles.rangeLine}>
+        <View style={s.rangeRow}>
+          <Text style={[s.rangeText, { color: theme.muted }]}>{MIN_AGE}</Text>
+          <View style={[s.rangeLine, { backgroundColor: theme.cardMuted }]}>
             <View
               style={[
-                styles.rangeFill,
+                s.rangeFill,
                 {
                   width: `${((age - MIN_AGE) / (MAX_AGE - MIN_AGE)) * 100}%`,
+                  backgroundColor: theme.accent,
                 },
               ]}
             />
           </View>
-          <Text style={styles.rangeText}>{MAX_AGE}</Text>
+          <Text style={[s.rangeText, { color: theme.muted }]}>{MAX_AGE}</Text>
         </View>
       </View>
 
       {isMinor ? (
-        <View style={styles.minorCard}>
+        <View style={[s.minorCard, { backgroundColor: "rgba(245,183,0,0.07)", borderColor: "rgba(245,183,0,0.2)" }]}>
           <Ionicons name="information-circle-outline" size={16} color="#F5B700" />
-          <Text style={styles.minorText}>
+          <Text style={s.minorText}>
             Si eres menor de edad, consulta con un profesional de salud antes de seguir un plan nutricional.
           </Text>
         </View>
@@ -179,91 +189,84 @@ export function OnboardingAgeScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: "#111219",
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    paddingVertical: 36,
-    paddingHorizontal: 24,
-    gap: 32,
-  },
-  counterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  adjBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "rgba(0,200,151,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(0,200,151,0.2)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  adjBtnDisabled: {
-    backgroundColor: "#0F1018",
-    borderColor: "rgba(255,255,255,0.04)",
-  },
-  ageDisplay: {
-    alignItems: "center",
-    gap: 2,
-  },
-  ageNumber: {
-    color: "#FFFFFF",
-    fontFamily: "Manrope_800ExtraBold",
-    fontSize: 72,
-    lineHeight: 80,
-  },
-  ageUnit: {
-    color: "#4B4E65",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    letterSpacing: 0.5,
-  },
-  rangeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  rangeText: {
-    color: "#3A3D58",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    minWidth: 24,
-    textAlign: "center",
-  },
-  rangeLine: {
-    flex: 1,
-    height: 3,
-    backgroundColor: "#1E2030",
-    borderRadius: 999,
-    overflow: "hidden",
-  },
-  rangeFill: {
-    height: "100%",
-    backgroundColor: "#00C897",
-    borderRadius: 999,
-  },
-  minorCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    backgroundColor: "rgba(245,183,0,0.07)",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(245,183,0,0.2)",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  minorText: {
-    flex: 1,
-    color: "#A08030",
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    lineHeight: 19,
-  },
-});
+function getStyles(theme: FitnessTheme) {
+  return StyleSheet.create({
+    card: {
+      backgroundColor: theme.card,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.stroke,
+      paddingVertical: 36,
+      paddingHorizontal: 24,
+      gap: 32,
+    },
+    counterRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    adjBtn: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: "rgba(0,200,151,0.08)",
+      borderWidth: 1,
+      borderColor: "rgba(0,200,151,0.2)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    ageDisplay: {
+      alignItems: "center",
+      gap: 2,
+    },
+    ageNumber: {
+      color: theme.text,
+      fontFamily: "Manrope_800ExtraBold",
+      fontSize: 72,
+      lineHeight: 80,
+    },
+    ageUnit: {
+      color: theme.muted,
+      fontFamily: "Inter_600SemiBold",
+      fontSize: 15,
+      letterSpacing: 0.5,
+    },
+    rangeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    rangeText: {
+      fontFamily: "Inter_600SemiBold",
+      fontSize: 12,
+      minWidth: 24,
+      textAlign: "center",
+    },
+    rangeLine: {
+      flex: 1,
+      height: 3,
+      borderRadius: 999,
+      overflow: "hidden",
+    },
+    rangeFill: {
+      height: "100%",
+      borderRadius: 999,
+    },
+    minorCard: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+      borderRadius: 14,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    minorText: {
+      flex: 1,
+      color: "#A08030",
+      fontFamily: "Inter_500Medium",
+      fontSize: 13,
+      lineHeight: 19,
+    },
+  });
+}

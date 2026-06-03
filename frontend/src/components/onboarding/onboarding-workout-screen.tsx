@@ -68,20 +68,26 @@ const OPTIONS: {
 
 const RECOMMENDED: WorkoutFrequency = "MEDIUM";
 
+type VisualMode = "dark" | "light";
+
 interface OnboardingWorkoutProps {
   userId: string;
   goal: GoalType;
   theme: FitnessTheme;
+  visualMode: VisualMode;
   onBack: () => void;
   onNext: () => void;
+  onToggleMode: () => void;
 }
 
 export function OnboardingWorkoutScreen({
   userId,
   goal: _goal,
   theme,
+  visualMode,
   onBack,
   onNext,
+  onToggleMode,
 }: OnboardingWorkoutProps) {
   const [selected, setSelected] = useState<WorkoutFrequency | null>(null);
   const [loading, setLoading] = useState(false);
@@ -102,14 +108,18 @@ export function OnboardingWorkoutScreen({
     }
   };
 
+  const s = getStyles(theme);
+
   return (
     <OnboardingShell
       theme={theme}
+      visualMode={visualMode}
       step={STEP}
       totalSteps={TOTAL_STEPS}
       title="¿A qué ritmo quieres avanzar?"
       subtitle="Calibramos tu plan según la velocidad de cambio que prefieres."
       onBack={onBack}
+      onToggleMode={onToggleMode}
       footer={
         <NextButton
           enabled={!!selected}
@@ -120,7 +130,7 @@ export function OnboardingWorkoutScreen({
         />
       }
     >
-      <View style={styles.list}>
+      <View style={s.list}>
         {OPTIONS.map((option) => {
           const isSelected = selected === option.value;
           const isRec = option.value === RECOMMENDED;
@@ -129,45 +139,45 @@ export function OnboardingWorkoutScreen({
               key={option.value}
               onPress={() => setSelected(option.value)}
               style={[
-                styles.card,
+                s.card,
                 isSelected && {
                   borderColor: option.accentBorder,
                   backgroundColor: option.iconBg,
                 },
               ]}
             >
-              <View style={styles.cardTop}>
-                <View style={[styles.iconCircle, { backgroundColor: option.iconBg }]}>
+              <View style={s.cardTop}>
+                <View style={[s.iconCircle, { backgroundColor: option.iconBg }]}>
                   <Ionicons name={option.icon} size={22} color={option.iconColor} />
                 </View>
                 {isRec && !isSelected ? (
-                  <View style={[styles.recPill, { backgroundColor: option.badgeBg }]}>
-                    <Text style={[styles.recPillText, { color: option.badgeColor }]}>
+                  <View style={[s.recPill, { backgroundColor: option.badgeBg }]}>
+                    <Text style={[s.recPillText, { color: option.badgeColor }]}>
                       Recomendado
                     </Text>
                   </View>
                 ) : null}
-                <View style={[styles.radioOuter, isSelected && { borderColor: option.iconColor }]}>
+                <View style={[s.radioOuter, isSelected && { borderColor: option.iconColor }]}>
                   {isSelected ? (
-                    <View style={[styles.radioDot, { backgroundColor: option.iconColor }]} />
+                    <View style={[s.radioDot, { backgroundColor: option.iconColor }]} />
                   ) : null}
                 </View>
               </View>
 
-              <View style={styles.cardBody}>
-                <Text style={[styles.cardLabel, isSelected && { color: "#FFFFFF" }]}>
+              <View style={s.cardBody}>
+                <Text style={[s.cardLabel, isSelected && { color: theme.text }]}>
                   {option.label}
                 </Text>
-                <Text style={styles.cardSubtitle}>{option.subtitle}</Text>
-                <Text style={[styles.cardDesc, isSelected && { color: "rgba(255,255,255,0.55)" }]}>
+                <Text style={s.cardSubtitle}>{option.subtitle}</Text>
+                <Text style={[s.cardDesc, isSelected && { color: theme.muted }]}>
                   {option.description}
                 </Text>
               </View>
 
               {isSelected ? (
-                <View style={[styles.badgeRow, { backgroundColor: option.badgeBg }]}>
+                <View style={[s.badgeRow, { backgroundColor: option.badgeBg }]}>
                   <Ionicons name="speedometer-outline" size={13} color={option.badgeColor} />
-                  <Text style={[styles.badgeText, { color: option.badgeColor }]}>
+                  <Text style={[s.badgeText, { color: option.badgeColor }]}>
                     {option.badge}
                   </Text>
                 </View>
@@ -180,95 +190,97 @@ export function OnboardingWorkoutScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  list: {
-    gap: 12,
-  },
-  card: {
-    backgroundColor: "#111219",
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.06)",
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    gap: 14,
-  },
-  cardTop: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-    flexShrink: 0,
-  },
-  recPill: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginRight: 10,
-    flexShrink: 0,
-  },
-  recPillText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 11,
-    letterSpacing: 0.4,
-  },
-  radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: "auto",
-    flexShrink: 0,
-  },
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  cardBody: {
-    gap: 4,
-    paddingLeft: 56,
-  },
-  cardLabel: {
-    color: "#8E92A8",
-    fontFamily: "Inter_700Bold",
-    fontSize: 17,
-    lineHeight: 22,
-  },
-  cardSubtitle: {
-    color: "#5A5E76",
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  cardDesc: {
-    color: "rgba(255,255,255,0.3)",
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    lineHeight: 18,
-    marginTop: 2,
-  },
-  badgeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginLeft: 56,
-  },
-  badgeText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
-});
+function getStyles(theme: FitnessTheme) {
+  return StyleSheet.create({
+    list: {
+      gap: 12,
+    },
+    card: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      borderWidth: 1.5,
+      borderColor: theme.stroke,
+      paddingVertical: 20,
+      paddingHorizontal: 20,
+      gap: 14,
+    },
+    cardTop: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    iconCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 12,
+      flexShrink: 0,
+    },
+    recPill: {
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      marginRight: 10,
+      flexShrink: 0,
+    },
+    recPillText: {
+      fontFamily: "Inter_600SemiBold",
+      fontSize: 11,
+      letterSpacing: 0.4,
+    },
+    radioOuter: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 2,
+      borderColor: theme.stroke,
+      alignItems: "center",
+      justifyContent: "center",
+      marginLeft: "auto",
+      flexShrink: 0,
+    },
+    radioDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+    },
+    cardBody: {
+      gap: 4,
+      paddingLeft: 56,
+    },
+    cardLabel: {
+      color: theme.muted,
+      fontFamily: "Inter_700Bold",
+      fontSize: 17,
+      lineHeight: 22,
+    },
+    cardSubtitle: {
+      color: theme.muted,
+      fontFamily: "Inter_500Medium",
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    cardDesc: {
+      color: theme.muted,
+      fontFamily: "Inter_400Regular",
+      fontSize: 13,
+      lineHeight: 18,
+      marginTop: 2,
+    },
+    badgeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      marginLeft: 56,
+    },
+    badgeText: {
+      fontFamily: "Inter_600SemiBold",
+      fontSize: 12,
+      letterSpacing: 0.2,
+    },
+  });
+}

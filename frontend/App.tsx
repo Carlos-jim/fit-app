@@ -549,7 +549,11 @@ function AppContent() {
   );
 
   const [activeTab, setActiveTab] = useState<AppTab>("home");
-  const [visualMode, setVisualMode] = useState<VisualMode>("dark");
+  const [visualMode, setVisualMode] = useState<VisualMode>("light");
+
+  const toggleVisualMode = () => {
+    setVisualMode((cur) => (cur === "light" ? "dark" : "light"));
+  };
   const [now, setNow] = useState(() => new Date());
   const [circadianCity, setCircadianCity] = useState<CircadianCity>(
     CIRCADIAN_CITIES[2],
@@ -560,6 +564,7 @@ function AppContent() {
   );
   const [email, setEmail] = useState(env.defaultEmail);
   const [fullName, setFullName] = useState(env.defaultName);
+  const [plan, setPlan] = useState<string>("FREE");
   const [mealLabel, setMealLabel] = useState("Almuerzo");
   const [mealDescription, setMealDescription] = useState(
     "Me comi una arepa con queso y dos huevos.",
@@ -1457,6 +1462,9 @@ function AppContent() {
       });
 
       setUserId(profile.id);
+      if (profile.plan) {
+        setPlan(profile.plan);
+      }
       setStatusMessage(
         `Perfil listo para ${profile.fullName ?? profile.email}.`,
       );
@@ -1541,11 +1549,14 @@ function AppContent() {
   };
 
   // ─── Auth handlers ───────────────────────────────────────────────
-  const handleAuthSuccess = (user: { id: string; email: string; fullName?: string | null }) => {
+  const handleAuthSuccess = (user: { id: string; email: string; fullName?: string | null; plan?: string }) => {
     setUserId(user.id);
     setEmail(user.email);
     if (user.fullName) {
       setFullName(user.fullName);
+    }
+    if (user.plan) {
+      setPlan(user.plan);
     }
     setAuthFlow("onboarding");
     setOnboardingStep("goal");
@@ -1564,11 +1575,13 @@ function AppContent() {
           <OnboardingGoalScreen
             userId={userId}
             theme={theme}
+            visualMode={visualMode}
             onBack={handleOnboardingBack}
             onNext={(goal) => {
               setOnboardingGoal(goal);
               handleOnboardingNext("workout");
             }}
+            onToggleMode={toggleVisualMode}
           />
         );
       case "workout":
@@ -1577,8 +1590,10 @@ function AppContent() {
             userId={userId}
             goal={onboardingGoal}
             theme={theme}
+            visualMode={visualMode}
             onBack={handleOnboardingBack}
             onNext={() => handleOnboardingNext("body")}
+            onToggleMode={toggleVisualMode}
           />
         );
       case "body":
@@ -1586,11 +1601,13 @@ function AppContent() {
           <OnboardingBodyScreen
             userId={userId}
             theme={theme}
+            visualMode={visualMode}
             onBack={handleOnboardingBack}
             onNext={(weightKg) => {
               setOnboardingWeightKg(weightKg);
               handleOnboardingNext("targetWeight");
             }}
+            onToggleMode={toggleVisualMode}
           />
         );
       case "targetWeight":
@@ -1600,8 +1617,10 @@ function AppContent() {
             goal={onboardingGoal}
             currentWeightKg={onboardingWeightKg}
             theme={theme}
+            visualMode={visualMode}
             onBack={handleOnboardingBack}
             onNext={() => handleOnboardingNext("gender")}
+            onToggleMode={toggleVisualMode}
           />
         );
       case "gender":
@@ -1609,8 +1628,10 @@ function AppContent() {
           <OnboardingGenderScreen
             userId={userId}
             theme={theme}
+            visualMode={visualMode}
             onBack={handleOnboardingBack}
             onNext={() => handleOnboardingNext("age")}
+            onToggleMode={toggleVisualMode}
           />
         );
       case "age":
@@ -1618,8 +1639,10 @@ function AppContent() {
           <OnboardingAgeScreen
             userId={userId}
             theme={theme}
+            visualMode={visualMode}
             onBack={handleOnboardingBack}
             onNext={() => handleOnboardingNext("country")}
+            onToggleMode={toggleVisualMode}
           />
         );
       case "country":
@@ -1627,8 +1650,10 @@ function AppContent() {
           <OnboardingCountryScreen
             userId={userId}
             theme={theme}
+            visualMode={visualMode}
             onBack={handleOnboardingBack}
             onFinish={handleOnboardingFinish}
+            onToggleMode={toggleVisualMode}
           />
         );
       default:
@@ -1816,8 +1841,10 @@ function AppContent() {
     return (
       <WelcomeScreen
         theme={theme}
+        visualMode={visualMode}
         onContinue={handleWelcomeContinue}
         onLogin={() => setAuthFlow("login")}
+        onToggleMode={toggleVisualMode}
         loading={bootstrapLoading}
       />
     );
@@ -1827,9 +1854,11 @@ function AppContent() {
     return (
       <AuthScreen
         theme={theme}
+        visualMode={visualMode}
         onLoginSuccess={handleAuthSuccess}
         onBack={() => setAuthFlow("welcome")}
         onShowRegister={() => setAuthFlow("register")}
+        onToggleMode={toggleVisualMode}
       />
     );
   }
@@ -1838,9 +1867,11 @@ function AppContent() {
     return (
       <RegisterScreen
         theme={theme}
+        visualMode={visualMode}
         onRegisterSuccess={handleAuthSuccess}
         onBack={() => setAuthFlow("welcome")}
         onShowLogin={() => setAuthFlow("login")}
+        onToggleMode={toggleVisualMode}
       />
     );
   }

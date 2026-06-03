@@ -27,6 +27,7 @@ export function OnboardingOptionCard<T extends string>({
   subtitle,
   selected,
   onPress,
+  theme,
   icon,
   iconColor = "#00C897",
   iconBg = "rgba(0,200,151,0.12)",
@@ -34,7 +35,14 @@ export function OnboardingOptionCard<T extends string>({
   return (
     <Pressable
       onPress={() => onPress(option.value)}
-      style={[styles.card, selected && styles.cardSelected]}
+      style={[
+        styles.card,
+        { backgroundColor: theme.card, borderColor: theme.stroke },
+        selected && {
+          backgroundColor: "rgba(0,200,151,0.07)",
+          borderColor: "rgba(0,200,151,0.45)",
+        },
+      ]}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       accessibilityLabel={option.label}
@@ -46,13 +54,22 @@ export function OnboardingOptionCard<T extends string>({
       ) : null}
 
       <View style={styles.textBlock}>
-        <Text style={[styles.label, selected && styles.labelSelected]}>
+        <Text style={[styles.label, { color: theme.muted }, selected && { color: theme.text }]}>
           {option.label}
         </Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        {subtitle ? <Text style={[styles.subtitle, { color: theme.muted }]}>{subtitle}</Text> : null}
       </View>
 
-      <View style={[styles.radio, selected && styles.radioSelected]}>
+      <View
+        style={[
+          styles.radio,
+          { borderColor: theme.stroke },
+          selected && {
+            borderColor: "#00C897",
+            backgroundColor: "rgba(0,200,151,0.1)",
+          },
+        ]}
+      >
         {selected ? <View style={styles.radioDot} /> : null}
       </View>
     </Pressable>
@@ -64,17 +81,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    backgroundColor: "#111219",
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
     paddingVertical: 18,
     paddingHorizontal: 18,
     minHeight: 72,
-  },
-  cardSelected: {
-    backgroundColor: "rgba(0,200,151,0.07)",
-    borderColor: "rgba(0,200,151,0.45)",
   },
   iconBox: {
     width: 44,
@@ -89,15 +100,10 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   label: {
-    color: "#8E92A8",
     fontFamily: "Inter_700Bold",
     fontSize: 16,
   },
-  labelSelected: {
-    color: "#FFFFFF",
-  },
   subtitle: {
-    color: "#474B64",
     fontFamily: "Inter_500Medium",
     fontSize: 13,
     lineHeight: 18,
@@ -107,14 +113,9 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.12)",
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-  },
-  radioSelected: {
-    borderColor: "#00C897",
-    backgroundColor: "rgba(0,200,151,0.1)",
   },
   radioDot: {
     width: 10,

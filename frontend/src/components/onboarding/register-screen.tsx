@@ -11,7 +11,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
@@ -22,28 +21,34 @@ import { env } from "../../config/env";
 
 WebBrowser.maybeCompleteAuthSession();
 
+type VisualMode = "dark" | "light";
+
 interface RegisterScreenProps {
   theme: FitnessTheme;
+  visualMode: VisualMode;
   onRegisterSuccess: (user: { id: string; email: string; fullName?: string | null }) => void;
   onBack: () => void;
   onShowLogin: () => void;
+  onToggleMode: () => void;
 }
 
 export function RegisterScreen({
   theme,
+  visualMode,
   onRegisterSuccess,
   onBack,
   onShowLogin,
+  onToggleMode,
 }: RegisterScreenProps) {
   const insets = useSafeAreaInsets();
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const lastNameRef = useRef<TextInput | null>(null);
   const emailRef = useRef<TextInput | null>(null);
   const passwordRef = useRef<TextInput | null>(null);
   const confirmRef = useRef<TextInput | null>(null);
@@ -99,18 +104,12 @@ export function RegisterScreen({
   };
 
   const darkMode = theme.background === "#050505";
-  const gradient: readonly [string, string, string] = darkMode
-    ? ["#061612", "#0A1F18", "#050505"]
-    : ["#FDF8EF", "#F2EADA", "#F7F4EE"];
-  const panelTone = darkMode ? "rgba(17,24,21,0.90)" : "rgba(255,255,255,0.88)";
-  const panelStroke = darkMode
-    ? "rgba(255,255,255,0.10)"
-    : "rgba(23,19,15,0.10)";
 
   const emailTrimmed = useMemo(() => email.trim().toLowerCase(), [email]);
   const passwordTrimmed = useMemo(() => password.trim(), [password]);
   const canSubmit =
-    name.trim().length >= 2 &&
+    firstName.trim().length >= 1 &&
+    lastName.trim().length >= 1 &&
     emailTrimmed.length > 4 &&
     passwordTrimmed.length >= 6 &&
     confirmPassword.trim().length >= 6;
@@ -125,11 +124,13 @@ export function RegisterScreen({
       return;
     }
 
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+
     console.log("[Register] Starting Email Registration for:", emailTrimmed);
     setLoading(true);
     try {
       const result = await biomaApi.registerWithEmail({
-        name: name.trim(),
+        name: fullName,
         email: emailTrimmed,
         password: passwordTrimmed,
       });
@@ -151,109 +152,207 @@ export function RegisterScreen({
       style={[styles.container, { backgroundColor: theme.background }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <LinearGradient colors={gradient} style={styles.container}>
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingTop: Math.max(insets.top, 16) }
+      <View style={styles.container}>
+        {/* Header Area */}
+        <View
+          style={[
+            styles.headerArea,
+            { paddingTop: Math.max(insets.top, 16) },
           ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
         >
           <Pressable
             onPress={onBack}
-            style={[styles.backButton, { backgroundColor: theme.cardMuted }]}
+            style={[styles.backButton, { top: Math.max(insets.top, 16) }]}
             accessibilityLabel="Volver"
           >
             <Ionicons name="arrow-back" size={20} color={theme.text} />
           </Pressable>
 
+          <Pressable
+            onPress={onToggleMode}
+            style={[styles.themeToggle, { top: Math.max(insets.top, 16) }]}
+            accessibilityLabel="Cambiar tema"
+          >
+            <Ionicons
+              name={visualMode === "dark" ? "moon-outline" : "sunny-outline"}
+              size={20}
+              color={theme.text}
+            />
+          </Pressable>
+
+          <Text style={[styles.headerTitle, { color: theme.text }]}>
+            Sign Up
+          </Text>
+
+          {/* Geometric shapes */}
           <View
             style={[
-              styles.panel,
-              { backgroundColor: panelTone, borderColor: panelStroke },
+              styles.shape,
+              styles.shape1,
+              {
+                backgroundColor: darkMode
+                  ? "rgba(255,255,255,0.03)"
+                  : "rgba(0,0,0,0.03)",
+              },
             ]}
+          />
+          <View
+            style={[
+              styles.shape,
+              styles.shape2,
+              {
+                backgroundColor: darkMode
+                  ? "rgba(255,255,255,0.02)"
+                  : "rgba(0,0,0,0.02)",
+              },
+            ]}
+          />
+          <View
+            style={[
+              styles.shape,
+              styles.shape3,
+              {
+                backgroundColor: darkMode
+                  ? "rgba(255,255,255,0.025)"
+                  : "rgba(0,0,0,0.025)",
+              },
+            ]}
+          />
+          <View
+            style={[
+              styles.shape,
+              styles.shape4,
+              {
+                backgroundColor: darkMode
+                  ? "rgba(0,200,151,0.06)"
+                  : "rgba(0,200,151,0.08)",
+              },
+            ]}
+          />
+        </View>
+
+        {/* Form Card */}
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: darkMode ? "#111111" : "#FFFFFF" },
+          ]}
+        >
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            <Text style={[styles.title, { color: theme.text }]}>Crear Cuenta</Text>
-            <Text style={[styles.subtitle, { color: theme.muted }]}>
-              Activa tu perfil y empieza tu onboarding en menos de dos minutos.
-            </Text>
-
-            <Pressable
-              style={[styles.socialButton, { backgroundColor: theme.cardMuted }]}
-              onPress={handleGoogleLogin}
-            >
-              <Ionicons name="logo-google" size={18} color="#DB4437" />
-              <Text style={[styles.socialButtonText, { color: theme.text }]}>
-                Registrarte con Google
-              </Text>
-            </Pressable>
-
-            <View style={styles.divider}>
-              <View style={[styles.dividerLine, { backgroundColor: theme.stroke }]} />
-              <Text style={[styles.dividerText, { color: theme.muted }]}>o</Text>
-              <View style={[styles.dividerLine, { backgroundColor: theme.stroke }]} />
-            </View>
-
             <View style={styles.fields}>
-              <Field
-                label="Nombre"
-                theme={theme}
-                icon="person-outline"
-                value={name}
-                onChangeText={setName}
-                placeholder="Tu nombre"
-                returnKeyType="next"
-                onSubmitEditing={() => emailRef.current?.focus()}
-              />
-              <Field
-                inputRef={emailRef}
-                label="Correo"
-                theme={theme}
-                icon="mail-outline"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="tu@email.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="email"
-                textContentType="emailAddress"
-                returnKeyType="next"
-                onSubmitEditing={() => passwordRef.current?.focus()}
-              />
-              <PasswordField
-                inputRef={passwordRef}
-                label="Contrasena"
-                theme={theme}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Minimo 6 caracteres"
-                showPassword={showPassword}
-                onTogglePassword={() => setShowPassword((current) => !current)}
-                returnKeyType="next"
-                onSubmitEditing={() => confirmRef.current?.focus()}
-              />
-              <PasswordField
-                inputRef={confirmRef}
-                label="Confirmar Contrasena"
-                theme={theme}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                placeholder="Repite tu contrasena"
-                showPassword={showConfirmPassword}
-                onTogglePassword={() =>
-                  setShowConfirmPassword((current) => !current)
-                }
-                returnKeyType="go"
-                onSubmitEditing={handleRegister}
-              />
+              <View style={styles.fieldBlock}>
+                <Text style={[styles.fieldLabel, { color: theme.muted }]}>
+                  First name
+                </Text>
+                <TextInput
+                  style={[styles.input, { color: theme.text }]}
+                  placeholder="Tu nombre"
+                  placeholderTextColor={theme.muted}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  textContentType="givenName"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  returnKeyType="next"
+                  onSubmitEditing={() => lastNameRef.current?.focus()}
+                />
+              </View>
+
+              <View style={styles.fieldBlock}>
+                <Text style={[styles.fieldLabel, { color: theme.muted }]}>
+                  Last name
+                </Text>
+                <TextInput
+                  ref={lastNameRef}
+                  style={[styles.input, { color: theme.text }]}
+                  placeholder="Tu apellido"
+                  placeholderTextColor={theme.muted}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  textContentType="familyName"
+                  value={lastName}
+                  onChangeText={setLastName}
+                  returnKeyType="next"
+                  onSubmitEditing={() => emailRef.current?.focus()}
+                />
+              </View>
+
+              <View style={styles.fieldBlock}>
+                <Text style={[styles.fieldLabel, { color: theme.muted }]}>
+                  Email
+                </Text>
+                <TextInput
+                  ref={emailRef}
+                  style={[styles.input, { color: theme.text }]}
+                  placeholder="tu@email.com"
+                  placeholderTextColor={theme.muted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                  value={email}
+                  onChangeText={setEmail}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                />
+              </View>
+
+              <View style={styles.fieldBlock}>
+                <Text style={[styles.fieldLabel, { color: theme.muted }]}>
+                  Password
+                </Text>
+                <TextInput
+                  ref={passwordRef}
+                  style={[styles.input, { color: theme.text }]}
+                  placeholder="Minimo 6 caracteres"
+                  placeholderTextColor={theme.muted}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="password"
+                  textContentType="newPassword"
+                  value={password}
+                  onChangeText={setPassword}
+                  returnKeyType="next"
+                  onSubmitEditing={() => confirmRef.current?.focus()}
+                />
+              </View>
+
+              <View style={styles.fieldBlock}>
+                <Text style={[styles.fieldLabel, { color: theme.muted }]}>
+                  Confirm password
+                </Text>
+                <TextInput
+                  ref={confirmRef}
+                  style={[styles.input, { color: theme.text }]}
+                  placeholder="Repite tu contrasena"
+                  placeholderTextColor={theme.muted}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="password"
+                  textContentType="newPassword"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  returnKeyType="go"
+                  onSubmitEditing={handleRegister}
+                />
+              </View>
             </View>
 
             <Pressable
               style={[
                 styles.primaryButton,
-                { backgroundColor: canSubmit ? theme.accent : theme.cardMuted },
+                {
+                  backgroundColor: canSubmit
+                    ? theme.accent
+                    : theme.cardMuted,
+                },
               ]}
               onPress={handleRegister}
               disabled={loading || !canSubmit}
@@ -261,98 +360,47 @@ export function RegisterScreen({
               <Text
                 style={[
                   styles.primaryButtonText,
-                  { color: canSubmit ? theme.background : theme.muted },
+                  {
+                    color: canSubmit ? "#FFFFFF" : theme.muted,
+                  },
                 ]}
               >
-                {loading ? "Creando Cuenta..." : "Crear Cuenta"}
+                {loading ? "Creando Cuenta..." : "Sign Up"}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.socialButton,
+                { borderColor: theme.stroke },
+              ]}
+              onPress={handleGoogleLogin}
+            >
+              <Ionicons name="logo-google" size={18} color="#DB4437" />
+              <Text
+                style={[
+                  styles.socialButtonText,
+                  { color: theme.text },
+                ]}
+              >
+                Registrarte con Google
               </Text>
             </Pressable>
 
             <Pressable onPress={onShowLogin} style={styles.linkWrap}>
               <Text style={[styles.linkText, { color: theme.muted }]}>
                 Ya tienes cuenta?{" "}
-                <Text style={[styles.linkAccent, { color: theme.accent }]}>
-                  Inicia sesion
+                <Text
+                  style={[styles.linkAccent, { color: theme.accent }]}
+                >
+                  Sign In
                 </Text>
               </Text>
             </Pressable>
-          </View>
-        </ScrollView>
-      </LinearGradient>
+          </ScrollView>
+        </View>
+      </View>
     </KeyboardAvoidingView>
-  );
-}
-
-function Field({
-  inputRef,
-  label,
-  theme,
-  icon,
-  ...inputProps
-}: {
-  inputRef?: React.RefObject<TextInput | null>;
-  label: string;
-  theme: FitnessTheme;
-  icon: React.ComponentProps<typeof Ionicons>["name"];
-} & React.ComponentProps<typeof TextInput>) {
-  return (
-    <View style={styles.fieldBlock}>
-      <Text style={[styles.fieldLabel, { color: theme.muted }]}>{label}</Text>
-      <View style={[styles.inputShell, { backgroundColor: theme.cardMuted }]}>
-        <Ionicons name={icon} size={16} color={theme.muted} />
-        <TextInput
-          ref={inputRef}
-          style={[styles.input, { color: theme.text }]}
-          placeholderTextColor={theme.muted}
-          {...inputProps}
-        />
-      </View>
-    </View>
-  );
-}
-
-function PasswordField({
-  inputRef,
-  label,
-  theme,
-  showPassword,
-  onTogglePassword,
-  ...inputProps
-}: {
-  inputRef?: React.RefObject<TextInput | null>;
-  label: string;
-  theme: FitnessTheme;
-  showPassword: boolean;
-  onTogglePassword: () => void;
-} & React.ComponentProps<typeof TextInput>) {
-  return (
-    <View style={styles.fieldBlock}>
-      <Text style={[styles.fieldLabel, { color: theme.muted }]}>{label}</Text>
-      <View style={[styles.inputShell, { backgroundColor: theme.cardMuted }]}>
-        <Ionicons name="lock-closed-outline" size={16} color={theme.muted} />
-        <TextInput
-          ref={inputRef}
-          style={[styles.input, { color: theme.text }]}
-          placeholderTextColor={theme.muted}
-          secureTextEntry={!showPassword}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="password"
-          textContentType="password"
-          {...inputProps}
-        />
-        <Pressable
-          onPress={onTogglePassword}
-          accessibilityLabel={showPassword ? "Ocultar contrasena" : "Ver contrasena"}
-        >
-          <Ionicons
-            name={showPassword ? "eye-off-outline" : "eye-outline"}
-            size={18}
-            color={theme.muted}
-          />
-        </Pressable>
-      </View>
-    </View>
   );
 }
 
@@ -360,93 +408,97 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-    gap: 14,
+  headerArea: {
+    height: "22%",
+    justifyContent: "center",
+    alignItems: "flex-start",
+    paddingHorizontal: 28,
+    position: "relative",
   },
   backButton: {
+    position: "absolute",
+    left: 20,
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    zIndex: 10,
   },
-  panel: {
-    borderRadius: 28,
-    borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingTop: 20,
-    paddingBottom: 18,
-  },
-  title: {
-    fontFamily: "Manrope_800ExtraBold",
-    fontSize: 34,
-    lineHeight: 38,
-  },
-  subtitle: {
-    marginTop: 10,
-    fontFamily: "Inter_500Medium",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  socialButton: {
-    marginTop: 20,
-    borderRadius: 16,
-    minHeight: 52,
-    flexDirection: "row",
+  themeToggle: {
+    position: "absolute",
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
+    backgroundColor: "rgba(128,128,128,0.12)",
+    zIndex: 10,
   },
-  socialButtonText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
+  headerTitle: {
+    fontFamily: "Manrope_800ExtraBold",
+    fontSize: 28,
+    marginTop: 8,
   },
-  divider: {
-    marginTop: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+  shape: {
+    position: "absolute",
+    borderRadius: 999,
   },
-  dividerLine: {
+  shape1: {
+    width: 180,
+    height: 180,
+    top: 10,
+    right: -60,
+  },
+  shape2: {
+    width: 140,
+    height: 140,
+    top: 40,
+    right: 60,
+  },
+  shape3: {
+    width: 100,
+    height: 100,
+    bottom: 10,
+    right: 20,
+  },
+  shape4: {
+    width: 120,
+    height: 120,
+    top: 0,
+    right: 120,
+  },
+  card: {
     flex: 1,
-    height: 1,
+    borderTopLeftRadius: 48,
+    paddingHorizontal: 28,
+    paddingTop: 32,
+    paddingBottom: 24,
   },
-  dividerText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
+  scrollContent: {
+    gap: 24,
   },
   fields: {
-    marginTop: 16,
-    gap: 12,
+    gap: 20,
   },
   fieldBlock: {
     gap: 8,
   },
   fieldLabel: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-  },
-  inputShell: {
-    borderRadius: 14,
-    minHeight: 50,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+    fontSize: 13,
   },
   input: {
-    flex: 1,
     fontFamily: "Inter_500Medium",
     fontSize: 15,
-    paddingVertical: 0,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(128,128,128,0.2)",
   },
   primaryButton: {
-    marginTop: 22,
+    marginTop: 8,
     borderRadius: 16,
     minHeight: 54,
     alignItems: "center",
@@ -456,9 +508,22 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 16,
   },
-  linkWrap: {
-    marginTop: 16,
+  socialButton: {
+    borderRadius: 16,
+    minHeight: 52,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderWidth: 1,
+  },
+  socialButtonText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+  },
+  linkWrap: {
+    alignItems: "center",
+    paddingVertical: 8,
   },
   linkText: {
     fontFamily: "Inter_500Medium",

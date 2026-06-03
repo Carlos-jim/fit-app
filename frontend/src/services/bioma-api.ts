@@ -113,17 +113,30 @@ class BiomaApi {
     imageUri: string,
     headers: Record<string, string>,
   ): Promise<void> {
-    const imageResponse = await fetch(imageUri);
-    const blob = await imageResponse.blob();
+    console.log("[API Request] PUT uploadImageToStorage", { uploadUrl, imageUri });
 
-    const response = await fetch(uploadUrl, {
-      method: "PUT",
-      headers,
-      body: blob,
-    });
+    try {
+      const imageResponse = await fetch(imageUri);
+      const blob = await imageResponse.blob();
 
-    if (!response.ok) {
-      throw new Error(`Storage upload failed with status ${response.status}.`);
+      const response = await fetch(uploadUrl, {
+        method: "PUT",
+        headers,
+        body: blob,
+      });
+
+      if (!response.ok) {
+        console.error(
+          `[API Error] PUT uploadImageToStorage | Status: ${response.status}`,
+          { uploadUrl, imageUri },
+        );
+        throw new Error(`Storage upload failed with status ${response.status}.`);
+      }
+
+      console.log("[API Response] PUT uploadImageToStorage | Status:", response.status);
+    } catch (error) {
+      console.error("[API Error] PUT uploadImageToStorage:", error);
+      throw error;
     }
   }
 
@@ -348,37 +361,61 @@ class BiomaApi {
     init: RequestInit,
   ): Promise<ApiEnvelope<T>> {
     if (!env.apiBaseUrl) {
+      console.error("[API Error] EXPO_PUBLIC_API_BASE_URL is not configured.");
       throw new Error("EXPO_PUBLIC_API_BASE_URL is not configured.");
     }
 
-    console.log(`[API Request] ${init.method ?? "GET"} ${path}`, init.body ? JSON.parse(init.body as string) : "");
+    const url = `${env.apiBaseUrl}${path}`;
+    const method = (init.method ?? "GET").toUpperCase();
+    const bodyData = init.body ? JSON.parse(init.body as string) : null;
 
-    const response = await fetch(`${env.apiBaseUrl}${path}`, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(init.headers ?? {}),
-      },
-    });
+    console.log(`[API Request] ${method} ${url}`, bodyData ? { body: bodyData } : "");
 
-    const text = await response.text();
-    const payload = text ? (JSON.parse(text) as ApiEnvelope<T>) : null;
+    try {
+      const response = await fetch(url, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          ...(init.headers ?? {}),
+        },
+      });
 
-    if (!response.ok) {
-      console.error(`[API Error] ${init.method ?? "GET"} ${path}:`, payload?.message ?? response.status);
-      throw new Error(
-        payload?.message ?? `Request failed with status ${response.status}.`,
-      );
+      const text = await response.text();
+      let payload: ApiEnvelope<T> | null = null;
+
+      try {
+        payload = text ? (JSON.parse(text) as ApiEnvelope<T>) : null;
+      } catch (parseError) {
+        console.error(`[API Error] ${method} ${path}: Failed to parse JSON response. Raw text:`, text);
+        throw new Error(`Invalid JSON response from ${path}: ${text}`);
+      }
+
+      if (!response.ok) {
+        console.error(
+          `[API Error] ${method} ${path} | Status: ${response.status}`,
+          { error: payload?.error, message: payload?.message, body: payload?.data },
+        );
+        throw new Error(
+          payload?.message ?? `Request failed with status ${response.status}.`,
+        );
+      }
+
+      if (!payload) {
+        console.error(`[API Error] ${method} ${path}: Empty response body`);
+        throw new Error("Empty API response.");
+      }
+
+      console.log(`[API Response] ${method} ${path} | Status: ${response.status}`, { data: payload.data });
+
+      return payload;
+    } catch (error) {
+      if (error instanceof TypeError) {
+        console.error(`[API Network Error] ${method} ${path}:`, error.message);
+      } else if (error instanceof Error) {
+        console.error(`[API Error] ${method} ${path}:`, error.message);
+      }
+      throw error;
     }
-
-    if (!payload) {
-      console.error(`[API Error] ${init.method ?? "GET"} ${path}: Empty response`);
-      throw new Error("Empty API response.");
-    }
-
-    console.log(`[API Response] ${init.method ?? "GET"} ${path}:`, payload.data);
-
-    return payload;
   }
 }
 
