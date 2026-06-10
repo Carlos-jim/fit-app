@@ -1,7 +1,6 @@
-import { type ComponentProps, useRef, useEffect } from "react";
+import { type ComponentProps, useMemo } from "react";
 import {
   Animated,
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -13,16 +12,31 @@ import { Ionicons } from "@expo/vector-icons";
 import type { FitnessTheme } from "./fitness-ui";
 import type { MealLog } from "../types/api";
 
-// ─── Constants ────────────────────────────────────────────────────
 const WATER_COLOR = "#3B9EE2";
+const STEPS_COLOR = "#FF8C42";
+const CARBS_COLOR = "#FFB5C2";
+const FAT_COLOR = "#FFE5A0";
+const PROTEIN_COLOR = "#B5D8FF";
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
 
-// ─── Props ────────────────────────────────────────────────────────
 export interface HomeScreenProps {
   theme: FitnessTheme;
   visualMode: "dark" | "light";
+  fullName: string;
   todayCalories: number;
   todayMealsCount: number;
+  calorieGoal: number;
+  stepsGoal: number;
+  todayMacros: {
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+  macroGoals: {
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
   lastMeal: MealLog | null;
   topBestMeals: MealLog[];
   topWorstMeals: MealLog[];
@@ -36,7 +50,13 @@ export interface HomeScreenProps {
   mainScrollY: Animated.Value;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Buenos dias";
+  if (hour < 18) return "Buenas tardes";
+  return "Buenas noches";
+}
+
 function getScoreColor(score: number, theme: FitnessTheme): string {
   if (score >= 70) return theme.accent;
   if (score >= 40) return theme.lime;
@@ -73,13 +93,48 @@ function formatMealDate(dateStr: string): string {
   );
 }
 
-// ─── Root Component ───────────────────────────────────────────────
+function getWeekDays(): Array<{ label: string; day: number; isToday: boolean }> {
+  const today = new Date();
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - today.getDay());
+
+  const dayLabels = ["D", "L", "M", "M", "J", "V", "S"];
+  const days: Array<{ label: string; day: number; isToday: boolean }> = [];
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startOfWeek);
+    d.setDate(startOfWeek.getDate() + i);
+    days.push({
+      label: dayLabels[i],
+      day: d.getDate(),
+      isToday:
+        d.getFullYear() === today.getFullYear() &&
+        d.getMonth() === today.getMonth() &&
+        d.getDate() === today.getDate(),
+    });
+  }
+
+  return days;
+}
+
+function getMonthYear(): string {
+  return new Date().toLocaleDateString("es-ES", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export function HomeScreen(props: HomeScreenProps) {
   const {
     theme,
     visualMode,
+    fullName,
     todayCalories,
     todayMealsCount,
+    calorieGoal,
+    stepsGoal,
+    todayMacros,
+    macroGoals,
     lastMeal,
     topBestMeals,
     topWorstMeals,
@@ -93,34 +148,13 @@ export function HomeScreen(props: HomeScreenProps) {
     mainScrollY,
   } = props;
 
-  // ─── Theme tokens ───────────────────────────────────────────────
   const isDark = visualMode === "dark";
-  const heroGradient: readonly [string, string, string] = isDark
-    ? ["#07100D", "#0D1815", "#101D19"]
-    : ["#FFFDF8", "#F6EFE4", "#EEE4D6"];
   const panelColor = isDark ? "#0F1513" : "#FBF8F1";
   const panelColorAlt = isDark ? "#121B18" : "#F2ECE1";
   const panelStroke = isDark ? "#1D2A25" : "#E8DED0";
   const mutedText = isDark ? "#8AA199" : "#786F65";
   const softText = isDark ? "#587067" : "#A3988B";
   const strongText = isDark ? "#F5FBF8" : "#17130F";
-  const heroPillBg = isDark
-    ? "rgba(255,255,255,0.08)"
-    : "rgba(23,19,15,0.04)";
-  const heroPillText = isDark ? "#F4FBF8" : "#2A241F";
-  const heroAuraPrimary = isDark
-    ? "rgba(118, 239, 229, 0.14)"
-    : "rgba(0, 200, 151, 0.12)";
-  const heroAuraSecondary = isDark
-    ? "rgba(232, 255, 84, 0.11)"
-    : "rgba(232, 255, 84, 0.10)";
-  const heroEyebrow = isDark ? "#8FACA1" : "#897E71";
-  const heroTitle = isDark ? "#FCFFFD" : "#1A1511";
-  const heroDivider = isDark
-    ? "rgba(255,255,255,0.10)"
-    : "rgba(23,19,15,0.08)";
-  const heroMiniValue = isDark ? "#FFFFFF" : "#17130F";
-  const heroMiniLabel = isDark ? "#8BA79C" : "#8C8174";
   const emptyBg = isDark ? "#0D1410" : "#F6F2EA";
   const emptyStroke = isDark ? "#1A2820" : "#E0D9CE";
   const waterEmpty = isDark ? "#1E3030" : "#D4EEF4";
@@ -128,21 +162,109 @@ export function HomeScreen(props: HomeScreenProps) {
   const waterBtnStroke = isDark ? "#1A3A4E" : "#BDE4F5";
   const waterCardStroke = isDark ? "#0F2A38" : "#BDE4F5";
 
-  const todayDateStr = new Date().toLocaleDateString("es-ES", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
+  const weekDays = useMemo(() => getWeekDays(), []);
+  const monthYear = useMemo(() => getMonthYear(), []);
 
-  const heroButtonTextColor = isDark ? "#07110E" : "#FFFFFF";
+  const calorieProgress = calorieGoal > 0 ? todayCalories / calorieGoal : 0;
+  const stepsProgress = stepsGoal > 0 ? 3500 / stepsGoal : 0;
+  const waterProgress = waterGoal > 0 ? waterGlasses / waterGoal : 0;
+
+  const carbsProgress = macroGoals.carbs > 0 ? todayMacros.carbs / macroGoals.carbs : 0;
+  const fatProgress = macroGoals.fat > 0 ? todayMacros.fat / macroGoals.fat : 0;
+  const proteinProgress = macroGoals.protein > 0 ? todayMacros.protein / macroGoals.protein : 0;
+
+  const totalMacroCalories =
+    todayMacros.carbs * 4 + todayMacros.protein * 4 + todayMacros.fat * 9;
+  const carbsPercent = totalMacroCalories > 0 ? Math.round((todayMacros.carbs * 4 / totalMacroCalories) * 100) : 0;
+  const fatPercent = totalMacroCalories > 0 ? Math.round((todayMacros.fat * 9 / totalMacroCalories) * 100) : 0;
+  const proteinPercent = totalMacroCalories > 0 ? Math.round((todayMacros.protein * 4 / totalMacroCalories) * 100) : 0;
+
+  const heroGradient: readonly [string, string, string] = isDark
+    ? ["#0A2E1F", "#0D3D28", "#104D32"]
+    : ["#C8F7E4", "#A8F0D4", "#88E8C4"];
+
+  const heroAuraPrimary = isDark
+    ? "rgba(118, 239, 229, 0.14)"
+    : "rgba(0, 200, 151, 0.12)";
+  const heroAuraSecondary = isDark
+    ? "rgba(232, 255, 84, 0.11)"
+    : "rgba(232, 255, 84, 0.10)";
+
+  const ringBg = isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.08)";
+  const ringTrackColor = isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)";
+
+  const smallCardBg = isDark ? "#111B17" : "#FFFFFF";
+  const smallCardStroke = isDark ? "#1D2A25" : "#E8DED0";
+
+  const calendarBg = isDark ? "#0F1513" : "#FFFFFF";
+  const calendarDayBg = isDark ? "#1A2820" : "#F0ECE5";
+  const calendarTodayBg = theme.accent;
+
+  const mealCardBg = isDark ? "#111B17" : "#FFFFFF";
+  const mealCardStroke = isDark ? "#1D2A25" : "#E8DED0";
+
+  const intakeCardBg = isDark ? "#0A2E1F" : "#E8F8EE";
+  const intakeCardStroke = isDark ? "#1A4A35" : "#C8E8D5";
+
+  const nutritionCardBg = isDark ? "#111B17" : "#FFFFFF";
+  const nutritionCardStroke = isDark ? "#1D2A25" : "#E8DED0";
+
+  const firstName = fullName.trim().split(" ")[0] || "Bioma";
+
+  const today = new Date();
+  const currentDayOfWeek = today.getDay() === 0 ? 6 : today.getDay();
 
   return (
     <View style={styles.root}>
-      {/* ─────────────────────── Hero Card ──────────────────────── */}
+      {/* ────────────────── Greeting Header ─────────────────── */}
       <Animated.View
         style={[
-          styles.heroWrap,
+          styles.greetingHeader,
           {
+            transform: [
+              {
+                translateY: mainScrollY.interpolate({
+                  inputRange: [0, 60],
+                  outputRange: [0, -10],
+                  extrapolate: "clamp",
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <View style={styles.greetingLeft}>
+          <View style={[styles.avatarCircle, { backgroundColor: theme.accent }]}>
+            <Text style={[styles.avatarText, { color: isDark ? "#050505" : "#FFFFFF" }]}>
+              {firstName.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.greetingTextWrap}>
+            <Text style={[styles.greetingLabel, { color: mutedText }]}>
+              {getGreeting()}!
+            </Text>
+            <Text style={[styles.greetingName, { color: strongText }]}>
+              {fullName.trim() || "Bioma"}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.greetingIcons}>
+          <Pressable style={[styles.iconButton, { backgroundColor: panelColor }]}>
+            <Ionicons name="calendar-outline" size={20} color={mutedText} />
+          </Pressable>
+          <Pressable style={[styles.iconButton, { backgroundColor: panelColor }]}>
+            <Ionicons name="notifications-outline" size={20} color={mutedText} />
+          </Pressable>
+        </View>
+      </Animated.View>
+
+      {/* ─────────────────── Daily Intake Card ────────────────── */}
+      <Animated.View
+        style={[
+          styles.intakeCard,
+          {
+            backgroundColor: intakeCardBg,
+            borderColor: intakeCardStroke,
             transform: [
               { scale: heroScale },
               {
@@ -155,214 +277,389 @@ export function HomeScreen(props: HomeScreenProps) {
           },
         ]}
       >
-        <LinearGradient
-          colors={heroGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.heroCard}
-        >
-          {/* Aura blobs */}
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.heroAuraPrimary,
-              { backgroundColor: heroAuraPrimary },
-              {
-                transform: [
+        <View style={styles.intakeHeader}>
+          <View style={styles.intakeLabelRow}>
+            <Ionicons name="flash-outline" size={16} color={isDark ? "#FFFFFF" : "#0A2E1F"} />
+            <Text style={[styles.intakeLabel, { color: isDark ? "rgba(255,255,255,0.8)" : "rgba(10,46,31,0.7)" }]}>
+              Ingreso diario
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={isDark ? "rgba(255,255,255,0.5)" : "rgba(10,46,31,0.4)"} />
+        </View>
+
+        <View style={styles.intakeContentRow}>
+          <View style={styles.intakeTextSection}>
+            <Text style={[styles.intakePercentage, { color: isDark ? "#FFFFFF" : "#0A2E1F" }]}>
+              {Math.round(calorieProgress * 100)}%
+            </Text>
+          </View>
+
+          <View style={styles.intakeRingWrap}>
+            <View style={[styles.intakeRing, { backgroundColor: ringBg }]}>
+              <View
+                style={[
+                  styles.intakeRingFill,
                   {
-                    scale: ambientPulse.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.92, 1.08],
-                    }),
+                    width: `${Math.min(calorieProgress, 1) * 100}%`,
+                    backgroundColor: isDark ? "#FFFFFF" : "#0A2E1F",
                   },
-                ],
-              },
-            ]}
-          />
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.heroAuraSecondary,
-              { backgroundColor: heroAuraSecondary },
-              {
-                transform: [
-                  {
-                    translateY: ambientPulse.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [10, -10],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          />
-
-          {/* Top pills */}
-          <View style={styles.heroTopRow}>
-            <View style={[styles.heroPill, { backgroundColor: heroPillBg }]}>
-              <Text style={[styles.heroPillText, { color: heroPillText }]}>
-                Comidas del día
-              </Text>
-            </View>
-            <View style={[styles.heroPill, { backgroundColor: heroPillBg }]}>
-              <Text style={[styles.heroPillText, { color: heroPillText }]}>
-                {todayDateStr}
-              </Text>
+                ]}
+              />
+              <View style={styles.intakeRingInner}>
+                <Text style={[styles.intakeRingValue, { color: isDark ? "#FFFFFF" : "#0A2E1F" }]}>
+                  {todayCalories}
+                </Text>
+                <Text style={[styles.intakeRingUnit, { color: isDark ? "rgba(255,255,255,0.7)" : "rgba(10,46,31,0.6)" }]}>
+                  {calorieGoal}
+                </Text>
+              </View>
             </View>
           </View>
-
-          {/* Heading */}
-          <View style={styles.heroHeading}>
-            <Text style={[styles.heroEyebrow, { color: heroEyebrow }]}>
-              TU NUTRICIÓN HOY
-            </Text>
-            <Text style={[styles.heroTitle, { color: heroTitle }]}>
-              {todayMealsCount > 0
-                ? `${todayMealsCount} comida${todayMealsCount !== 1 ? "s" : ""} registrada${todayMealsCount !== 1 ? "s" : ""}.`
-                : "Empieza registrando tu primera comida."}
-            </Text>
-          </View>
-
-          {/* Stats row */}
-          <View style={styles.heroStatsRow}>
-            <View style={styles.heroStat}>
-              <Text style={[styles.heroStatValue, { color: heroMiniValue }]}>
-                {todayCalories || 0}
-              </Text>
-              <Text style={[styles.heroStatLabel, { color: heroMiniLabel }]}>
-                KCAL HOY
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.heroStatDivider,
-                { backgroundColor: heroDivider },
-              ]}
-            />
-            <View style={styles.heroStat}>
-              <Text style={[styles.heroStatValue, { color: heroMiniValue }]}>
-                {todayMealsCount}
-              </Text>
-              <Text style={[styles.heroStatLabel, { color: heroMiniLabel }]}>
-                COMIDAS
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.heroStatDivider,
-                { backgroundColor: heroDivider },
-              ]}
-            />
-            <View style={styles.heroStat}>
-              <Text style={[styles.heroStatValue, { color: WATER_COLOR }]}>
-                {waterGlasses}
-              </Text>
-              <Text style={[styles.heroStatLabel, { color: heroMiniLabel }]}>
-                VASOS AGUA
-              </Text>
-            </View>
-          </View>
-
-          {/* CTA */}
-          <Pressable
-            style={[styles.heroButton, { backgroundColor: theme.accent }]}
-            onPress={onOpenCamera}
-          >
-            <Ionicons
-              name="add-circle-outline"
-              size={18}
-              color={heroButtonTextColor}
-            />
-            <Text
-              style={[styles.heroButtonText, { color: heroButtonTextColor }]}
-            >
-              Registrar comida
-            </Text>
-          </Pressable>
-        </LinearGradient>
+        </View>
       </Animated.View>
 
-      {/* ─────────────────── Última comida ──────────────────────── */}
+      {/* ─────────────────── Steps & Water Cards ──────────────── */}
+      <View style={styles.smallCardsRow}>
+        <Animated.View
+          style={[
+            styles.smallCard,
+            {
+              backgroundColor: smallCardBg,
+              borderColor: smallCardStroke,
+              opacity: mainScrollY.interpolate({
+                inputRange: [0, 100, 200],
+                outputRange: [0.7, 0.9, 1],
+                extrapolate: "clamp",
+              }),
+              transform: [
+                {
+                  translateY: mainScrollY.interpolate({
+                    inputRange: [0, 120],
+                    outputRange: [20, 0],
+                    extrapolate: "clamp",
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View style={[styles.smallCardIconWrap, { backgroundColor: `${STEPS_COLOR}18` }]}>
+            <Ionicons name="flame" size={22} color={STEPS_COLOR} />
+          </View>
+          <Text style={[styles.smallCardLabel, { color: mutedText }]}>
+            Pasos para caminar
+          </Text>
+          <Text style={[styles.smallCardValue, { color: strongText }]}>
+            5,500{" "}
+            <Text style={[styles.smallCardUnit, { color: mutedText }]}>pasos</Text>
+          </Text>
+          <View style={[styles.smallProgressTrack, { backgroundColor: ringTrackColor }]}>
+            <View
+              style={[
+                styles.smallProgressFill,
+                {
+                  width: `${Math.min(stepsProgress, 1) * 100}%`,
+                  backgroundColor: STEPS_COLOR,
+                },
+              ]}
+            />
+          </View>
+        </Animated.View>
+
+        <Animated.View
+          style={[
+            styles.smallCard,
+            {
+              backgroundColor: smallCardBg,
+              borderColor: smallCardStroke,
+              opacity: mainScrollY.interpolate({
+                inputRange: [0, 100, 200],
+                outputRange: [0.7, 0.9, 1],
+                extrapolate: "clamp",
+              }),
+              transform: [
+                {
+                  translateY: mainScrollY.interpolate({
+                    inputRange: [0, 120],
+                    outputRange: [20, 0],
+                    extrapolate: "clamp",
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View style={[styles.smallCardIconWrap, { backgroundColor: `${WATER_COLOR}18` }]}>
+            <Ionicons name="water" size={22} color={WATER_COLOR} />
+          </View>
+          <Text style={[styles.smallCardLabel, { color: mutedText }]}>
+            Beber Agua
+          </Text>
+          <Text style={[styles.smallCardValue, { color: strongText }]}>
+            {waterGlasses}{" "}
+            <Text style={[styles.smallCardUnit, { color: mutedText }]}>vasos</Text>
+          </Text>
+          <View style={[styles.smallProgressTrack, { backgroundColor: ringTrackColor }]}>
+            <View
+              style={[
+                styles.smallProgressFill,
+                {
+                  width: `${Math.min(waterProgress, 1) * 100}%`,
+                  backgroundColor: WATER_COLOR,
+                },
+              ]}
+            />
+          </View>
+        </Animated.View>
+      </View>
+
+      {/* ─────────────────── Nutrition Info Card ──────────────── */}
+      <Animated.View
+        style={[
+          styles.nutritionCard,
+          {
+            backgroundColor: nutritionCardBg,
+            borderColor: nutritionCardStroke,
+            opacity: mainScrollY.interpolate({
+              inputRange: [60, 160, 280],
+              outputRange: [0.6, 0.85, 1],
+              extrapolate: "clamp",
+            }),
+            transform: [
+              {
+                translateY: mainScrollY.interpolate({
+                  inputRange: [60, 200],
+                  outputRange: [24, 0],
+                  extrapolate: "clamp",
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <View style={styles.nutritionHeader}>
+          <View style={styles.nutritionTitleRow}>
+            <Ionicons name="pie-chart-outline" size={18} color={mutedText} />
+            <Text style={[styles.nutritionTitle, { color: strongText }]}>
+              Nutricion
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={mutedText} />
+        </View>
+
+        <View style={styles.macroList}>
+          <View style={styles.macroRow}>
+            <View style={styles.macroInfo}>
+              <Text style={[styles.macroLabel, { color: mutedText }]}>
+                Carbs
+              </Text>
+              <Text style={[styles.macroPercentage, { color: strongText }]}>
+                {carbsPercent}%
+              </Text>
+            </View>
+            <View style={styles.macroBarWrap}>
+              <View style={[styles.macroBar, { backgroundColor: ringTrackColor }]}>
+                <View
+                  style={[
+                    styles.macroBarFill,
+                    {
+                      width: `${Math.min(carbsProgress, 1) * 100}%`,
+                      backgroundColor: CARBS_COLOR,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+            <Text style={[styles.macroValue, { color: strongText }]}>
+              {todayMacros.carbs} / {macroGoals.carbs} g
+            </Text>
+          </View>
+
+          <View style={styles.macroRow}>
+            <View style={styles.macroInfo}>
+              <Text style={[styles.macroLabel, { color: mutedText }]}>
+                Fat
+              </Text>
+              <Text style={[styles.macroPercentage, { color: strongText }]}>
+                {fatPercent}%
+              </Text>
+            </View>
+            <View style={styles.macroBarWrap}>
+              <View style={[styles.macroBar, { backgroundColor: ringTrackColor }]}>
+                <View
+                  style={[
+                    styles.macroBarFill,
+                    {
+                      width: `${Math.min(fatProgress, 1) * 100}%`,
+                      backgroundColor: FAT_COLOR,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+            <Text style={[styles.macroValue, { color: strongText }]}>
+              {todayMacros.fat} / {macroGoals.fat} g
+            </Text>
+          </View>
+
+          <View style={styles.macroRow}>
+            <View style={styles.macroInfo}>
+              <Text style={[styles.macroLabel, { color: mutedText }]}>
+                Protein
+              </Text>
+              <Text style={[styles.macroPercentage, { color: strongText }]}>
+                {proteinPercent}%
+              </Text>
+            </View>
+            <View style={styles.macroBarWrap}>
+              <View style={[styles.macroBar, { backgroundColor: ringTrackColor }]}>
+                <View
+                  style={[
+                    styles.macroBarFill,
+                    {
+                      width: `${Math.min(proteinProgress, 1) * 100}%`,
+                      backgroundColor: PROTEIN_COLOR,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+            <Text style={[styles.macroValue, { color: strongText }]}>
+              {todayMacros.protein} / {macroGoals.protein} g
+            </Text>
+          </View>
+        </View>
+      </Animated.View>
+
+      {/* ─────────────────── Calendar Strip ───────────────────── */}
+      <Animated.View
+        style={[
+          styles.calendarCard,
+          {
+            backgroundColor: calendarBg,
+            borderColor: panelStroke,
+            opacity: mainScrollY.interpolate({
+              inputRange: [120, 220, 340],
+              outputRange: [0.55, 0.82, 1],
+              extrapolate: "clamp",
+            }),
+            transform: [
+              {
+                translateY: mainScrollY.interpolate({
+                  inputRange: [120, 260],
+                  outputRange: [28, 0],
+                  extrapolate: "clamp",
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <View style={styles.calendarHeader}>
+          <Text style={[styles.calendarTitle, { color: strongText }]}>
+            {monthYear.charAt(0).toUpperCase() + monthYear.slice(1)}
+          </Text>
+          <View style={styles.calendarArrows}>
+            <Pressable style={[styles.calendarArrow, { backgroundColor: panelColorAlt }]}>
+              <Ionicons name="chevron-back" size={16} color={mutedText} />
+            </Pressable>
+            <Pressable style={[styles.calendarArrow, { backgroundColor: panelColorAlt }]}>
+              <Ionicons name="chevron-forward" size={16} color={mutedText} />
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.calendarDaysRow}>
+          {weekDays.map((item, index) => (
+            <View key={index} style={styles.calendarDayColumn}>
+              <Text style={[styles.calendarDayLabel, { color: mutedText }]}>
+                {item.label}
+              </Text>
+              <View
+                style={[
+                  styles.calendarDayCircle,
+                  item.isToday && { backgroundColor: calendarTodayBg },
+                  !item.isToday && { backgroundColor: "transparent" },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.calendarDayNumber,
+                    { color: item.isToday ? "#FFFFFF" : strongText },
+                  ]}
+                >
+                  {String(item.day).padStart(2, "0")}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </Animated.View>
+
+      {/* ─────────────────── Meal Entries ────────────────────── */}
       <Animated.View
         style={{
           opacity: mainScrollY.interpolate({
-            inputRange: [0, 80, 180],
-            outputRange: [0.72, 0.9, 1],
+            inputRange: [180, 300, 420],
+            outputRange: [0.5, 0.85, 1],
             extrapolate: "clamp",
           }),
           transform: [
             {
               translateY: mainScrollY.interpolate({
-                inputRange: [0, 160],
-                outputRange: [28, 0],
+                inputRange: [180, 340],
+                outputRange: [32, 0],
                 extrapolate: "clamp",
               }),
             },
           ],
         }}
       >
-        <LinearGradient
-          colors={
-            isDark ? ["#111917", "#0D1412"] : ["#FFFFFF", "#F6F1E8"]
-          }
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.sectionCard, { borderColor: panelStroke }]}
+        <View
+          style={[
+            styles.mealCard,
+            { backgroundColor: mealCardBg, borderColor: mealCardStroke },
+          ]}
         >
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionEyebrow, { color: theme.accent }]}>
-              ÚLTIMA COMIDA
-            </Text>
-            <View
-              style={[
-                styles.sectionIconBadge,
-                { backgroundColor: `${theme.accent}18` },
-              ]}
-            >
-              <Ionicons name="time-outline" size={14} color={theme.accent} />
+          <View style={styles.mealHeaderRow}>
+            <View style={styles.mealTitleRow}>
+              <Ionicons name="flame" size={18} color={STEPS_COLOR} />
+              <Text style={[styles.mealTitle, { color: strongText }]}>
+                Desayuno
+              </Text>
             </View>
+            <Text style={[styles.mealCalories, { color: mutedText }]}>
+              456 - 512 kcal
+            </Text>
           </View>
-
-          <Text style={[styles.sectionTitle, { color: strongText }]}>
-            Último registro
-          </Text>
-
-          {lastMeal != null ? (
-            <LastMealContent
-              meal={lastMeal}
-              theme={theme}
-              isDark={isDark}
-              strongText={strongText}
-              mutedText={mutedText}
-              softText={softText}
-              panelColorAlt={panelColorAlt}
-              panelStroke={panelStroke}
-            />
-          ) : (
-            <EmptyState
-              icon="restaurant-outline"
-              message="Aún no hay comidas registradas. ¡Escanea tu primera comida!"
-              emptyBg={emptyBg}
-              emptyStroke={emptyStroke}
-              mutedText={mutedText}
-              theme={theme}
-            />
-          )}
-        </LinearGradient>
+          <View style={styles.mealImagesRow}>
+            <View style={[styles.mealImagePlaceholder, { backgroundColor: panelColorAlt }]}>
+              <Ionicons name="restaurant-outline" size={28} color={mutedText} />
+            </View>
+            <View style={[styles.mealImagePlaceholder, { backgroundColor: panelColorAlt }]}>
+              <Ionicons name="restaurant-outline" size={28} color={mutedText} />
+            </View>
+            <Pressable
+              style={[styles.mealAddButton, { backgroundColor: `${theme.accent}18` }]}
+              onPress={onOpenCamera}
+            >
+              <Ionicons name="add" size={22} color={theme.accent} />
+            </Pressable>
+          </View>
+        </View>
       </Animated.View>
 
-      {/* ─────────────────── Top 3 mejor score ──────────────────── */}
       <Animated.View
         style={{
           opacity: mainScrollY.interpolate({
-            inputRange: [80, 200, 340],
-            outputRange: [0.55, 0.88, 1],
+            inputRange: [240, 360, 480],
+            outputRange: [0.45, 0.82, 1],
             extrapolate: "clamp",
           }),
           transform: [
             {
               translateY: mainScrollY.interpolate({
-                inputRange: [80, 300],
+                inputRange: [240, 400],
                 outputRange: [36, 0],
                 extrapolate: "clamp",
               }),
@@ -372,147 +669,50 @@ export function HomeScreen(props: HomeScreenProps) {
       >
         <View
           style={[
-            styles.sectionCard,
-            { backgroundColor: panelColor, borderColor: panelStroke },
+            styles.mealCard,
+            { backgroundColor: mealCardBg, borderColor: mealCardStroke },
           ]}
         >
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionEyebrow, { color: theme.accent }]}>
-              MEJORES COMIDAS
+          <View style={styles.mealHeaderRow}>
+            <View style={styles.mealTitleRow}>
+              <Ionicons name="flame" size={18} color={STEPS_COLOR} />
+              <Text style={[styles.mealTitle, { color: strongText }]}>
+                Hora del almuerzo
+              </Text>
+            </View>
+            <Text style={[styles.mealCalories, { color: mutedText }]}>
+              456 - 512 kcal
             </Text>
-            <View
-              style={[
-                styles.sectionIconBadge,
-                { backgroundColor: `${theme.accent}18` },
-              ]}
-            >
-              <Ionicons
-                name="trophy-outline"
-                size={14}
-                color={theme.accent}
-              />
-            </View>
           </View>
-
-          <Text style={[styles.sectionTitle, { color: strongText }]}>
-            Top 3 con mejor score
-          </Text>
-
-          {topBestMeals.length > 0 ? (
-            <View style={styles.rankList}>
-              {topBestMeals.map((meal, index) => (
-                <MealRankRow
-                  key={meal.id}
-                  rank={index + 1}
-                  meal={meal}
-                  theme={theme}
-                  strongText={strongText}
-                  mutedText={mutedText}
-                  panelColorAlt={panelColorAlt}
-                  panelStroke={panelStroke}
-                />
-              ))}
+          <View style={styles.mealImagesRow}>
+            <View style={[styles.mealImagePlaceholder, { backgroundColor: panelColorAlt }]}>
+              <Ionicons name="restaurant-outline" size={28} color={mutedText} />
             </View>
-          ) : (
-            <EmptyState
-              icon="trophy-outline"
-              message="Registra comidas con análisis IA para ver tu ranking de mejores opciones."
-              emptyBg={emptyBg}
-              emptyStroke={emptyStroke}
-              mutedText={mutedText}
-              theme={theme}
-            />
-          )}
+            <View style={[styles.mealImagePlaceholder, { backgroundColor: panelColorAlt }]}>
+              <Ionicons name="restaurant-outline" size={28} color={mutedText} />
+            </View>
+            <Pressable
+              style={[styles.mealAddButton, { backgroundColor: `${theme.accent}18` }]}
+              onPress={onOpenCamera}
+            >
+              <Ionicons name="add" size={22} color={theme.accent} />
+            </Pressable>
+          </View>
         </View>
       </Animated.View>
 
-      {/* ─────────────────── Top 3 peor score ───────────────────── */}
+      {/* ─────────────────── Water Tracker ────────────────────── */}
       <Animated.View
         style={{
           opacity: mainScrollY.interpolate({
-            inputRange: [180, 320, 460],
-            outputRange: [0.48, 0.82, 1],
-            extrapolate: "clamp",
-          }),
-          transform: [
-            {
-              translateY: mainScrollY.interpolate({
-                inputRange: [180, 400],
-                outputRange: [40, 0],
-                extrapolate: "clamp",
-              }),
-            },
-          ],
-        }}
-      >
-        <View
-          style={[
-            styles.sectionCard,
-            { backgroundColor: panelColor, borderColor: panelStroke },
-          ]}
-        >
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionEyebrow, { color: theme.danger }]}>
-              PARA MEJORAR
-            </Text>
-            <View
-              style={[
-                styles.sectionIconBadge,
-                { backgroundColor: `${theme.danger}18` },
-              ]}
-            >
-              <Ionicons
-                name="warning-outline"
-                size={14}
-                color={theme.danger}
-              />
-            </View>
-          </View>
-
-          <Text style={[styles.sectionTitle, { color: strongText }]}>
-            Top 3 con peor score
-          </Text>
-
-          {topWorstMeals.length > 0 ? (
-            <View style={styles.rankList}>
-              {topWorstMeals.map((meal, index) => (
-                <MealRankRow
-                  key={meal.id}
-                  rank={index + 1}
-                  meal={meal}
-                  theme={theme}
-                  strongText={strongText}
-                  mutedText={mutedText}
-                  panelColorAlt={panelColorAlt}
-                  panelStroke={panelStroke}
-                />
-              ))}
-            </View>
-          ) : (
-            <EmptyState
-              icon="warning-outline"
-              message="Aún no hay datos suficientes. Registra más comidas para ver tus áreas de mejora."
-              emptyBg={emptyBg}
-              emptyStroke={emptyStroke}
-              mutedText={mutedText}
-              theme={theme}
-            />
-          )}
-        </View>
-      </Animated.View>
-
-      {/* ─────────────────── Tracker de agua ────────────────────── */}
-      <Animated.View
-        style={{
-          opacity: mainScrollY.interpolate({
-            inputRange: [280, 420, 560],
+            inputRange: [340, 480, 620],
             outputRange: [0.45, 0.82, 1],
             extrapolate: "clamp",
           }),
           transform: [
             {
               translateY: mainScrollY.interpolate({
-                inputRange: [280, 500],
+                inputRange: [340, 560],
                 outputRange: [44, 0],
                 extrapolate: "clamp",
               }),
@@ -530,7 +730,6 @@ export function HomeScreen(props: HomeScreenProps) {
           end={{ x: 1, y: 1 }}
           style={[styles.sectionCard, { borderColor: waterCardStroke }]}
         >
-          {/* Soft water glow */}
           <View
             pointerEvents="none"
             style={[
@@ -545,7 +744,7 @@ export function HomeScreen(props: HomeScreenProps) {
 
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionEyebrow, { color: WATER_COLOR }]}>
-              HIDRATACIÓN
+              HIDRATACION
             </Text>
             <View
               style={[
@@ -561,7 +760,6 @@ export function HomeScreen(props: HomeScreenProps) {
             Vasos de agua hoy
           </Text>
 
-          {/* Drop icons */}
           <View style={styles.waterDropsRow}>
             {Array.from({ length: waterGoal }, (_, i) => (
               <View key={i}>
@@ -574,7 +772,6 @@ export function HomeScreen(props: HomeScreenProps) {
             ))}
           </View>
 
-          {/* Controls */}
           <View style={styles.waterControls}>
             <Pressable
               style={[
@@ -614,7 +811,6 @@ export function HomeScreen(props: HomeScreenProps) {
             </Pressable>
           </View>
 
-          {/* Progress track */}
           <View
             style={[styles.waterTrack, { backgroundColor: waterBtnBg }]}
           >
@@ -640,385 +836,342 @@ export function HomeScreen(props: HomeScreenProps) {
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────
-
-function LastMealContent(props: {
-  meal: MealLog;
-  theme: FitnessTheme;
-  isDark: boolean;
-  strongText: string;
-  mutedText: string;
-  softText: string;
-  panelColorAlt: string;
-  panelStroke: string;
-}) {
-  const {
-    meal,
-    theme,
-    isDark,
-    strongText,
-    mutedText,
-    panelColorAlt,
-    panelStroke,
-  } = props;
-
-  return (
-    <View style={styles.lastMealContent}>
-      {meal.imageUrl != null ? (
-        <Image
-          source={{ uri: meal.imageUrl }}
-          style={styles.lastMealImage}
-          resizeMode="cover"
-          accessibilityLabel={meal.title ?? "Foto de la comida"}
-        />
-      ) : null}
-
-      <View style={styles.lastMealBody}>
-        <View style={styles.lastMealTopRow}>
-          <Text
-            style={[styles.lastMealTitle, { color: strongText }]}
-            numberOfLines={2}
-          >
-            {meal.title ?? "Comida registrada"}
-          </Text>
-          <View
-            style={[
-              styles.lastMealCalorieBadge,
-              { backgroundColor: `${theme.accent}18` },
-            ]}
-          >
-            <Text
-              style={[styles.lastMealCalorieText, { color: theme.accent }]}
-            >
-              {Math.round(meal.calories)} kcal
-            </Text>
-          </View>
-        </View>
-
-        <Text style={[styles.lastMealTime, { color: mutedText }]}>
-          {formatMealDate(meal.createdAt)}
-        </Text>
-
-        {/* Macros strip */}
-        <View
-          style={[
-            styles.lastMealMacros,
-            {
-              backgroundColor: panelColorAlt,
-              borderColor: panelStroke,
-            },
-          ]}
-        >
-          <MacroPill
-            label="Prot."
-            value={Math.round(meal.proteinGrams)}
-            unit="g"
-            color={theme.accent}
-            mutedText={mutedText}
-            strongText={strongText}
-          />
-          <View
-            style={[
-              styles.macroDivider,
-              {
-                backgroundColor: isDark
-                  ? "rgba(255,255,255,0.08)"
-                  : "rgba(23,19,15,0.06)",
-              },
-            ]}
-          />
-          <MacroPill
-            label="Carbs"
-            value={Math.round(meal.carbsGrams)}
-            unit="g"
-            color="#6688FF"
-            mutedText={mutedText}
-            strongText={strongText}
-          />
-          <View
-            style={[
-              styles.macroDivider,
-              {
-                backgroundColor: isDark
-                  ? "rgba(255,255,255,0.08)"
-                  : "rgba(23,19,15,0.06)",
-              },
-            ]}
-          />
-          <MacroPill
-            label="Grasas"
-            value={Math.round(meal.fatGrams)}
-            unit="g"
-            color={theme.lime}
-            mutedText={mutedText}
-            strongText={strongText}
-          />
-        </View>
-
-        {/* AI score badge if available */}
-        {meal.aiSuggestion != null ? (
-          <View style={styles.lastMealScoreRow}>
-            <View
-              style={[
-                styles.lastMealScoreBadge,
-                {
-                  backgroundColor: `${getScoreColor(meal.aiSuggestion.healthScore, theme)}18`,
-                },
-              ]}
-            >
-              <Ionicons
-                name={
-                  meal.aiSuggestion.isHealthy
-                    ? "checkmark-circle-outline"
-                    : "alert-circle-outline"
-                }
-                size={14}
-                color={getScoreColor(meal.aiSuggestion.healthScore, theme)}
-              />
-              <Text
-                style={[
-                  styles.lastMealScoreText,
-                  {
-                    color: getScoreColor(
-                      meal.aiSuggestion.healthScore,
-                      theme,
-                    ),
-                  },
-                ]}
-              >
-                Score IA: {meal.aiSuggestion.healthScore}/100
-              </Text>
-            </View>
-          </View>
-        ) : null}
-      </View>
-    </View>
-  );
-}
-
-function MacroPill(props: {
-  label: string;
-  value: number;
-  unit: string;
-  color: string;
-  mutedText: string;
-  strongText: string;
-}) {
-  const { label, value, unit, color, mutedText, strongText } = props;
-  return (
-    <View style={styles.macroPill}>
-      <Text style={[styles.macroLabel, { color: mutedText }]}>{label}</Text>
-      <Text style={[styles.macroValue, { color: strongText }]}>
-        {value}
-        <Text style={[styles.macroUnit, { color: color }]}>{unit}</Text>
-      </Text>
-    </View>
-  );
-}
-
-function MealRankRow(props: {
-  rank: number;
-  meal: MealLog;
-  theme: FitnessTheme;
-  strongText: string;
-  mutedText: string;
-  panelColorAlt: string;
-  panelStroke: string;
-}) {
-  const { rank, meal, theme, strongText, mutedText, panelColorAlt, panelStroke } =
-    props;
-  const score = meal.aiSuggestion!.healthScore;
-  const scoreColor = getScoreColor(score, theme);
-
-  return (
-    <View
-      style={[
-        styles.rankRow,
-        { backgroundColor: panelColorAlt, borderColor: panelStroke },
-      ]}
-    >
-      {/* Rank badge */}
-      <View
-        style={[styles.rankBadge, { backgroundColor: `${scoreColor}20` }]}
-      >
-        <Text style={[styles.rankNumber, { color: scoreColor }]}>
-          {rank}
-        </Text>
-      </View>
-
-      {/* Info */}
-      <View style={styles.rankInfo}>
-        <Text
-          style={[styles.rankMealName, { color: strongText }]}
-          numberOfLines={1}
-        >
-          {meal.title ?? "Comida registrada"}
-        </Text>
-        <Text style={[styles.rankMealCalories, { color: mutedText }]}>
-          {Math.round(meal.calories)} kcal
-        </Text>
-      </View>
-
-      {/* Score */}
-      <View
-        style={[
-          styles.rankScoreBadge,
-          {
-            backgroundColor: `${scoreColor}18`,
-            borderColor: `${scoreColor}30`,
-          },
-        ]}
-      >
-        <Text style={[styles.rankScoreText, { color: scoreColor }]}>
-          {score}
-        </Text>
-        <Text style={[styles.rankScoreUnit, { color: `${scoreColor}AA` }]}>
-          /100
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function EmptyState(props: {
-  icon: IoniconName;
-  message: string;
-  emptyBg: string;
-  emptyStroke: string;
-  mutedText: string;
-  theme: FitnessTheme;
-}) {
-  const { icon, message, emptyBg, emptyStroke, mutedText, theme } = props;
-  return (
-    <View
-      style={[
-        styles.emptyState,
-        { backgroundColor: emptyBg, borderColor: emptyStroke },
-      ]}
-    >
-      <View
-        style={[
-          styles.emptyIconWrap,
-          { backgroundColor: `${theme.accent}14` },
-        ]}
-      >
-        <Ionicons name={icon} size={24} color={theme.accent} />
-      </View>
-      <Text style={[styles.emptyMessage, { color: mutedText }]}>
-        {message}
-      </Text>
-    </View>
-  );
-}
-
-// ─── Styles ───────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: {
-    gap: 18,
+    gap: 16,
   },
 
-  // ── Hero ──────────────────────────────────────────────────────
-  heroWrap: {
-    overflow: "visible",
-  },
-  heroCard: {
-    borderRadius: 34,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 22,
-    gap: 16,
-    overflow: "hidden",
-  },
-  heroAuraPrimary: {
-    position: "absolute",
-    top: -34,
-    right: -10,
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-  },
-  heroAuraSecondary: {
-    position: "absolute",
-    bottom: -52,
-    left: -32,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-  },
-  heroTopRow: {
+  // ── Greeting Header ────────────────────────────────────────
+  greetingHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 10,
+    paddingHorizontal: 2,
   },
-  heroPill: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  heroPillText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-  },
-  heroHeading: {
-    gap: 8,
-    maxWidth: "82%",
-  },
-  heroEyebrow: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  heroTitle: {
-    fontFamily: "Manrope_800ExtraBold",
-    fontSize: 30,
-    lineHeight: 36,
-  },
-  heroStatsRow: {
+  greetingLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 0,
-    marginTop: 4,
+    gap: 12,
   },
-  heroStat: {
-    flex: 1,
-    gap: 4,
-    alignItems: "center",
-  },
-  heroStatValue: {
-    fontFamily: "Manrope_700Bold",
-    fontSize: 26,
-    lineHeight: 30,
-  },
-  heroStatLabel: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 10,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-  },
-  heroStatDivider: {
-    width: 1,
-    height: 36,
-    marginHorizontal: 4,
-  },
-  heroButton: {
-    flexDirection: "row",
+  avatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
+  },
+  avatarText: {
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 18,
+  },
+  greetingTextWrap: {
+    gap: 2,
+  },
+  greetingLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+  },
+  greetingName: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    lineHeight: 22,
+  },
+  greetingIcons: {
+    flexDirection: "row",
     gap: 8,
-    minHeight: 50,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // ── Daily Intake Card ──────────────────────────────────────
+  intakeCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 22,
+    overflow: "hidden",
+  },
+  intakeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  intakeLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  intakeLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  intakeContentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  intakeTextSection: {
+    flex: 1,
+  },
+  intakePercentage: {
+    fontFamily: "Manrope_800ExtraBold",
+    fontSize: 56,
+    lineHeight: 64,
+  },
+  intakeRingWrap: {
+    flexShrink: 0,
+    marginLeft: 16,
+  },
+  intakeRing: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  intakeRingFill: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 50,
+  },
+  intakeRingInner: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+  },
+  intakeRingValue: {
+    fontFamily: "Manrope_800ExtraBold",
+    fontSize: 22,
+    lineHeight: 26,
+  },
+  intakeRingUnit: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+  },
+
+  // ── Small Cards Row ─────────────────────────────────────────
+  smallCardsRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  smallCard: {
+    flex: 1,
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  smallCardIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  smallCardLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  smallCardValue: {
+    fontFamily: "Manrope_800ExtraBold",
+    fontSize: 24,
+    lineHeight: 28,
+  },
+  smallCardUnit: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+  },
+  smallProgressTrack: {
+    height: 6,
     borderRadius: 999,
+    overflow: "hidden",
     marginTop: 4,
   },
-  heroButtonText: {
+  smallProgressFill: {
+    height: "100%",
+    borderRadius: 999,
+  },
+
+  // ── Nutrition Card ─────────────────────────────────────────
+  nutritionCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    gap: 16,
+  },
+  nutritionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  nutritionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  nutritionTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  macroList: {
+    gap: 14,
+  },
+  macroRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  macroInfo: {
+    width: 70,
+    gap: 2,
+  },
+  macroLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  macroPercentage: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+  },
+  macroBarWrap: {
+    flex: 1,
+  },
+  macroBar: {
+    height: 8,
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  macroBarFill: {
+    height: "100%",
+    borderRadius: 999,
+  },
+  macroValue: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    width: 90,
+    textAlign: "right",
+  },
+
+  // ── Calendar Strip ──────────────────────────────────────────
+  calendarCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    gap: 14,
+  },
+  calendarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  calendarTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  calendarArrows: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  calendarArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  calendarDaysRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  calendarDayColumn: {
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
+  calendarDayLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    textTransform: "uppercase",
+  },
+  calendarDayCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  calendarDayNumber: {
     fontFamily: "Inter_700Bold",
     fontSize: 14,
   },
 
-  // ── Section cards ─────────────────────────────────────────────
+  // ── Meal Cards ──────────────────────────────────────────────
+  mealCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 14,
+  },
+  mealHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  mealTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  mealTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  mealCalories: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+  },
+  mealImagesRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  mealImagePlaceholder: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mealAddButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // ── Water Section ──────────────────────────────────────────
   sectionCard: {
-    borderRadius: 30,
+    borderRadius: 28,
     borderWidth: 1,
     paddingHorizontal: 18,
     paddingVertical: 18,
@@ -1048,178 +1201,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     lineHeight: 26,
   },
-
-  // ── Last meal ─────────────────────────────────────────────────
-  lastMealContent: {
-    gap: 12,
-  },
-  lastMealImage: {
-    width: "100%",
-    height: 180,
-    borderRadius: 20,
-  },
-  lastMealBody: {
-    gap: 10,
-  },
-  lastMealTopRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  lastMealTitle: {
-    flex: 1,
-    fontFamily: "Inter_700Bold",
-    fontSize: 18,
-    lineHeight: 24,
-  },
-  lastMealCalorieBadge: {
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  lastMealCalorieText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 13,
-  },
-  lastMealTime: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  lastMealMacros: {
-    flexDirection: "row",
-    borderRadius: 16,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  lastMealScoreRow: {
-    flexDirection: "row",
-  },
-  lastMealScoreBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  lastMealScoreText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-  },
-
-  // ── Macros ────────────────────────────────────────────────────
-  macroPill: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 10,
-    gap: 3,
-  },
-  macroLabel: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  macroValue: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 16,
-  },
-  macroUnit: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-  },
-  macroDivider: {
-    width: 1,
-    alignSelf: "stretch",
-  },
-
-  // ── Rank list ─────────────────────────────────────────────────
-  rankList: {
-    gap: 10,
-  },
-  rankRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  rankBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  rankNumber: {
-    fontFamily: "Manrope_800ExtraBold",
-    fontSize: 16,
-  },
-  rankInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  rankMealName: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  rankMealCalories: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-  },
-  rankScoreBadge: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    flexShrink: 0,
-  },
-  rankScoreText: {
-    fontFamily: "Manrope_800ExtraBold",
-    fontSize: 18,
-  },
-  rankScoreUnit: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 11,
-  },
-
-  // ── Empty state ───────────────────────────────────────────────
-  emptyState: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    padding: 20,
-    alignItems: "center",
-    gap: 12,
-  },
-  emptyIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyMessage: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    lineHeight: 21,
-    textAlign: "center",
-    maxWidth: "88%",
-  },
-
-  // ── Water tracker ─────────────────────────────────────────────
   waterGlow: {
     position: "absolute",
     top: -60,

@@ -22,22 +22,27 @@ import {
   onboardingStep6Schema,
   onboardingStep7Schema,
 } from "./contracts/onboarding-request.js";
+import { generateTipsRequestSchema } from "./contracts/generate-tips-request.js";
 import { suggestMealRequestSchema } from "./contracts/suggest-meal-request.js";
 import { AppError } from "./lib/app-error.js";
 import { prisma } from "./lib/prisma.js";
 import { LogRepository } from "./repositories/log.repository.js";
 import { OnboardingRepository } from "./repositories/onboarding.repository.js";
+import { UserProfileRepository } from "./repositories/user-profile.repository.js";
 import { UserRepository } from "./repositories/user.repository.js";
 import { AuthService } from "./services/auth.service.js";
 import { NutritionAnalysisService } from "./services/nutrition-analysis.service.js";
 import { SupabaseStorageService } from "./services/supabase-storage.service.js";
+import { TipsService } from "./services/tips.service.js";
 
 const app = express();
 const userRepository = new UserRepository(prisma);
 const logRepository = new LogRepository(prisma);
 const onboardingRepository = new OnboardingRepository(prisma);
+const userProfileRepository = new UserProfileRepository(prisma);
 const authService = new AuthService(prisma);
 const nutritionAnalysisService = new NutritionAnalysisService();
+const tipsService = new TipsService();
 const storageService = new SupabaseStorageService();
 
 app.use(cors());
@@ -223,6 +228,23 @@ app.get("/onboarding/session", async (req, res) => {
 app.delete("/onboarding/session", async (req, res) => {
   try {
     const userId = parseQueryUserId(req);
+    const session = await onboardingRepository.getSession(userId);
+
+    if (session) {
+      await userProfileRepository.upsertFromOnboarding(userId, {
+        goal: session.goal,
+        weightKg: session.weightKg,
+        heightCm: session.heightCm,
+        desiredWeightKg: session.desiredWeightKg,
+        gender: session.gender,
+        age: session.age,
+        country: session.country,
+        workoutFrequency: session.workoutFrequency,
+        activityLevel: session.activityLevel,
+        dietaryPrefs: session.dietaryPrefs,
+      });
+    }
+
     await onboardingRepository.deleteSession(userId);
     res.status(200).json({ data: { ok: true } });
   } catch (error) {
@@ -446,6 +468,120 @@ app.post("/logs/suggest-meal", async (req, res) => {
   }
 });
 
+app.post("/tips/generate", async (req, res) => {
+  try {
+    const request = parseBody(generateTipsRequestSchema, req.body);
+    const profile = await userProfileRepository.getByUserId(request.userId);
+
+    if (!profile) {
+      throw new AppError("User profile not found. Complete onboarding first.", {
+        statusCode: 404,
+        code: "PROFILE_NOT_FOUND",
+      });
+    }
+
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const recentMeals = await prisma.log.findMany({
+      where: {
+        userId: request.userId,
+        type: "MEAL_ANALYSIS",
+        createdAt: { gte: oneWeekAgo },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: {
+        title: true,
+        calories: true,
+        proteinGrams: true,
+        carbsGrams: true,
+        fatGrams: true,
+        createdAt: true,
+      },
+    });
+
+    const weekKey = getWeekYearKey(new Date());
+
+    if (!request.force) {
+      const existing = await prisma.tip.findFirst({
+        where: { userId: request.userId, weekYear: weekKey },
+      });
+
+      if (existing) {
+        const tips = await prisma.tip.findMany({
+          where: { userId: request.userId, weekYear: weekKey },
+          orderBy: { createdAt: "asc" },
+        });
+        res.status(200).json({ data: tips });
+        return;
+      }
+    }
+
+    const generated = await tipsService.generateWeeklyTips({
+      profile: {
+        goal: profile.goal,
+        weightKg: profile.weightKg,
+        heightCm: profile.heightCm,
+        desiredWeightKg: profile.desiredWeightKg,
+        gender: profile.gender,
+        age: profile.age,
+        country: profile.country,
+        workoutFrequency: profile.workoutFrequency,
+        activityLevel: profile.activityLevel,
+      },
+      recentMeals: recentMeals.map((m) => ({
+        title: m.title,
+        calories: m.calories,
+        proteinGrams: m.proteinGrams,
+        carbsGrams: m.carbsGrams,
+        fatGrams: m.fatGrams,
+        createdAt: m.createdAt.toISOString(),
+      })),
+    });
+
+    await prisma.tip.deleteMany({
+      where: { userId: request.userId, weekYear: weekKey },
+    });
+
+    const created = await prisma.tip.createMany({
+      data: generated.tips.map((tip) => ({
+        userId: request.userId,
+        title: tip.title,
+        body: tip.body,
+        category: tip.category,
+        icon: tip.icon ?? null,
+        weekYear: weekKey,
+      })),
+    });
+
+    const tips = await prisma.tip.findMany({
+      where: { userId: request.userId, weekYear: weekKey },
+      orderBy: { createdAt: "asc" },
+    });
+
+    res.status(200).json({ data: tips });
+  } catch (error) {
+    handleError(res, error, "generating weekly tips");
+  }
+});
+
+app.get("/tips", async (req, res) => {
+  try {
+    const userId = parseQueryUserId(req);
+    const weekKey = getWeekYearKey(new Date());
+
+    const tips = await prisma.tip.findMany({
+      where: { userId, weekYear: weekKey },
+      orderBy: { createdAt: "asc" },
+    });
+
+    res.status(200).json({ data: tips });
+  } catch (error) {
+    handleError(res, error, "fetching weekly tips");
+  }
+});
+
 app.use((_req, res) => {
   res.status(404).json({
     error: "NOT_FOUND",
@@ -540,4 +676,13 @@ function serializeMealLog(log: {
     warnings: Array.isArray(log.warnings) ? log.warnings : [],
     createdAt: log.createdAt.toISOString(),
   };
+}
+
+function getWeekYearKey(date: Date): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
 }

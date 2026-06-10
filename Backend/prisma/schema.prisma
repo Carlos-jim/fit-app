@@ -71,6 +71,8 @@ model User {
   planExpiresAt    DateTime?
   logs             Log[]
   onboardingSession OnboardingSession?
+  profile          UserProfile?
+  tips             Tip[]
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 }
@@ -127,4 +129,38 @@ model Log {
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([type, createdAt(sort: Desc)])
+}
+
+model UserProfile {
+  id               String            @id @default(cuid())
+  userId           String            @unique
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal             GoalType?
+  weightKg         Float?
+  heightCm         Float?
+  desiredWeightKg  Float?
+  gender           Gender?
+  age              Int?
+  country          String?
+  workoutFrequency WorkoutFrequency?
+  activityLevel    ActivityLevel?
+  dietaryPrefs     Json?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model Tip {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  body        String
+  category    String
+  icon        String?
+  weekYear    String
+  generatedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, weekYear])
 }

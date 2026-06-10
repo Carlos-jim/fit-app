@@ -7,6 +7,7 @@ import type {
   MenuAnalysisResponse,
   OnboardingSession,
   UploadMealImageResponse,
+  UserTip,
 } from "../types/api";
 
 export interface AnalyzeMealPayload {
@@ -354,6 +355,22 @@ class BiomaApi {
       `/onboarding/session?userId=${encodeURIComponent(userId)}`,
       { method: "DELETE" },
     );
+  }
+
+  async generateTips(userId: string, force?: boolean): Promise<UserTip[]> {
+    const response = await this.request<UserTip[]>("/tips/generate", {
+      method: "POST",
+      body: JSON.stringify({ userId, force }),
+    });
+    return response.data;
+  }
+
+  async getTips(userId: string): Promise<UserTip[]> {
+    const response = await this.request<UserTip[]>(
+      `/tips?userId=${encodeURIComponent(userId)}`,
+      { method: "GET" },
+    );
+    return response.data;
   }
 
   private async request<T>(

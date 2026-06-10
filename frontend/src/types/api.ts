@@ -130,3 +130,33 @@ export interface OnboardingSession {
   createdAt: string;
   updatedAt: string;
 }
+
+export type TipCategory =
+  | "nutricion"
+  | "habitos"
+  | "ejercicio"
+  | "salud_mental"
+  | "planificacion";
+
+export type TipIcon =
+  | "nutrition"
+  | "fitness"
+  | "heart"
+  | "bulb"
+  | "restaurant"
+  | "water"
+  | "sleep"
+  | "sunny";
+
+export interface UserTip {
+  id: string;
+  userId: string;
+  title: string;
+  body: string;
+  category: TipCategory;
+  icon: TipIcon | null;
+  weekYear: string;
+  generatedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}

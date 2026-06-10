@@ -12,6 +12,7 @@ import {
   Easing,
   Image,
   useWindowDimensions,
+  Modal,
   Pressable,
   ScrollView,
   StatusBar,
@@ -99,15 +100,14 @@ import type {
   MealAnalysisSummary,
   MealLog,
   MenuAnalysisResponse,
+  UserTip,
 } from "./src/types/api";
 
 type MealInputMode = "photo" | "text" | "menuScan";
 type VisualMode = "dark" | "light";
 type ScannerMode = "food" | "barcode";
-type StatsView = "food" | "steps";
-type PlaceholderView = "steps" | "recommendations";
 type StatsTabItem = {
-  key: StatsView;
+  key: "food";
   label: string;
   icon: ComponentProps<typeof Ionicons>["name"];
 };
@@ -115,7 +115,6 @@ type StatsTabItem = {
 const weightTrend = [54, 62, 47, 66, 67, 63, 42, 58];
 const statsTabs: StatsTabItem[] = [
   { key: "food", label: "Comida", icon: "restaurant-outline" },
-  { key: "steps", label: "Pasos", icon: "footsteps-outline" },
 ];
 const weekdayLabels = [
   "DOM",
@@ -242,281 +241,6 @@ function RingProgress(props: {
   );
 }
 
-function ComingSoonPage(props: { view: PlaceholderView }) {
-  const { view } = props;
-  const config: {
-    eyebrow: string;
-    icon: ComponentProps<typeof Ionicons>["name"];
-    colors: readonly [string, string, string];
-    accent: string;
-    copy: string;
-    tagline: string;
-  } =
-    view === "steps"
-      ? {
-        eyebrow: "Pasos",
-        icon: "footsteps-outline" as const,
-        colors: ["#0F1115", "#181C22", "#101216"] as const,
-        accent: "#A7F86E",
-        copy: "Estamos preparando una vista de movimiento con progreso diario, metas y tendencias.",
-        tagline: "Cada paso cuenta",
-      }
-      : {
-        eyebrow: "Recomendaciones",
-        icon: "sparkles-outline" as const,
-        colors: ["#151110", "#211A17", "#130F0E"] as const,
-        accent: "#FFB866",
-        copy: "Aqui vas a ver recomendaciones inteligentes y accionables, con el mismo look limpio.",
-        tagline: "Tu proximo nivel te espera",
-      };
-
-  // Animation values for coming soon page
-  const comingSoonFloatY = useRef(new Animated.Value(0)).current;
-  const comingSoonIconScale = useRef(new Animated.Value(1)).current;
-  const comingSoonIconRotate = useRef(new Animated.Value(0)).current;
-  const comingSoonTaglineOpacity = useRef(new Animated.Value(0)).current;
-  const comingSoonTaglineScale = useRef(new Animated.Value(0.92)).current;
-  const comingSoonDotsPulse = useRef(new Animated.Value(0)).current;
-  const comingSoonGlowOpacity = useRef(new Animated.Value(0)).current;
-
-  // Float animation
-  useEffect(() => {
-    const floatAnim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(comingSoonFloatY, {
-          toValue: -8,
-          duration: 2200,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(comingSoonFloatY, {
-          toValue: 8,
-          duration: 2200,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-
-    // Icon breathing scale + rotation
-    const iconAnim = Animated.loop(
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(comingSoonIconScale, {
-            toValue: 1.06,
-            duration: 2800,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(comingSoonIconRotate, {
-            toValue: 6,
-            duration: 2800,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.parallel([
-          Animated.timing(comingSoonIconScale, {
-            toValue: 1,
-            duration: 2800,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(comingSoonIconRotate, {
-            toValue: -6,
-            duration: 2800,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true,
-          }),
-        ]),
-      ]),
-    );
-
-    // Tagline entrance
-    const taglineAnim = Animated.sequence([
-      Animated.delay(400),
-      Animated.parallel([
-        Animated.timing(comingSoonTaglineOpacity, {
-          toValue: 1,
-          duration: 600,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.spring(comingSoonTaglineScale, {
-          toValue: 1,
-          friction: 6,
-          tension: 100,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]);
-
-    // Dots pulse
-    const dotsAnim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(comingSoonDotsPulse, {
-          toValue: 1,
-          duration: 1200,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(comingSoonDotsPulse, {
-          toValue: 0,
-          duration: 1200,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-
-    // Glow pulse
-    const glowAnim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(comingSoonGlowOpacity, {
-          toValue: 1,
-          duration: 3000,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(comingSoonGlowOpacity, {
-          toValue: 0,
-          duration: 3000,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-
-    floatAnim.start();
-    iconAnim.start();
-    taglineAnim.start();
-    dotsAnim.start();
-    glowAnim.start();
-
-    return () => {
-      floatAnim.stop();
-      iconAnim.stop();
-      taglineAnim.stop();
-      dotsAnim.stop();
-      glowAnim.stop();
-    };
-  }, []);
-
-  const dotInterpolate = comingSoonDotsPulse.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.3, 1, 0.3],
-  });
-
-  const dot1Opacity = dotInterpolate;
-  const dot2Opacity = comingSoonDotsPulse.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.6, 0.3, 0.6],
-  });
-  const dot3Opacity = comingSoonDotsPulse.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [1, 0.6, 1],
-  });
-  const iconRotate = comingSoonIconRotate.interpolate({
-    inputRange: [-6, 6],
-    outputRange: ["-6deg", "6deg"],
-  });
-
-  return (
-    <LinearGradient
-      colors={config.colors}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.comingSoonCard}
-    >
-      {/* Glow background */}
-      <Animated.View
-        style={[
-          styles.comingSoonGlow,
-          {
-            opacity: comingSoonGlowOpacity,
-            borderColor: `${config.accent}18`,
-          },
-        ]}
-      />
-
-      {/* Floating icon */}
-      <Animated.View style={{ transform: [{ translateY: comingSoonFloatY }] }}>
-        <Animated.View
-          style={[
-            styles.comingSoonIconWrap,
-            {
-              borderColor: `${config.accent}33`,
-              transform: [
-                { scale: comingSoonIconScale },
-                { rotate: iconRotate },
-              ],
-            },
-          ]}
-        >
-          <Ionicons name={config.icon} size={28} color={config.accent} />
-        </Animated.View>
-      </Animated.View>
-
-      <Text style={[styles.comingSoonEyebrow, { color: config.accent }]}>
-        {config.eyebrow}
-      </Text>
-      <Text style={styles.comingSoonTitle}>Muy Pronto</Text>
-
-      {/* Tagline with spring entrance */}
-      <Animated.View
-        style={[
-          styles.comingSoonTaglineWrap,
-          {
-            opacity: comingSoonTaglineOpacity,
-            transform: [{ scale: comingSoonTaglineScale }],
-          },
-        ]}
-      >
-        <View
-          style={[
-            styles.comingSoonTaglinePill,
-            { backgroundColor: `${config.accent}14` },
-          ]}
-        >
-          <Ionicons
-            name="rocket-outline"
-            size={13}
-            color={config.accent}
-            style={{ marginRight: 6 }}
-          />
-          <Text style={[styles.comingSoonTagline, { color: config.accent }]}>
-            {config.tagline}
-          </Text>
-        </View>
-      </Animated.View>
-
-      <Text style={styles.comingSoonText}>{config.copy}</Text>
-
-      {/* Animated loading dots */}
-      <View style={styles.comingSoonDots}>
-        <Animated.View
-          style={[
-            styles.comingSoonDot,
-            { backgroundColor: config.accent, opacity: dot1Opacity },
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.comingSoonDot,
-            { backgroundColor: config.accent, opacity: dot2Opacity },
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.comingSoonDot,
-            { backgroundColor: config.accent, opacity: dot3Opacity },
-          ]}
-        />
-      </View>
-    </LinearGradient>
-  );
-}
-
 export default function App() {
   return (
     <SafeAreaProvider>
@@ -565,6 +289,9 @@ function AppContent() {
   const [email, setEmail] = useState(env.defaultEmail);
   const [fullName, setFullName] = useState(env.defaultName);
   const [plan, setPlan] = useState<string>("FREE");
+  const [paywallVisible, setPaywallVisible] = useState(false);
+  const [selectedPaywallPlan, setSelectedPaywallPlan] = useState<"monthly" | "yearly">("yearly");
+  const [hasSeenPhotoPaywall, setHasSeenPhotoPaywall] = useState(false);
   const [mealLabel, setMealLabel] = useState("Almuerzo");
   const [mealDescription, setMealDescription] = useState(
     "Me comi una arepa con queso y dos huevos.",
@@ -588,19 +315,19 @@ function AppContent() {
     "camera" | "history" | "text" | "menuScan"
   >("camera");
   const [cameraReturnTab, setCameraReturnTab] = useState<AppTab>("home");
-  const [statsView, setStatsView] = useState<StatsView>("food");
   const [selectedStatsDate, setSelectedStatsDate] = useState(() =>
     getLocalDateKey(new Date()),
   );
   const [statsMonthPickerExpanded, setStatsMonthPickerExpanded] =
     useState(false);
-  const [statsPagerLocked, setStatsPagerLocked] = useState(false);
   const [statsMealsExpanded, setStatsMealsExpanded] = useState(false);
   const [statsMealLogs, setStatsMealLogs] = useState<MealLog[]>([]);
   const [statsMealLogsLoading, setStatsMealLogsLoading] = useState(false);
   const [bootstrapLoading, setBootstrapLoading] = useState(false);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [tips, setTips] = useState<UserTip[]>([]);
+  const [tipsLoading, setTipsLoading] = useState(false);
 
   const screenOpacity = useRef(new Animated.Value(1)).current;
   const screenTranslateY = useRef(new Animated.Value(0)).current;
@@ -610,9 +337,7 @@ function AppContent() {
   const ambientPulse = useRef(new Animated.Value(0)).current;
   const nutritionQuickMenuAnim = useRef(new Animated.Value(0)).current;
   const mainScrollY = useRef(new Animated.Value(0)).current;
-  const statsScrollX = useRef(new Animated.Value(0)).current;
   const statsMealsExpandAnim = useRef(new Animated.Value(0)).current;
-  const statsPagerRef = useRef<ScrollView | null>(null);
   const cameraRef = useRef<CameraView | null>(null);
   const analysisSourceRef = useRef<"camera" | null>(null);
   const cameraLoadingRing1 = useRef(new Animated.Value(0)).current;
@@ -657,8 +382,6 @@ function AppContent() {
     visualMode === "light" ? fitnessLightColors : fitnessColors;
   const wellnessCardMode = visualMode === "light" ? "day" : "night";
   const loading = bootstrapLoading || analysisLoading;
-  const statsPageWidth = Math.max(windowWidth - 40, 1);
-  const statsTabWidth = Math.max((statsPageWidth - 12) / statsTabs.length, 1);
   const foodSurface = visualMode === "light" ? "#FFF9F1" : "#0D1613";
   const foodSurfaceSecondary = visualMode === "light" ? "#F4EDE2" : "#13211D";
   const foodSurfaceStrong = visualMode === "light" ? "#FFFFFF" : "#162822";
@@ -813,11 +536,6 @@ function AppContent() {
       })),
     [selectedDateMeals],
   );
-  const statsTabIndicatorTranslateX = statsScrollX.interpolate({
-    inputRange: [0, statsPageWidth],
-    outputRange: [0, statsTabWidth],
-    extrapolate: "clamp",
-  });
   const statsMealsContentHeight = Math.max(
     registeredMealsPreview.length * 92 + 20,
     96,
@@ -840,6 +558,45 @@ function AppContent() {
     homeTodayMeals.reduce((sum, meal) => sum + meal.calories, 0),
   );
   const homeTodayMealsCount = homeTodayMeals.length;
+
+  const homeCalorieGoal = useMemo(() => {
+    const base = onboardingWeightKg * 24;
+    switch (onboardingGoal) {
+      case "LOSE_WEIGHT":
+        return Math.round(base * 0.8);
+      case "GAIN_WEIGHT":
+        return Math.round(base * 1.15);
+      default:
+        return Math.round(base);
+    }
+  }, [onboardingGoal, onboardingWeightKg]);
+
+  const homeTodayMacros = useMemo(() => {
+    const totals = homeTodayMeals.reduce(
+      (acc, meal) => ({
+        protein: acc.protein + meal.proteinGrams,
+        carbs: acc.carbs + meal.carbsGrams,
+        fat: acc.fat + meal.fatGrams,
+      }),
+      { protein: 0, carbs: 0, fat: 0 },
+    );
+    return {
+      protein: Math.round(totals.protein * 10) / 10,
+      carbs: Math.round(totals.carbs * 10) / 10,
+      fat: Math.round(totals.fat * 10) / 10,
+    };
+  }, [homeTodayMeals]);
+
+  const homeMacroGoals = useMemo(() => {
+    const calories = homeCalorieGoal;
+    return {
+      protein: Math.round((calories * 0.3) / 4),
+      carbs: Math.round((calories * 0.5) / 4),
+      fat: Math.round((calories * 0.2) / 9),
+    };
+  }, [homeCalorieGoal]);
+
+  const homeStepsGoal = 8000;
 
   const homeLastMeal = useMemo(() => {
     if (statsMealLogs.length === 0) return null;
@@ -1209,28 +966,18 @@ function AppContent() {
   }, [statsMealsExpandAnim, statsMealsExpanded]);
 
   useEffect(() => {
-    if (activeTab !== "stats") {
-      return;
-    }
-
-    const activeIndex = statsTabs.findIndex((tab) => tab.key === statsView);
-    const timer = setTimeout(() => {
-      statsPagerRef.current?.scrollTo({
-        x: activeIndex * statsPageWidth,
-        animated: false,
-      });
-    }, 0);
-
-    return () => clearTimeout(timer);
-  }, [activeTab, statsPageWidth]);
-
-  useEffect(() => {
     if (!userId || !env.apiBaseUrl) {
       return;
     }
 
     void loadStatsMealLogs(userId);
   }, [userId]);
+
+  useEffect(() => {
+    if (activeTab === "tips" && userId) {
+      void loadTips();
+    }
+  }, [activeTab, userId]);
 
   if (!fontsLoaded) {
     return null;
@@ -1365,6 +1112,15 @@ function AppContent() {
     setStatusMessage(
       "Apunta la camara al menu del restaurante y la IA te recomendara los mejores platos.",
     );
+  }
+
+  function handleGatedPhotoAction(action: () => void) {
+    if (plan === "FREE") {
+      setPaywallVisible(true);
+      setHasSeenPhotoPaywall(true);
+      return;
+    }
+    action();
   }
 
   const pickImage = async () => {
@@ -1514,6 +1270,32 @@ function AppContent() {
       setAuthFlow("welcome");
       setActiveTab("home");
       setBootstrapLoading(false);
+    }
+  };
+
+  const loadTips = async () => {
+    if (!userId) return;
+    try {
+      setTipsLoading(true);
+      const data = await biomaApi.getTips(userId);
+      setTips(data);
+    } catch {
+      setTips([]);
+    } finally {
+      setTipsLoading(false);
+    }
+  };
+
+  const generateTips = async () => {
+    if (!userId) return;
+    try {
+      setTipsLoading(true);
+      const data = await biomaApi.generateTips(userId, true);
+      setTips(data);
+    } catch {
+      Alert.alert("Error", "No se pudieron generar los consejos. Intenta más tarde.");
+    } finally {
+      setTipsLoading(false);
     }
   };
 
@@ -1743,7 +1525,6 @@ function AppContent() {
       if (analysisSourceRef.current === "camera") {
         analysisSourceRef.current = null;
         setSelectedStatsDate(getLocalDateKey(new Date()));
-        setStatsView("food");
         setNutritionView("camera");
         setImageAsset(null);
         setActiveTab("stats");
@@ -1771,7 +1552,7 @@ function AppContent() {
             userId={userId}
             theme={theme}
             mode={wellnessCardMode}
-            onOpenCamera={() => openCameraScreen("nutrition")}
+            onOpenCamera={() => handleGatedPhotoAction(() => openCameraScreen("nutrition"))}
             initialMeal={initialMealForDetail}
             onClearInitialMeal={() => setInitialMealForDetail(null)}
           />
@@ -1806,8 +1587,13 @@ function AppContent() {
           <HomeScreen
             theme={theme}
             visualMode={visualMode}
+            fullName={fullName}
             todayCalories={homeTodayCalories}
             todayMealsCount={homeTodayMealsCount}
+            calorieGoal={homeCalorieGoal}
+            stepsGoal={homeStepsGoal}
+            todayMacros={homeTodayMacros}
+            macroGoals={homeMacroGoals}
             lastMeal={homeLastMeal}
             topBestMeals={homeTopBestMeals}
             topWorstMeals={homeTopWorstMeals}
@@ -1815,7 +1601,7 @@ function AppContent() {
             waterGoal={waterGoal}
             onWaterIncrement={incrementWater}
             onWaterDecrement={decrementWater}
-            onOpenCamera={() => openCameraScreen("home")}
+            onOpenCamera={() => handleGatedPhotoAction(() => openCameraScreen("home"))}
             ambientPulse={ambientPulse}
             heroScale={heroScale}
             mainScrollY={mainScrollY}
@@ -1924,12 +1710,14 @@ function AppContent() {
           { useNativeDriver: false },
         )}
       >
-        <FitnessHeader
-          activeTab={activeTab}
-          fullName={fullName}
-          onOpenProfile={() => setActiveTab("profile")}
-          theme={theme}
-        />
+        {activeTab !== "home" && (
+          <FitnessHeader
+            activeTab={activeTab}
+            fullName={fullName}
+            onOpenProfile={() => setActiveTab("profile")}
+            theme={theme}
+          />
+        )}
 
         <Animated.View
           style={[
@@ -2020,7 +1808,7 @@ function AppContent() {
 
           <View style={styles.nutritionQuickMenuActions}>
             <Pressable
-              onPress={() => openPhotoNutritionFlow(activeTab)}
+              onPress={() => handleGatedPhotoAction(() => openPhotoNutritionFlow(activeTab))}
               style={styles.nutritionQuickMenuActionWrap}
             >
               <LinearGradient
@@ -2031,15 +1819,24 @@ function AppContent() {
                 }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.nutritionQuickMenuAction}
+                style={[
+                  styles.nutritionQuickMenuAction,
+                  plan === "FREE" && { opacity: 0.6 },
+                ]}
               >
                 <View style={styles.nutritionQuickMenuIconBadge}>
-                  <Ionicons name="camera-outline" size={20} color="#FFFFFF" />
+                  <Ionicons
+                    name={plan === "FREE" ? "lock-closed-outline" : "camera-outline"}
+                    size={20}
+                    color="#FFFFFF"
+                  />
                 </View>
                 <View style={styles.nutritionQuickMenuActionTextBlock}>
                   <Text style={styles.nutritionQuickMenuActionTitle}>Foto</Text>
                   <Text style={styles.nutritionQuickMenuActionText}>
-                    Captura o sube una imagen
+                    {plan === "FREE"
+                      ? "Solo plan Pro"
+                      : "Captura o sube una imagen"}
                   </Text>
                 </View>
               </LinearGradient>
@@ -2095,6 +1892,180 @@ function AppContent() {
         theme={theme}
       />
       <WaterCelebration isDark={visualMode === "dark"} />
+
+      <Modal
+        animationType="slide"
+        transparent={false}
+        visible={paywallVisible}
+        onRequestClose={() => setPaywallVisible(false)}
+      >
+        <LinearGradient
+          colors={["#0A2E23", "#0D4D3A", "#00C897"]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={styles.paywallScreen}
+        >
+          <SafeAreaView style={styles.paywallSafeArea}>
+            <View style={styles.paywallTopBar}>
+              <View style={styles.paywallTopIcon}>
+                <Ionicons name="lock-closed" size={18} color="#FFFFFF" />
+              </View>
+              <Pressable
+                onPress={() => setPaywallVisible(false)}
+                style={styles.paywallTopIcon}
+              >
+                <Ionicons name="close" size={22} color="#FFFFFF" />
+              </Pressable>
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.paywallScrollContent}
+            >
+              <View style={styles.paywallHeroIconWrap}>
+                <View style={styles.paywallHeroIconRing}>
+                  <Ionicons name="camera" size={36} color="#00C897" />
+                </View>
+              </View>
+
+              <Text style={styles.paywallHeroTitle}>
+                Desbloquea Pro
+              </Text>
+
+              <View style={styles.paywallFeatures}>
+                {[
+                  "Análisis de fotos ilimitado",
+                  "Escaneo de menús con IA",
+                  "Historial y reportes avanzados",
+                  "Coach IA personalizado",
+                ].map((feature) => (
+                  <View key={feature} style={styles.paywallFeatureRow}>
+                    <Ionicons
+                      name="checkmark"
+                      size={20}
+                      color="#FFFFFF"
+                      style={styles.paywallFeatureCheck}
+                    />
+                    <Text style={styles.paywallFeatureText}>{feature}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.paywallPlanCards}>
+                <Pressable
+                  style={[
+                    styles.paywallPlanOption,
+                    styles.paywallPlanOptionMonthly,
+                    selectedPaywallPlan === "monthly" && styles.paywallPlanOptionActive,
+                  ]}
+                  onPress={() => setSelectedPaywallPlan("monthly")}
+                >
+                  <View style={styles.paywallPlanOptionLeft}>
+                    <Text style={styles.paywallPlanOptionLabel}>
+                      1 Mes
+                    </Text>
+                  </View>
+                  <View style={styles.paywallPlanOptionRight}>
+                    <Text style={styles.paywallPlanOptionPrice}>
+                      $5.99 / mes
+                    </Text>
+                    <View
+                      style={[
+                        styles.paywallPlanOptionRadio,
+                        selectedPaywallPlan === "monthly" && styles.paywallPlanOptionRadioActive,
+                      ]}
+                    >
+                      {selectedPaywallPlan === "monthly" && (
+                        <Ionicons
+                          name="checkmark"
+                          size={14}
+                          color="#FFFFFF"
+                        />
+                      )}
+                    </View>
+                  </View>
+                </Pressable>
+
+                <Pressable
+                  style={[
+                    styles.paywallPlanOption,
+                    styles.paywallPlanOptionYearly,
+                    selectedPaywallPlan === "yearly" && styles.paywallPlanOptionActive,
+                  ]}
+                  onPress={() => setSelectedPaywallPlan("yearly")}
+                >
+                  <View style={styles.paywallPlanOptionBadge}>
+                    <Text style={styles.paywallPlanOptionBadgeText}>
+                      AHORRA 30%
+                    </Text>
+                  </View>
+                  <View style={styles.paywallPlanOptionRow}>
+                    <View style={styles.paywallPlanOptionLeft}>
+                      <Text style={styles.paywallPlanOptionLabelYearly}>
+                        12 Meses
+                      </Text>
+                      <View style={styles.paywallPlanOptionPrices}>
+                        <Text style={styles.paywallPlanOptionPriceOld}>
+                          $71.88
+                        </Text>
+                        <Text style={styles.paywallPlanOptionPriceNew}>
+                          $49.99
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.paywallPlanOptionRight}>
+                      <Text style={styles.paywallPlanOptionPriceYearly}>
+                        $4.17 / mes
+                      </Text>
+                      <View
+                        style={[
+                          styles.paywallPlanOptionRadio,
+                          selectedPaywallPlan === "yearly" && styles.paywallPlanOptionRadioActive,
+                        ]}
+                      >
+                        {selectedPaywallPlan === "yearly" && (
+                          <Ionicons
+                            name="checkmark"
+                            size={14}
+                            color="#FFFFFF"
+                          />
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                </Pressable>
+              </View>
+
+              <Text style={styles.paywallTrialText}>
+                Cancela cuando quieras.
+              </Text>
+
+              <Pressable
+                style={styles.paywallCtaButton}
+                onPress={() => {
+                  Alert.alert(
+                    "Próximamente",
+                    "La suscripción estará disponible muy pronto.",
+                  );
+                }}
+              >
+                <Text style={styles.paywallCtaButtonText}>
+                  Probar gratis y suscribirme
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setPaywallVisible(false)}
+                style={styles.paywallSkipButton}
+              >
+                <Text style={styles.paywallSkipButtonText}>
+                  Continuar con plan Free
+                </Text>
+              </Pressable>
+            </ScrollView>
+          </SafeAreaView>
+        </LinearGradient>
+      </Modal>
     </SafeAreaView>
   );
 
@@ -2655,7 +2626,7 @@ function AppContent() {
                   styles.homeActionButtonSecondary,
                   { backgroundColor: homePanelColorAlt },
                 ]}
-                onPress={() => openCameraScreen("home")}
+                onPress={() => handleGatedPhotoAction(() => openCameraScreen("home"))}
               >
                 <Text
                   style={[
@@ -2753,53 +2724,6 @@ function AppContent() {
         </Animated.View>
       </View>
     );
-  }
-
-  function scrollToStatsView(nextView: StatsView) {
-    const nextIndex = statsTabs.findIndex((tab) => tab.key === nextView);
-    setStatsView(nextView);
-    statsPagerRef.current?.scrollTo({
-      x: nextIndex * statsPageWidth,
-      animated: true,
-    });
-  }
-
-  function getStatsPageMotion(index: number) {
-    return {
-      opacity: statsScrollX.interpolate({
-        inputRange: [
-          (index - 1) * statsPageWidth,
-          index * statsPageWidth,
-          (index + 1) * statsPageWidth,
-        ],
-        outputRange: [0.72, 1, 0.72],
-        extrapolate: "clamp",
-      }),
-      transform: [
-        {
-          translateY: statsScrollX.interpolate({
-            inputRange: [
-              (index - 1) * statsPageWidth,
-              index * statsPageWidth,
-              (index + 1) * statsPageWidth,
-            ],
-            outputRange: [20, 0, 20],
-            extrapolate: "clamp",
-          }),
-        },
-        {
-          scale: statsScrollX.interpolate({
-            inputRange: [
-              (index - 1) * statsPageWidth,
-              index * statsPageWidth,
-              (index + 1) * statsPageWidth,
-            ],
-            outputRange: [0.97, 1, 0.97],
-            extrapolate: "clamp",
-          }),
-        },
-      ],
-    };
   }
 
   function updateSelectedStatsMonthYear(
@@ -2902,9 +2826,6 @@ function AppContent() {
               styles.foodMonthPicker,
               { backgroundColor: foodSurfaceSecondary },
             ]}
-            onTouchStart={() => setStatsPagerLocked(true)}
-            onTouchEnd={() => setStatsPagerLocked(false)}
-            onTouchCancel={() => setStatsPagerLocked(false)}
           >
             <View style={styles.foodMonthPickerYearRow}>
               <Pressable
@@ -3001,9 +2922,6 @@ function AppContent() {
 
         <View
           style={styles.foodCalendarRow}
-          onTouchStart={() => setStatsPagerLocked(true)}
-          onTouchEnd={() => setStatsPagerLocked(false)}
-          onTouchCancel={() => setStatsPagerLocked(false)}
         >
           {selectedWeekMeals.map((item) => (
             <Pressable
@@ -3292,111 +3210,12 @@ function AppContent() {
   function renderStatsScreen() {
     return (
       <View style={styles.screen}>
-        <View
-          style={[styles.statsTabBar, { backgroundColor: theme.cardMuted }]}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 120 }}
         >
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.statsTabIndicator,
-              {
-                width: statsTabWidth,
-                transform: [{ translateX: statsTabIndicatorTranslateX }],
-              },
-            ]}
-          >
-            <LinearGradient
-              colors={
-                visualMode === "light"
-                  ? ["#17130F", "#2A211A"]
-                  : ["#F7F1E6", "#FFFFFF"]
-              }
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.statsTabIndicatorFill}
-            />
-          </Animated.View>
-
-          {statsTabs.map((tab) => {
-            const active = statsView === tab.key;
-
-            return (
-              <Pressable
-                key={tab.key}
-                style={styles.statsTabButton}
-                onPress={() => scrollToStatsView(tab.key)}
-              >
-                <Ionicons
-                  name={tab.icon}
-                  size={18}
-                  color={
-                    active
-                      ? visualMode === "light"
-                        ? "#FFFFFF"
-                        : "#17130F"
-                      : theme.muted
-                  }
-                />
-                <Text
-                  style={[
-                    styles.statsTabLabel,
-                    {
-                      color: active
-                        ? visualMode === "light"
-                          ? "#FFFFFF"
-                          : "#17130F"
-                        : theme.muted,
-                    },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {tab.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Animated.ScrollView
-          ref={statsPagerRef}
-          horizontal
-          pagingEnabled
-          scrollEnabled={!statsPagerLocked && !statsMonthPickerExpanded}
-          bounces={false}
-          decelerationRate="fast"
-          disableIntervalMomentum
-          nestedScrollEnabled
-          showsHorizontalScrollIndicator={false}
-          scrollEventThrottle={16}
-          snapToAlignment="start"
-          snapToInterval={statsPageWidth}
-          onMomentumScrollEnd={(event) => {
-            const index = Math.round(
-              event.nativeEvent.contentOffset.x / statsPageWidth,
-            );
-            const nextView = statsTabs[index]?.key ?? "food";
-            setStatsView(nextView);
-          }}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { x: statsScrollX } } }],
-            { useNativeDriver: false },
-          )}
-        >
-          {statsTabs.map((tab, index) => (
-            <View
-              key={tab.key}
-              style={[styles.statsPage, { width: statsPageWidth }]}
-            >
-              <Animated.View style={getStatsPageMotion(index)}>
-                {tab.key === "food" ? (
-                  renderFoodStatsPage()
-                ) : (
-                  <ComingSoonPage view={tab.key} />
-                )}
-              </Animated.View>
-            </View>
-          ))}
-        </Animated.ScrollView>
+          {renderFoodStatsPage()}
+        </ScrollView>
       </View>
     );
   }
@@ -4174,90 +3993,33 @@ function AppContent() {
         <StatusBar
           barStyle={visualMode === "light" ? "dark-content" : "light-content"}
         />
+        <View style={styles.textModeTopRow}>
+          <Pressable
+            style={[
+              styles.textModeBackButton,
+              {
+                backgroundColor:
+                  visualMode === "light"
+                    ? "rgba(23, 19, 15, 0.06)"
+                    : "rgba(255,255,255,0.10)",
+              },
+            ]}
+            onPress={closeCameraScreen}
+          >
+            <Ionicons name="arrow-back" size={20} color={theme.text} />
+          </Pressable>
+        </View>
         <ScrollView
           contentContainerStyle={styles.textModeContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <LinearGradient
-            colors={
-              visualMode === "light"
-                ? ["#FFFFFF", "#F6EFE5", "#F2E7DA"]
-                : ["#0C1412", "#131C19", "#0A100E"]
-            }
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.textModeHero, { borderColor: theme.stroke }]}
-          >
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.textModeHeroGlow,
-                {
-                  backgroundColor:
-                    visualMode === "light"
-                      ? "rgba(0, 200, 151, 0.14)"
-                      : "rgba(118, 239, 229, 0.14)",
-                  transform: [
-                    {
-                      translateY: ambientPulse.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, -10],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            />
-
-            <View style={styles.textModeTopRow}>
-              <Pressable
-                style={[
-                  styles.textModeBackButton,
-                  {
-                    backgroundColor:
-                      visualMode === "light"
-                        ? "rgba(23, 19, 15, 0.06)"
-                        : "rgba(255,255,255,0.10)",
-                  },
-                ]}
-                onPress={closeCameraScreen}
-              >
-                <Ionicons name="arrow-back" size={20} color={theme.text} />
-              </Pressable>
-              <View
-                style={[
-                  styles.textModeBadge,
-                  {
-                    backgroundColor:
-                      visualMode === "light"
-                        ? "rgba(23, 19, 15, 0.05)"
-                        : "rgba(255,255,255,0.09)",
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="sparkles-outline"
-                  size={14}
-                  color={theme.accent}
-                />
-                <Text style={[styles.textModeBadgeText, { color: theme.text }]}>
-                  Entrada premium
-                </Text>
-              </View>
-            </View>
-
-            <Text style={[styles.textModeEyebrow, { color: theme.accent }]}>
-              Nutricion
-            </Text>
-            <Text style={[styles.textModeTitle, { color: theme.text }]}>
-              Describe tu comida y te devolvemos macros estimados.
-            </Text>
-            <Text style={[styles.textModeSubtitle, { color: theme.muted }]}>
-              Ideal cuando no quieres tomar una foto o ya sabes exactamente lo
-              que comiste.
-            </Text>
-          </LinearGradient>
+          <Text style={[styles.textModeTitle, { color: theme.text }]}>
+            ¿Qué comiste hoy?
+          </Text>
+          <Text style={[styles.textModeSubtitle, { color: theme.muted }]}>
+            Escribe lo que comiste y calculamos las calorías y macros.
+          </Text>
 
           <View
             style={[
@@ -4265,54 +4027,9 @@ function AppContent() {
               { backgroundColor: theme.card, borderColor: theme.stroke },
             ]}
           >
-            <View style={styles.textModeSectionHeader}>
-              <Text
-                style={[styles.textModeSectionTitle, { color: theme.text }]}
-              >
-                Tipo de comida
-              </Text>
-              <Text
-                style={[styles.textModeSectionHint, { color: theme.muted }]}
-              >
-                Ayuda a mejorar el contexto
-              </Text>
-            </View>
-
-            <View style={styles.textModeChipRow}>
-              {quickLabels.map((label) => {
-                const active =
-                  mealLabel.trim().toLowerCase() === label.toLowerCase();
-
-                return (
-                  <Pressable
-                    key={label}
-                    style={[
-                      styles.textModeChip,
-                      {
-                        backgroundColor: active
-                          ? theme.accent
-                          : theme.cardMuted,
-                        borderColor: active ? theme.accent : theme.stroke,
-                      },
-                    ]}
-                    onPress={() => setMealLabel(label)}
-                  >
-                    <Text
-                      style={[
-                        styles.textModeChipText,
-                        { color: active ? theme.background : theme.text },
-                      ]}
-                    >
-                      {label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
             <View style={styles.textModeFieldBlock}>
               <Text style={[styles.textModeFieldLabel, { color: theme.muted }]}>
-                Titulo
+                Título
               </Text>
               <TextInput
                 value={mealLabel}
@@ -4331,18 +4048,9 @@ function AppContent() {
             </View>
 
             <View style={styles.textModeFieldBlock}>
-              <View style={styles.textModeSectionHeader}>
-                <Text
-                  style={[styles.textModeFieldLabel, { color: theme.muted }]}
-                >
-                  Descripcion
-                </Text>
-                <Text
-                  style={[styles.textModeSectionHint, { color: theme.muted }]}
-                >
-                  Ingredientes, porcion y preparacion
-                </Text>
-              </View>
+              <Text style={[styles.textModeFieldLabel, { color: theme.muted }]}>
+                Descripción
+              </Text>
               <TextInput
                 value={mealDescription}
                 onChangeText={setMealDescription}
@@ -4374,11 +4082,6 @@ function AppContent() {
                   ]}
                   onPress={() => setMealDescription(suggestion)}
                 >
-                  <Ionicons
-                    name="flash-outline"
-                    size={14}
-                    color={theme.accent}
-                  />
                   <Text
                     style={[
                       styles.textModeSuggestionText,
@@ -4405,27 +4108,20 @@ function AppContent() {
               {loading ? (
                 <ActivityIndicator color={theme.background} />
               ) : (
-                <>
-                  <Ionicons
-                    name="sparkles"
-                    size={18}
-                    color={theme.background}
-                  />
-                  <Text
-                    style={[
-                      styles.textModePrimaryButtonText,
-                      { color: theme.background },
-                    ]}
-                  >
-                    Analizar con IA
-                  </Text>
-                </>
+                <Text
+                  style={[
+                    styles.textModePrimaryButtonText,
+                    { color: theme.background },
+                  ]}
+                >
+                  Calcular macros
+                </Text>
               )}
             </Pressable>
 
             <Text style={[styles.textModeHelper, { color: theme.muted }]}>
               {statusMessage ??
-                "Describe con naturalidad. La IA estima ingredientes, porciones y macros."}
+                "Sé natural. Cuanto más detalle, más preciso el cálculo."}
             </Text>
           </View>
 
@@ -4743,9 +4439,175 @@ function AppContent() {
   }
 
   function renderTipsScreen() {
+    const iconMap: Record<string, ComponentProps<typeof Ionicons>["name"]> = {
+      nutrition: "nutrition-outline",
+      fitness: "barbell-outline",
+      heart: "heart-outline",
+      bulb: "bulb-outline",
+      restaurant: "restaurant-outline",
+      water: "water-outline",
+      sleep: "moon-outline",
+      sunny: "sunny-outline",
+    };
+
+    const categoryLabel: Record<string, string> = {
+      nutricion: "Nutrición",
+      habitos: "Hábitos",
+      ejercicio: "Ejercicio",
+      salud_mental: "Bienestar",
+      planificacion: "Planificación",
+    };
+
+    const categoryColor: Record<string, string> = {
+      nutricion: "#00C897",
+      habitos: "#E8FF54",
+      ejercicio: "#76EFE5",
+      salud_mental: "#FF5260",
+      planificacion: "#FFB866",
+    };
+
     return (
-      <View style={styles.screen}>
-        <ComingSoonPage view="recommendations" />
+      <View style={[styles.screen, { backgroundColor: theme.background }]}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.tipsContent}
+        >
+          <View style={styles.tipsHeader}>
+            <Text style={[styles.tipsHeaderEyebrow, { color: theme.accent }]}>
+              Consejos semanales
+            </Text>
+            <Text style={[styles.tipsHeaderTitle, { color: theme.text }]}>
+              Tips personalizados para ti
+            </Text>
+            <Text style={[styles.tipsHeaderSubtitle, { color: theme.muted }]}>
+              Basados en tu perfil y comidas recientes, generados por IA.
+            </Text>
+          </View>
+
+          {tipsLoading ? (
+            <View style={styles.tipsLoading}>
+              <ActivityIndicator color={theme.accent} size="large" />
+              <Text style={[styles.tipsLoadingText, { color: theme.muted }]}>
+                Generando consejos...
+              </Text>
+            </View>
+          ) : tips.length === 0 ? (
+            <View style={styles.tipsEmpty}>
+              <Ionicons
+                name="bulb-outline"
+                size={48}
+                color={theme.muted}
+              />
+              <Text style={[styles.tipsEmptyTitle, { color: theme.text }]}>
+                Sin consejos aún
+              </Text>
+              <Text style={[styles.tipsEmptyText, { color: theme.muted }]}>
+                Completa el onboarding o registra comidas para recibir tips personalizados.
+              </Text>
+              {userId ? (
+                <Pressable
+                  style={[
+                    styles.tipsGenerateButton,
+                    { backgroundColor: theme.accent },
+                  ]}
+                  onPress={generateTips}
+                >
+                  <Text style={styles.tipsGenerateButtonText}>
+                    Generar consejos ahora
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.tipsList}>
+              {tips.map((tip, index) => {
+                const iconName = tip.icon
+                  ? iconMap[tip.icon] ?? "bulb-outline"
+                  : "bulb-outline";
+                const catLabel = categoryLabel[tip.category] ?? tip.category;
+                const catColor = categoryColor[tip.category] ?? theme.accent;
+
+                return (
+                  <View
+                    key={tip.id}
+                    style={[
+                      styles.tipCard,
+                      {
+                        borderColor: theme.stroke,
+                        backgroundColor: theme.card,
+                      },
+                    ]}
+                  >
+                    <View style={styles.tipCardHeader}>
+                      <View
+                        style={[
+                          styles.tipCardIconWrap,
+                          { backgroundColor: `${catColor}18` },
+                        ]}
+                      >
+                        <Ionicons
+                          name={iconName}
+                          size={20}
+                          color={catColor}
+                        />
+                      </View>
+                      <View style={styles.tipCardMeta}>
+                        <Text
+                          style={[
+                            styles.tipCardCategory,
+                            { color: catColor },
+                          ]}
+                        >
+                          {catLabel}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.tipCardIndex,
+                            { color: theme.muted },
+                          ]}
+                        >
+                          {index + 1} / {tips.length}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text
+                      style={[styles.tipCardTitle, { color: theme.text }]}
+                    >
+                      {tip.title}
+                    </Text>
+                    <Text
+                      style={[styles.tipCardBody, { color: theme.muted }]}
+                    >
+                      {tip.body}
+                    </Text>
+                  </View>
+                );
+              })}
+
+              <Pressable
+                style={[
+                  styles.tipsRegenerateButton,
+                  { borderColor: theme.stroke },
+                ]}
+                onPress={generateTips}
+              >
+                <Ionicons
+                  name="refresh"
+                  size={18}
+                  color={theme.accent}
+                />
+                <Text
+                  style={[
+                    styles.tipsRegenerateText,
+                    { color: theme.accent },
+                  ]}
+                >
+                  Generar nuevos consejos
+                </Text>
+              </Pressable>
+            </View>
+          )}
+        </ScrollView>
       </View>
     );
   }
@@ -5555,127 +5417,65 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   textModeContent: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingHorizontal: 24,
+    paddingTop: 8,
     paddingBottom: 140,
-    gap: 18,
-  },
-  textModeHero: {
-    borderRadius: 32,
-    borderWidth: 1,
-    overflow: "hidden",
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 22,
-    gap: 12,
-  },
-  textModeHeroGlow: {
-    position: "absolute",
-    right: -30,
-    top: -40,
-    width: 150,
-    height: 150,
-    borderRadius: 75,
+    gap: 8,
   },
   textModeTopRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   textModeBackButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
   },
-  textModeBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  textModeBadgeText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
-  },
-  textModeEyebrow: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 1.1,
-  },
   textModeTitle: {
-    maxWidth: "90%",
     fontFamily: "Manrope_800ExtraBold",
-    fontSize: 30,
-    lineHeight: 36,
+    fontSize: 28,
+    lineHeight: 34,
+    marginTop: 8,
   },
   textModeSubtitle: {
-    maxWidth: "92%",
     fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 20,
   },
   textModeFormCard: {
-    borderRadius: 28,
+    borderRadius: 24,
     borderWidth: 1,
-    padding: 18,
+    padding: 20,
     gap: 16,
   },
-  textModeSectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 10,
-  },
-  textModeSectionTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 17,
-  },
-  textModeSectionHint: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-  },
-  textModeChipRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  textModeChip: {
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  textModeChipText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 13,
-  },
   textModeFieldBlock: {
-    gap: 8,
+    gap: 6,
   },
   textModeFieldLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
   },
   textModeInput: {
-    minHeight: 52,
-    borderRadius: 18,
+    minHeight: 48,
+    borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 16,
     fontFamily: "Inter_500Medium",
     fontSize: 15,
   },
   textModeTextarea: {
-    minHeight: 150,
-    borderRadius: 22,
+    minHeight: 120,
+    borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 16,
+    paddingTop: 14,
+    paddingBottom: 14,
     fontFamily: "Inter_500Medium",
     fontSize: 15,
     lineHeight: 22,
@@ -5684,23 +5484,19 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   textModeSuggestionChip: {
-    borderRadius: 18,
+    borderRadius: 14,
     borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "flex-start",
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   textModeSuggestionText: {
-    flex: 1,
     fontFamily: "Inter_500Medium",
     fontSize: 13,
     lineHeight: 18,
   },
   textModePrimaryButton: {
-    minHeight: 56,
-    borderRadius: 18,
+    minHeight: 52,
+    borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -5712,8 +5508,9 @@ const styles = StyleSheet.create({
   },
   textModeHelper: {
     fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: "center",
   },
   safeArea: {
     flex: 1,
@@ -7287,6 +7084,328 @@ const styles = StyleSheet.create({
   },
   menuScanBackToCameraText: {
     fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+  },
+  paywallScreen: {
+    flex: 1,
+  },
+  paywallSafeArea: {
+    flex: 1,
+  },
+  paywallTopBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  paywallTopIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  paywallScrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+    alignItems: "center",
+  },
+  paywallHeroIconWrap: {
+    alignItems: "center",
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  paywallHeroIconRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  paywallHeroTitle: {
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 28,
+    color: "#FFFFFF",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  paywallFeatures: {
+    alignSelf: "stretch",
+    gap: 14,
+    marginBottom: 32,
+  },
+  paywallFeatureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  paywallFeatureCheck: {
+    opacity: 0.9,
+  },
+  paywallFeatureText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 15,
+    color: "#FFFFFF",
+    lineHeight: 20,
+  },
+  paywallPlanCards: {
+    alignSelf: "stretch",
+    gap: 12,
+    marginBottom: 16,
+  },
+  paywallPlanOption: {
+    borderRadius: 20,
+    padding: 16,
+    backgroundColor: "#FFFFFF",
+  },
+  paywallPlanOptionMonthly: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  paywallPlanOptionYearly: {
+    overflow: "hidden",
+  },
+  paywallPlanOptionBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#00C897",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 10,
+    marginTop: -4,
+    marginLeft: -4,
+  },
+  paywallPlanOptionBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+  paywallPlanOptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  paywallPlanOptionLeft: {
+    gap: 2,
+  },
+  paywallPlanOptionRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  paywallPlanOptionLabel: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: "#17130F",
+  },
+  paywallPlanOptionLabelYearly: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: "#17130F",
+  },
+  paywallPlanOptionPrice: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: "#76736E",
+  },
+  paywallPlanOptionPriceYearly: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: "#76736E",
+  },
+  paywallPlanOptionPrices: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  paywallPlanOptionPriceOld: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: "#A0A0A0",
+    textDecorationLine: "line-through",
+  },
+  paywallPlanOptionPriceNew: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#00C897",
+  },
+  paywallPlanOptionRadio: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#D0D0D0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  paywallPlanOptionActive: {
+    borderWidth: 2,
+    borderColor: "#00C897",
+  },
+  paywallPlanOptionRadioActive: {
+    backgroundColor: "#00C897",
+    borderColor: "#00C897",
+  },
+  paywallTrialText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.7)",
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  paywallCtaButton: {
+    alignSelf: "stretch",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 999,
+    paddingVertical: 18,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  paywallCtaButtonText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: "#00C897",
+  },
+  paywallSkipButton: {
+    alignSelf: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  paywallSkipButtonText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: "rgba(255,255,255,0.7)",
+    textDecorationLine: "underline",
+  },
+  tipsContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 32,
+    gap: 16,
+  },
+  tipsHeader: {
+    gap: 4,
+    marginBottom: 8,
+  },
+  tipsHeaderEyebrow: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  tipsHeaderTitle: {
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 24,
+    lineHeight: 30,
+  },
+  tipsHeaderSubtitle: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  tipsLoading: {
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 48,
+  },
+  tipsLoadingText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+  },
+  tipsEmpty: {
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 48,
+  },
+  tipsEmptyTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+  },
+  tipsEmptyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: "center",
+    paddingHorizontal: 16,
+  },
+  tipsGenerateButton: {
+    marginTop: 8,
+    borderRadius: 999,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+  },
+  tipsGenerateButtonText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#FFFFFF",
+  },
+  tipsList: {
+    gap: 12,
+  },
+  tipCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 18,
+    gap: 10,
+  },
+  tipCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  tipCardIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tipCardMeta: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  tipCardCategory: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  tipCardIndex: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  tipCardTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  tipCardBody: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  tipsRegenerateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  tipsRegenerateText: {
+    fontFamily: "Inter_700Bold",
     fontSize: 15,
   },
 });
