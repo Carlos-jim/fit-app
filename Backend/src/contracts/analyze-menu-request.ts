@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const analyzeMenuRequestSchema = z.object({
-  userId: z.string().min(1),
   imageUrl: z.string().url(),
 });
 

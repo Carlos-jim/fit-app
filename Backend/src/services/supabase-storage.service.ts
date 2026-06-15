@@ -27,6 +27,8 @@ const SUPPORTED_CONTENT_TYPES = new Set([
   "image/gif",
 ]);
 
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
 export interface StorageUploadPayload {
   uploadUrl: string;
   bucket: string;
@@ -51,10 +53,47 @@ export class SupabaseStorageService {
     fileName: string;
     contentType: string;
   }): Promise<StorageUploadPayload> {
+    const normalizedFileName = input.fileName.replace(/\0/g, "").trim();
+
+    if (normalizedFileName.length === 0) {
+      throw new AppError("Invalid file name.", {
+        statusCode: 400,
+        code: "INVALID_FILE_NAME",
+      });
+    }
+
+    if (normalizedFileName.includes("..") || /[\\/]/.test(normalizedFileName)) {
+      throw new AppError("File name contains invalid characters.", {
+        statusCode: 400,
+        code: "INVALID_FILE_NAME",
+      });
+    }
+
+    if (!SUPPORTED_CONTENT_TYPES.has(input.contentType)) {
+      throw new AppError(
+        "Unsupported image format. Allowed types: JPEG, PNG, WEBP, GIF.",
+        {
+          statusCode: 415,
+          code: "UNSUPPORTED_MEDIA_TYPE",
+        },
+      );
+    }
+
     const extension =
-      extname(input.fileName).toLowerCase() ||
+      extname(normalizedFileName).toLowerCase() ||
       extensionByContentType[input.contentType] ||
       ".jpg";
+
+    const expectedExtension = extensionByContentType[input.contentType];
+    if (expectedExtension && extension !== expectedExtension) {
+      throw new AppError(
+        `File extension does not match content type. Expected ${expectedExtension}.`,
+        {
+          statusCode: 400,
+          code: "FILE_EXTENSION_MISMATCH",
+        },
+      );
+    }
 
     const path = [
       "uploads",
@@ -126,6 +165,13 @@ export class SupabaseStorageService {
       throw new AppError("Stored image is empty.", {
         statusCode: 422,
         code: "EMPTY_IMAGE",
+      });
+    }
+
+    if (bytes.length > MAX_FILE_SIZE_BYTES) {
+      throw new AppError("Image exceeds maximum size of 10 MB.", {
+        statusCode: 413,
+        code: "IMAGE_TOO_LARGE",
       });
     }
 

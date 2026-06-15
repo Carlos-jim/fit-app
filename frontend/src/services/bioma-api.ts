@@ -9,9 +9,9 @@ import type {
   UploadMealImageResponse,
   UserTip,
 } from "../types/api";
+import { tokenManager, type AuthTokens } from "./auth-token-manager";
 
 export interface AnalyzeMealPayload {
-  userId: string;
   path?: string;
   bucket?: string;
   base64Image?: string;
@@ -19,6 +19,11 @@ export interface AnalyzeMealPayload {
   mealLabel?: string;
   notes?: string;
   consumedAt?: string;
+}
+
+export interface AuthResponse {
+  user: BootstrapUserResponse;
+  tokens: AuthTokens;
 }
 
 export type GoalType = "LOSE_WEIGHT" | "MAINTAIN" | "GAIN_WEIGHT";
@@ -57,44 +62,68 @@ class BiomaApi {
     name: string;
     email: string;
     password: string;
-  }): Promise<BootstrapUserResponse> {
-    const response = await this.request<BootstrapUserResponse>(
-      "/auth/register",
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-      },
-    );
+  }): Promise<AuthResponse> {
+    const response = await this.request<AuthResponse>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    await tokenManager.setTokens(response.data.tokens);
     return response.data;
   }
 
   async loginWithEmail(input: {
     email: string;
     password: string;
-  }): Promise<BootstrapUserResponse> {
-    const response = await this.request<BootstrapUserResponse>("/auth/login", {
+  }): Promise<AuthResponse> {
+    const response = await this.request<AuthResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(input),
     });
+    await tokenManager.setTokens(response.data.tokens);
     return response.data;
   }
 
-  async loginWithGoogle(idToken: string): Promise<BootstrapUserResponse> {
-    const response = await this.request<BootstrapUserResponse>("/auth/google", {
+  async loginWithGoogle(idToken: string): Promise<AuthResponse> {
+    const response = await this.request<AuthResponse>("/auth/google", {
       method: "POST",
       body: JSON.stringify({ idToken }),
     });
+    await tokenManager.setTokens(response.data.tokens);
     return response.data;
   }
 
+  async refreshAccessToken(): Promise<AuthTokens | null> {
+    const refreshToken = await tokenManager.getRefreshToken();
+    if (!refreshToken) return null;
+
+    try {
+      const response = await this.request<AuthTokens>("/auth/refresh", {
+        method: "POST",
+        body: JSON.stringify({ refreshToken }),
+      });
+      await tokenManager.setTokens(response.data);
+      return response.data;
+    } catch {
+      await tokenManager.clearTokens();
+      return null;
+    }
+  }
+
   async logout(): Promise<void> {
-    await this.request<void>("/auth/logout", {
-      method: "POST",
-    });
+    const refreshToken = await tokenManager.getRefreshToken();
+    await tokenManager.clearTokens();
+
+    try {
+      await this.request<void>("/auth/logout", {
+        method: "POST",
+        body: JSON.stringify({ refreshToken }),
+      });
+    } catch {
+      // Ignore logout errors
+    }
   }
 
   async createMealUploadUrl(input: {
-    userId: string;
     fileName: string;
     contentType: string;
   }): Promise<UploadMealImageResponse> {
@@ -114,7 +143,7 @@ class BiomaApi {
     imageUri: string,
     headers: Record<string, string>,
   ): Promise<void> {
-    console.log("[API Request] PUT uploadImageToStorage", { uploadUrl, imageUri });
+    console.log("[API Request] PUT uploadImageToStorage", { uploadUrl });
 
     try {
       const imageResponse = await fetch(imageUri);
@@ -129,7 +158,7 @@ class BiomaApi {
       if (!response.ok) {
         console.error(
           `[API Error] PUT uploadImageToStorage | Status: ${response.status}`,
-          { uploadUrl, imageUri },
+          { uploadUrl },
         );
         throw new Error(`Storage upload failed with status ${response.status}.`);
       }
@@ -160,7 +189,6 @@ class BiomaApi {
   }
 
   async analyzeMealText(input: {
-    userId: string;
     description: string;
     mealLabel?: string;
     consumedAt?: string;
@@ -176,13 +204,10 @@ class BiomaApi {
     return response.data;
   }
 
-  async getLogs(userId: string): Promise<MealLog[]> {
-    const response = await this.request<MealLog[]>(
-      `/logs?userId=${encodeURIComponent(userId)}`,
-      {
-        method: "GET",
-      },
-    );
+  async getLogs(): Promise<MealLog[]> {
+    const response = await this.request<MealLog[]>("/logs", {
+      method: "GET",
+    });
 
     return response.data;
   }
@@ -217,18 +242,12 @@ class BiomaApi {
     return response.data;
   }
 
-  async analyzeMenuImage(
-    imageUrl: string,
-    userId: string,
-  ): Promise<MenuAnalysisResponse> {
+  async analyzeMenuImage(imageUrl: string): Promise<MenuAnalysisResponse> {
     const response = await this.request<MenuAnalysisResponse>(
       "/logs/analyze-menu-image",
       {
         method: "POST",
-        body: JSON.stringify({
-          userId,
-          imageUrl,
-        }),
+        body: JSON.stringify({ imageUrl }),
       },
     );
 
@@ -237,36 +256,31 @@ class BiomaApi {
 
   // ─── Onboarding ──────────────────────────────────────────────────
 
-  async onboardingStep1(
-    userId: string,
-    goal: GoalType,
-  ): Promise<OnboardingSession> {
+  async onboardingStep1(goal: GoalType): Promise<OnboardingSession> {
     const response = await this.request<OnboardingSession>(
       "/onboarding/step/1",
       {
         method: "POST",
-        body: JSON.stringify({ userId, goal }),
+        body: JSON.stringify({ goal }),
       },
     );
     return response.data;
   }
 
   async onboardingStep2(
-    userId: string,
     workoutFrequency: WorkoutFrequency,
   ): Promise<OnboardingSession> {
     const response = await this.request<OnboardingSession>(
       "/onboarding/step/2",
       {
         method: "POST",
-        body: JSON.stringify({ userId, workoutFrequency }),
+        body: JSON.stringify({ workoutFrequency }),
       },
     );
     return response.data;
   }
 
   async onboardingStep3(
-    userId: string,
     weightKg?: number,
     heightCm?: number,
   ): Promise<OnboardingSession> {
@@ -274,74 +288,62 @@ class BiomaApi {
       "/onboarding/step/3",
       {
         method: "POST",
-        body: JSON.stringify({ userId, weightKg, heightCm }),
+        body: JSON.stringify({ weightKg, heightCm }),
       },
     );
     return response.data;
   }
 
   async onboardingStep4(
-    userId: string,
     desiredWeightKg?: number,
   ): Promise<OnboardingSession> {
     const response = await this.request<OnboardingSession>(
       "/onboarding/step/4",
       {
         method: "POST",
-        body: JSON.stringify({ userId, desiredWeightKg }),
+        body: JSON.stringify({ desiredWeightKg }),
       },
     );
     return response.data;
   }
 
-  async onboardingStep5(
-    userId: string,
-    gender: Gender,
-  ): Promise<OnboardingSession> {
+  async onboardingStep5(gender: Gender): Promise<OnboardingSession> {
     const response = await this.request<OnboardingSession>(
       "/onboarding/step/5",
       {
         method: "POST",
-        body: JSON.stringify({ userId, gender }),
+        body: JSON.stringify({ gender }),
       },
     );
     return response.data;
   }
 
-  async onboardingStep6(
-    userId: string,
-    age: number,
-  ): Promise<OnboardingSession> {
+  async onboardingStep6(age: number): Promise<OnboardingSession> {
     const response = await this.request<OnboardingSession>(
       "/onboarding/step/6",
       {
         method: "POST",
-        body: JSON.stringify({ userId, age }),
+        body: JSON.stringify({ age }),
       },
     );
     return response.data;
   }
 
-  async onboardingStep7(
-    userId: string,
-    country: string,
-  ): Promise<OnboardingSession> {
+  async onboardingStep7(country: string): Promise<OnboardingSession> {
     const response = await this.request<OnboardingSession>(
       "/onboarding/step/7",
       {
         method: "POST",
-        body: JSON.stringify({ userId, country }),
+        body: JSON.stringify({ country }),
       },
     );
     return response.data;
   }
 
-  async getOnboardingSession(
-    userId: string,
-  ): Promise<OnboardingSession | null> {
+  async getOnboardingSession(): Promise<OnboardingSession | null> {
     try {
       const response = await this.request<OnboardingSession | null>(
-        `/onboarding/session?userId=${encodeURIComponent(userId)}`,
+        "/onboarding/session",
         { method: "GET" },
       );
       return response.data;
@@ -350,32 +352,31 @@ class BiomaApi {
     }
   }
 
-  async deleteOnboardingSession(userId: string): Promise<void> {
-    await this.request<void>(
-      `/onboarding/session?userId=${encodeURIComponent(userId)}`,
-      { method: "DELETE" },
-    );
+  async deleteOnboardingSession(): Promise<void> {
+    await this.request<void>("/onboarding/session", { method: "DELETE" });
   }
 
-  async generateTips(userId: string, force?: boolean): Promise<UserTip[]> {
+  async generateTips(force?: boolean): Promise<UserTip[]> {
     const response = await this.request<UserTip[]>("/tips/generate", {
       method: "POST",
-      body: JSON.stringify({ userId, force }),
+      body: JSON.stringify({ force }),
     });
     return response.data;
   }
 
-  async getTips(userId: string): Promise<UserTip[]> {
-    const response = await this.request<UserTip[]>(
-      `/tips?userId=${encodeURIComponent(userId)}`,
-      { method: "GET" },
-    );
+  async getTips(): Promise<UserTip[]> {
+    const response = await this.request<UserTip[]>("/tips", {
+      method: "GET",
+    });
     return response.data;
   }
+
+  private refreshPromise: Promise<AuthTokens | null> | null = null;
 
   private async request<T>(
     path: string,
     init: RequestInit,
+    retry = true,
   ): Promise<ApiEnvelope<T>> {
     if (!env.apiBaseUrl) {
       console.error("[API Error] EXPO_PUBLIC_API_BASE_URL is not configured.");
@@ -384,47 +385,43 @@ class BiomaApi {
 
     const url = `${env.apiBaseUrl}${path}`;
     const method = (init.method ?? "GET").toUpperCase();
-    const bodyData = init.body ? JSON.parse(init.body as string) : null;
 
-    console.log(`[API Request] ${method} ${url}`, bodyData ? { body: bodyData } : "");
+    const accessToken = await tokenManager.getAccessToken();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (init.headers && typeof init.headers === "object") {
+      Object.entries(init.headers).forEach(([key, value]) => {
+        if (typeof value === "string") {
+          headers[key] = value;
+        }
+      });
+    }
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    console.log(`[API Request] ${method} ${path}`);
 
     try {
       const response = await fetch(url, {
         ...init,
-        headers: {
-          "Content-Type": "application/json",
-          ...(init.headers ?? {}),
-        },
+        headers,
       });
 
-      const text = await response.text();
-      let payload: ApiEnvelope<T> | null = null;
-
-      try {
-        payload = text ? (JSON.parse(text) as ApiEnvelope<T>) : null;
-      } catch (parseError) {
-        console.error(`[API Error] ${method} ${path}: Failed to parse JSON response. Raw text:`, text);
-        throw new Error(`Invalid JSON response from ${path}: ${text}`);
+      if (response.status === 401 && retry && path !== "/auth/refresh") {
+        const newTokens = await this.performRefresh();
+        if (newTokens) {
+          headers["Authorization"] = `Bearer ${newTokens.accessToken}`;
+          const retryResponse = await fetch(url, {
+            ...init,
+            headers,
+          });
+          return this.parseResponse<T>(retryResponse, path, method);
+        }
       }
 
-      if (!response.ok) {
-        console.error(
-          `[API Error] ${method} ${path} | Status: ${response.status}`,
-          { error: payload?.error, message: payload?.message, body: payload?.data },
-        );
-        throw new Error(
-          payload?.message ?? `Request failed with status ${response.status}.`,
-        );
-      }
-
-      if (!payload) {
-        console.error(`[API Error] ${method} ${path}: Empty response body`);
-        throw new Error("Empty API response.");
-      }
-
-      console.log(`[API Response] ${method} ${path} | Status: ${response.status}`, { data: payload.data });
-
-      return payload;
+      return this.parseResponse<T>(response, path, method);
     } catch (error) {
       if (error instanceof TypeError) {
         console.error(`[API Network Error] ${method} ${path}:`, error.message);
@@ -433,6 +430,50 @@ class BiomaApi {
       }
       throw error;
     }
+  }
+
+  private async parseResponse<T>(
+    response: Response,
+    path: string,
+    method: string,
+  ): Promise<ApiEnvelope<T>> {
+    const text = await response.text();
+    let payload: ApiEnvelope<T> | null = null;
+
+    try {
+      payload = text ? (JSON.parse(text) as ApiEnvelope<T>) : null;
+    } catch {
+      console.error(`[API Error] ${method} ${path}: Failed to parse JSON response`);
+      throw new Error(`Invalid JSON response from ${path}`);
+    }
+
+    if (!response.ok) {
+      console.error(`[API Error] ${method} ${path} | Status: ${response.status}`, {
+        error: payload?.error,
+        message: payload?.message,
+      });
+      throw new Error(
+        payload?.message ?? `Request failed with status ${response.status}.`,
+      );
+    }
+
+    if (!payload) {
+      console.error(`[API Error] ${method} ${path}: Empty response body`);
+      throw new Error("Empty API response.");
+    }
+
+    console.log(`[API Response] ${method} ${path} | Status: ${response.status}`);
+
+    return payload;
+  }
+
+  private async performRefresh(): Promise<AuthTokens | null> {
+    if (!this.refreshPromise) {
+      this.refreshPromise = this.refreshAccessToken();
+    }
+    const result = await this.refreshPromise;
+    this.refreshPromise = null;
+    return result;
   }
 }
 

@@ -70,7 +70,7 @@ export function AuthScreen({
     console.log("[Auth] Starting Google Auth with ID Token...");
     setLoading(true);
     try {
-      const user = await biomaApi.loginWithGoogle(idToken);
+      const { user } = await biomaApi.loginWithGoogle(idToken);
       console.log("[Auth] Google Login Success:", user);
       onLoginSuccess(user);
     } catch (err) {
@@ -100,10 +100,10 @@ export function AuthScreen({
     try {
       const result = await biomaApi.loginWithEmail({
         email: emailTrimmed,
-        password: password.trim(),
+        password,
       });
-      console.log("[Auth] Email Login Success:", result);
-      onLoginSuccess(result);
+      console.log("[Auth] Email Login Success:", result.user);
+      onLoginSuccess(result.user);
     } catch (err) {
       console.error("[Auth] Email Login Error:", err);
       Alert.alert(

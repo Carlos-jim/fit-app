@@ -1,5 +1,8 @@
 import cors from "cors";
 import express, { type Request, type Response } from "express";
+import rateLimit from "express-rate-limit";
+import helmet from "helmet";
+import * as Sentry from "@sentry/node";
 import { z } from "zod";
 
 import { env } from "./config/env.js";
@@ -24,6 +27,7 @@ import {
 } from "./contracts/onboarding-request.js";
 import { generateTipsRequestSchema } from "./contracts/generate-tips-request.js";
 import { suggestMealRequestSchema } from "./contracts/suggest-meal-request.js";
+import { requireAuth } from "./middleware/auth.middleware.js";
 import { AppError } from "./lib/app-error.js";
 import { prisma } from "./lib/prisma.js";
 import { LogRepository } from "./repositories/log.repository.js";
@@ -35,6 +39,16 @@ import { NutritionAnalysisService } from "./services/nutrition-analysis.service.
 import { SupabaseStorageService } from "./services/supabase-storage.service.js";
 import { TipsService } from "./services/tips.service.js";
 
+if (env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || "development",
+    tracesSampleRate: 0.1,
+  });
+}
+
+const isProduction = process.env.NODE_ENV === "production";
+
 const app = express();
 const userRepository = new UserRepository(prisma);
 const logRepository = new LogRepository(prisma);
@@ -45,16 +59,74 @@ const nutritionAnalysisService = new NutritionAnalysisService();
 const tipsService = new TipsService();
 const storageService = new SupabaseStorageService();
 
-app.use(cors());
+// Security headers
+app.use(helmet());
+
+// CORS
+const corsOrigins = env.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || corsOrigins.includes("*") || corsOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+  }),
+);
+
 app.use(express.json({ limit: "2mb" }));
 
-app.get("/health", (_req, res) => {
-  res.status(200).json({
-    data: {
-      ok: true,
-      service: "bioma-backend",
-    },
-  });
+// Rate limiters
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "TOO_MANY_REQUESTS", message: "Too many requests." },
+});
+
+const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  message: { error: "TOO_MANY_REQUESTS", message: "Too many auth attempts." },
+});
+
+const aiLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip || "unknown",
+  message: { error: "TOO_MANY_REQUESTS", message: "AI quota exceeded." },
+});
+
+app.use(generalLimiter);
+app.use("/auth/", authLimiter);
+
+app.get("/health", async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({
+      data: {
+        ok: true,
+        service: "bioma-backend",
+        database: "connected",
+      },
+    });
+  } catch {
+    res.status(503).json({
+      error: {
+        message: "Database unavailable",
+        service: "bioma-backend",
+        database: "disconnected",
+      },
+    });
+  }
 });
 
 app.post("/users/bootstrap", async (req, res) => {
@@ -80,8 +152,8 @@ app.post("/users/bootstrap", async (req, res) => {
 app.post("/auth/register", async (req, res) => {
   try {
     const request = parseBody(registerRequestSchema, req.body);
-    const user = await authService.register(request);
-    res.status(201).json({ data: user });
+    const result = await authService.register(request);
+    res.status(201).json({ data: result });
   } catch (error) {
     handleError(res, error, "registering user");
   }
@@ -90,8 +162,8 @@ app.post("/auth/register", async (req, res) => {
 app.post("/auth/login", async (req, res) => {
   try {
     const request = parseBody(loginRequestSchema, req.body);
-    const user = await authService.loginWithEmail(request);
-    res.status(200).json({ data: user });
+    const result = await authService.loginWithEmail(request);
+    res.status(200).json({ data: result });
   } catch (error) {
     handleError(res, error, "logging in user");
   }
@@ -100,22 +172,37 @@ app.post("/auth/login", async (req, res) => {
 app.post("/auth/google", async (req, res) => {
   try {
     const request = parseBody(googleLoginRequestSchema, req.body);
-    // In production, verify the Google ID token here
-    // For now, we'll create/login the user directly
-    // You would normally use google-auth-library to verify the token
-    const user = await authService.loginWithGoogle({
+    const result = await authService.loginWithGoogle({
       idToken: request.idToken,
     });
-    res.status(200).json({ data: user });
+    res.status(200).json({ data: result });
   } catch (error) {
     handleError(res, error, "logging in with Google");
   }
 });
 
+app.post("/auth/refresh", async (req, res) => {
+  try {
+    const refreshToken = req.body?.refreshToken;
+    if (typeof refreshToken !== "string") {
+      throw new AppError("Refresh token is required.", {
+        statusCode: 400,
+        code: "MISSING_REFRESH_TOKEN",
+      });
+    }
+    const tokens = await authService.refreshAccessToken(refreshToken);
+    res.status(200).json({ data: tokens });
+  } catch (error) {
+    handleError(res, error, "refreshing token");
+  }
+});
+
 app.post("/auth/logout", async (req, res) => {
   try {
-    // In a mature app, you'd invalidate tokens or sessions here.
-    // We just return a success payload for now.
+    const refreshToken = req.body?.refreshToken;
+    if (typeof refreshToken === "string") {
+      await authService.logout(refreshToken);
+    }
     res.status(200).json({ data: { success: true } });
   } catch (error) {
     handleError(res, error, "logging out");
@@ -124,114 +211,91 @@ app.post("/auth/logout", async (req, res) => {
 
 // ─── Onboarding endpoints ─────────────────────────────────────────
 
-app.post("/onboarding/step/1", async (req, res) => {
+app.post("/onboarding/step/1", requireAuth, async (req, res) => {
   try {
     const request = parseBody(onboardingStep1Schema, req.body);
-    const session = await onboardingRepository.updateStep1(
-      request.userId,
-      request,
-    );
+    const session = await onboardingRepository.updateStep1(getUserId(req), request);
     res.status(200).json({ data: session });
   } catch (error) {
     handleError(res, error, "saving onboarding step 1");
   }
 });
 
-app.post("/onboarding/step/2", async (req, res) => {
+app.post("/onboarding/step/2", requireAuth, async (req, res) => {
   try {
     const request = parseBody(onboardingStep2Schema, req.body);
-    const session = await onboardingRepository.updateStep2(
-      request.userId,
-      request,
-    );
+    const session = await onboardingRepository.updateStep2(getUserId(req), request);
     res.status(200).json({ data: session });
   } catch (error) {
     handleError(res, error, "saving onboarding step 2");
   }
 });
 
-app.post("/onboarding/step/3", async (req, res) => {
+app.post("/onboarding/step/3", requireAuth, async (req, res) => {
   try {
     const request = parseBody(onboardingStep3Schema, req.body);
-    const session = await onboardingRepository.updateStep3(
-      request.userId,
-      request,
-    );
+    const session = await onboardingRepository.updateStep3(getUserId(req), request);
     res.status(200).json({ data: session });
   } catch (error) {
     handleError(res, error, "saving onboarding step 3");
   }
 });
 
-app.post("/onboarding/step/4", async (req, res) => {
+app.post("/onboarding/step/4", requireAuth, async (req, res) => {
   try {
     const request = parseBody(onboardingStep4Schema, req.body);
-    const session = await onboardingRepository.updateStep4(
-      request.userId,
-      request,
-    );
+    const session = await onboardingRepository.updateStep4(getUserId(req), request);
     res.status(200).json({ data: session });
   } catch (error) {
     handleError(res, error, "saving onboarding step 4");
   }
 });
 
-app.post("/onboarding/step/5", async (req, res) => {
+app.post("/onboarding/step/5", requireAuth, async (req, res) => {
   try {
     const request = parseBody(onboardingStep5Schema, req.body);
-    const session = await onboardingRepository.updateStep5(
-      request.userId,
-      request,
-    );
+    const session = await onboardingRepository.updateStep5(getUserId(req), request);
     res.status(200).json({ data: session });
   } catch (error) {
     handleError(res, error, "saving onboarding step 5");
   }
 });
 
-app.post("/onboarding/step/6", async (req, res) => {
+app.post("/onboarding/step/6", requireAuth, async (req, res) => {
   try {
     const request = parseBody(onboardingStep6Schema, req.body);
-    const session = await onboardingRepository.updateStep6(
-      request.userId,
-      request,
-    );
+    const session = await onboardingRepository.updateStep6(getUserId(req), request);
     res.status(200).json({ data: session });
   } catch (error) {
     handleError(res, error, "saving onboarding step 6");
   }
 });
 
-app.post("/onboarding/step/7", async (req, res) => {
+app.post("/onboarding/step/7", requireAuth, async (req, res) => {
   try {
     const request = parseBody(onboardingStep7Schema, req.body);
-    const session = await onboardingRepository.updateStep7(
-      request.userId,
-      request,
-    );
+    const session = await onboardingRepository.updateStep7(getUserId(req), request);
     res.status(200).json({ data: session });
   } catch (error) {
     handleError(res, error, "saving onboarding step 7");
   }
 });
 
-app.get("/onboarding/session", async (req, res) => {
+app.get("/onboarding/session", requireAuth, async (req, res) => {
   try {
-    const userId = parseQueryUserId(req);
-    const session = await onboardingRepository.getSession(userId);
+    const session = await onboardingRepository.getSession(getUserId(req));
     res.status(200).json({ data: session });
   } catch (error) {
     handleError(res, error, "fetching onboarding session");
   }
 });
 
-app.delete("/onboarding/session", async (req, res) => {
+app.delete("/onboarding/session", requireAuth, async (req, res) => {
   try {
-    const userId = parseQueryUserId(req);
-    const session = await onboardingRepository.getSession(userId);
+    const session = await onboardingRepository.getSession(getUserId(req));
 
     if (session) {
-      await userProfileRepository.upsertFromOnboarding(userId, {
+      await userProfileRepository.upsertFromOnboarding(getUserId(req), {
         goal: session.goal,
         weightKg: session.weightKg,
         heightCm: session.heightCm,
@@ -245,34 +309,28 @@ app.delete("/onboarding/session", async (req, res) => {
       });
     }
 
-    await onboardingRepository.deleteSession(userId);
+    await onboardingRepository.deleteSession(getUserId(req));
     res.status(200).json({ data: { ok: true } });
   } catch (error) {
     handleError(res, error, "deleting onboarding session");
   }
 });
 
-app.post("/uploads/meal-image-url", async (req, res) => {
+app.post("/uploads/meal-image-url", requireAuth, async (req, res) => {
   try {
     const request = parseBody(createMealUploadUrlRequestSchema, req.body);
-    const userExists = await userRepository.exists(request.userId);
+    const upload = await storageService.createMealImageUploadUrl({
+      userId: getUserId(req),
+      fileName: request.fileName,
+      contentType: request.contentType,
+    });
 
-    if (!userExists) {
-      throw new AppError("User not found.", {
-        statusCode: 404,
-        code: "USER_NOT_FOUND",
-      });
-    }
-
-    const upload = await storageService.createMealImageUploadUrl(request);
-
-    console.log("[upload-meal-image-url] Signed URL created:", {
-      userId: request.userId,
+    console.log("[upload-meal-image-url] Signed URL created", {
+      userId: getUserId(req),
       fileName: request.fileName,
       contentType: request.contentType,
       bucket: upload.bucket,
       path: upload.path,
-      fileUrl: upload.fileUrl,
     });
 
     res.status(200).json({
@@ -284,17 +342,16 @@ app.post("/uploads/meal-image-url", async (req, res) => {
   }
 });
 
-app.post("/logs/analyze-meal-image", async (req, res) => {
+app.post("/logs/analyze-meal-image", requireAuth, aiLimiter, async (req, res) => {
   try {
     const request = parseBody(analyzeMealRequestSchema, req.body);
 
-    console.log("[analyze-meal-image] Request received:", {
-      userId: request.userId,
-      bucket: request.bucket,
-      path: request.path,
+    console.log("[analyze-meal-image] Request received", {
+      userId: getUserId(req),
+      hasPath: !!request.path,
+      hasBase64: !!request.base64Image,
       mealLabel: request.mealLabel,
       consumedAt: request.consumedAt,
-      isLocal: !!request.base64Image,
     });
 
     let imageDataUrl: string;
@@ -303,30 +360,31 @@ app.post("/logs/analyze-meal-image", async (req, res) => {
     let imageUrl: string | undefined = undefined;
 
     if (request.base64Image) {
-      imageDataUrl = request.base64Image.startsWith("data:") 
-        ? request.base64Image 
+      imageDataUrl = request.base64Image.startsWith("data:")
+        ? request.base64Image
         : `data:image/jpeg;base64,${request.base64Image}`;
       imageUrl = request.localImageUrl;
-      
-      console.log("[analyze-meal-image] Using provided base64 image (length:", request.base64Image.length, ")");
+
+      console.log("[analyze-meal-image] Using provided base64 image", {
+        length: request.base64Image.length,
+      });
     } else {
       if (!request.path) {
         throw new AppError("Path is required when base64Image is not provided.", { statusCode: 400, code: "MISSING_PATH" });
       }
-      
+
       const imageAsset = await storageService.getImage({
         bucket: request.bucket,
         path: request.path,
       });
 
-      console.log("[analyze-meal-image] Image fetched from storage:", {
+      console.log("[analyze-meal-image] Image fetched from storage", {
         bucket: imageAsset.bucket,
         path: imageAsset.path,
         contentType: imageAsset.contentType,
         bytes: imageAsset.bytes.length,
-        publicUrl: imageAsset.publicUrl,
       });
-      
+
       imageBucket = imageAsset.bucket;
       imageKey = imageAsset.path;
       imageUrl = imageAsset.publicUrl;
@@ -339,7 +397,7 @@ app.post("/logs/analyze-meal-image", async (req, res) => {
       notes: request.notes,
     });
 
-    console.log("[analyze-meal-image] AI analysis done:", {
+    console.log("[analyze-meal-image] AI analysis done", {
       model: analysisResult.model,
       mealName: analysisResult.parsed.mealName,
       confidence: analysisResult.parsed.confidence,
@@ -347,7 +405,7 @@ app.post("/logs/analyze-meal-image", async (req, res) => {
     });
 
     const log = await logRepository.createMealAnalysisLog({
-      userId: request.userId,
+      userId: getUserId(req),
       source: "IMAGE",
       mealLabel: request.mealLabel,
       notes: request.notes,
@@ -359,14 +417,9 @@ app.post("/logs/analyze-meal-image", async (req, res) => {
       aiModel: analysisResult.model,
     });
 
-    console.log("[analyze-meal-image] Log saved:", {
-      logId: log.id,
-      imageUrl: log.imageUrl,
-    });
+    console.log("[analyze-meal-image] Log saved", { logId: log.id });
 
     const response = serializeMealLog(log);
-
-    console.log("[analyze-meal-image] Response imageUrl:", response.imageUrl);
 
     res.status(201).json({
       data: response,
@@ -377,7 +430,7 @@ app.post("/logs/analyze-meal-image", async (req, res) => {
   }
 });
 
-app.post("/logs/analyze-meal-text", async (req, res) => {
+app.post("/logs/analyze-meal-text", requireAuth, aiLimiter, async (req, res) => {
   try {
     const request = parseBody(analyzeMealTextRequestSchema, req.body);
     const analysisResult = await nutritionAnalysisService.analyzeFromText({
@@ -386,7 +439,7 @@ app.post("/logs/analyze-meal-text", async (req, res) => {
     });
 
     const log = await logRepository.createMealAnalysisLog({
-      userId: request.userId,
+      userId: getUserId(req),
       source: "TEXT",
       mealLabel: request.mealLabel,
       notes: request.description,
@@ -403,20 +456,28 @@ app.post("/logs/analyze-meal-text", async (req, res) => {
   }
 });
 
-app.post("/logs/analyze-menu-image", async (req, res) => {
+app.post("/logs/analyze-menu-image", requireAuth, aiLimiter, async (req, res) => {
   try {
     const request = parseBody(analyzeMenuRequestSchema, req.body);
 
-    console.log("[analyze-menu-image] Request received:", {
-      userId: request.userId,
-      imageUrl: request.imageUrl,
+    // Basic URL validation to prevent SSRF / arbitrary fetches
+    const url = new URL(request.imageUrl);
+    if (!/^https?:$/.test(url.protocol)) {
+      throw new AppError("Invalid image URL protocol.", {
+        statusCode: 400,
+        code: "INVALID_IMAGE_URL",
+      });
+    }
+
+    console.log("[analyze-menu-image] Request received", {
+      userId: getUserId(req),
     });
 
     const menuAnalysisResult = await nutritionAnalysisService.analyzeMenuImage(
       request.imageUrl,
     );
 
-    console.log("[analyze-menu-image] AI analysis done:", {
+    console.log("[analyze-menu-image] AI analysis done", {
       dishesDetected: menuAnalysisResult.dishesDetected.length,
       recommendedDishes: menuAnalysisResult.recommendedDishes.length,
       dishesToAvoid: menuAnalysisResult.dishesToAvoid.length,
@@ -431,17 +492,16 @@ app.post("/logs/analyze-menu-image", async (req, res) => {
   }
 });
 
-app.get("/logs", async (req, res) => {
+app.get("/logs", requireAuth, async (req, res) => {
   try {
-    const userId = parseQueryUserId(req);
-    const logs = await logRepository.getUserLogs(userId);
+    const logs = await logRepository.getUserLogs(getUserId(req));
     res.status(200).json({ data: logs });
   } catch (error) {
     handleError(res, error, "fetching meal logs");
   }
 });
 
-app.post("/logs/suggest-meal", async (req, res) => {
+app.post("/logs/suggest-meal", requireAuth, aiLimiter, async (req, res) => {
   try {
     const request = parseBody(suggestMealRequestSchema, req.body);
 
@@ -468,10 +528,10 @@ app.post("/logs/suggest-meal", async (req, res) => {
   }
 });
 
-app.post("/tips/generate", async (req, res) => {
+app.post("/tips/generate", requireAuth, aiLimiter, async (req, res) => {
   try {
     const request = parseBody(generateTipsRequestSchema, req.body);
-    const profile = await userProfileRepository.getByUserId(request.userId);
+    const profile = await userProfileRepository.getByUserId(getUserId(req));
 
     if (!profile) {
       throw new AppError("User profile not found. Complete onboarding first.", {
@@ -485,7 +545,7 @@ app.post("/tips/generate", async (req, res) => {
 
     const recentMeals = await prisma.log.findMany({
       where: {
-        userId: request.userId,
+        userId: getUserId(req),
         type: "MEAL_ANALYSIS",
         createdAt: { gte: oneWeekAgo },
       },
@@ -505,12 +565,12 @@ app.post("/tips/generate", async (req, res) => {
 
     if (!request.force) {
       const existing = await prisma.tip.findFirst({
-        where: { userId: request.userId, weekYear: weekKey },
+        where: { userId: getUserId(req), weekYear: weekKey },
       });
 
       if (existing) {
         const tips = await prisma.tip.findMany({
-          where: { userId: request.userId, weekYear: weekKey },
+          where: { userId: getUserId(req), weekYear: weekKey },
           orderBy: { createdAt: "asc" },
         });
         res.status(200).json({ data: tips });
@@ -541,12 +601,12 @@ app.post("/tips/generate", async (req, res) => {
     });
 
     await prisma.tip.deleteMany({
-      where: { userId: request.userId, weekYear: weekKey },
+      where: { userId: getUserId(req), weekYear: weekKey },
     });
 
-    const created = await prisma.tip.createMany({
+    await prisma.tip.createMany({
       data: generated.tips.map((tip) => ({
-        userId: request.userId,
+        userId: getUserId(req),
         title: tip.title,
         body: tip.body,
         category: tip.category,
@@ -556,7 +616,7 @@ app.post("/tips/generate", async (req, res) => {
     });
 
     const tips = await prisma.tip.findMany({
-      where: { userId: request.userId, weekYear: weekKey },
+      where: { userId: getUserId(req), weekYear: weekKey },
       orderBy: { createdAt: "asc" },
     });
 
@@ -566,13 +626,12 @@ app.post("/tips/generate", async (req, res) => {
   }
 });
 
-app.get("/tips", async (req, res) => {
+app.get("/tips", requireAuth, async (req, res) => {
   try {
-    const userId = parseQueryUserId(req);
     const weekKey = getWeekYearKey(new Date());
 
     const tips = await prisma.tip.findMany({
-      where: { userId, weekYear: weekKey },
+      where: { userId: getUserId(req), weekYear: weekKey },
       orderBy: { createdAt: "asc" },
     });
 
@@ -615,29 +674,30 @@ function parseBody<TSchema extends z.ZodTypeAny>(
   return parsed.data;
 }
 
-function parseQueryUserId(req: Request): string {
-  const userId = req.query.userId;
-
-  if (typeof userId !== "string" || userId.trim().length === 0) {
-    throw new AppError("userId query parameter is required.", {
-      statusCode: 400,
-      code: "MISSING_USER_ID",
+function getUserId(req: Request): string {
+  if (!req.user) {
+    throw new AppError("Authentication required.", {
+      statusCode: 401,
+      code: "UNAUTHORIZED",
     });
   }
-
-  return userId;
+  return getUserId(req);
 }
 
 function handleError(res: Response, error: unknown, context: string): void {
   if (error instanceof AppError) {
+    if (error.statusCode >= 500) {
+      Sentry.captureException(error, { extra: { context } });
+    }
     res.status(error.statusCode).json({
       error: error.code,
       message: error.message,
-      details: error.expose ? (error.cause ?? null) : null,
+      details: !isProduction && error.expose ? (error.cause ?? null) : null,
     });
     return;
   }
 
+  Sentry.captureException(error, { extra: { context } });
   console.error(`Unhandled error while ${context}`, error);
 
   res.status(500).json({

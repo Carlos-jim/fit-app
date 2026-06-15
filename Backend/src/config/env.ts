@@ -18,6 +18,12 @@ const envSchema = z.object({
     .transform((value) => (value ? Number(value) : 3000))
     .pipe(z.number().int().positive().max(65535)),
   GOOGLE_CLIENT_IDS: z.string().optional().default(""),
+  SENTRY_DSN: z.string().url().optional(),
+  JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
+  JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
+  JWT_ACCESS_EXPIRES_IN: z.string().optional().default("15m"),
+  JWT_REFRESH_EXPIRES_IN: z.string().optional().default("7d"),
+  CORS_ORIGIN: z.string().optional().default("*"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

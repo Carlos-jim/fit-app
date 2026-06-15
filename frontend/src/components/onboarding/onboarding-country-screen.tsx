@@ -73,8 +73,8 @@ export function OnboardingCountryScreen({
     if (!selected) return;
     setLoading(true);
     try {
-      await biomaApi.onboardingStep7(userId, selected);
-      await biomaApi.deleteOnboardingSession(userId);
+      await biomaApi.onboardingStep7(selected);
+      await biomaApi.deleteOnboardingSession();
       onFinish();
     } catch (err) {
       Alert.alert(

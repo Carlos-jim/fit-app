@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const generateTipsRequestSchema = z.object({
-  userId: z.string().min(1, "userId is required"),
   force: z.boolean().optional(),
 });
 

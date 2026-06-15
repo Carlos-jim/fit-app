@@ -42,7 +42,16 @@
           "cameraPermission": "Bioma usa la camara para escanear comidas y codigos de barra."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "bioma",
+          "project": "bioma-mobile",
+          "url": "https://sentry.io/"
+        }
+      ],
+      "expo-secure-store"
     ]
   }
 }

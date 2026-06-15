@@ -2,7 +2,6 @@ import { z } from "zod";
 
 export const analyzeMealRequestSchema = z
   .object({
-    userId: z.string().min(1),
     path: z.string().min(1).optional(),
     bucket: z.string().min(1).optional(),
     base64Image: z.string().min(1).optional(),

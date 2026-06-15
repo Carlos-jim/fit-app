@@ -71,7 +71,7 @@ export function OnboardingGoalScreen({
     if (!selected) return;
     setLoading(true);
     try {
-      await biomaApi.onboardingStep1(userId, selected);
+      await biomaApi.onboardingStep1(selected);
       onNext(selected);
     } catch (err) {
       Alert.alert(

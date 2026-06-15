@@ -68,7 +68,7 @@ export function OnboardingGenderScreen({
     if (!selected) return;
     setLoading(true);
     try {
-      await biomaApi.onboardingStep5(userId, selected);
+      await biomaApi.onboardingStep5(selected);
       onNext();
     } catch (err) {
       Alert.alert(

@@ -160,7 +160,7 @@ export function OnboardingTargetWeightScreen({
   const handleNext = async () => {
     setLoading(true);
     try {
-      await biomaApi.onboardingStep4(userId, Number(desiredWeightKg.toFixed(1)));
+      await biomaApi.onboardingStep4(Number(desiredWeightKg.toFixed(1)));
       onNext();
     } catch (err) {
       Alert.alert(

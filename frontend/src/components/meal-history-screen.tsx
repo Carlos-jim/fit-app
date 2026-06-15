@@ -152,15 +152,15 @@ export function MealHistoryScreen({
 
   useEffect(() => {
     if (userId) {
-      void loadLogs(userId);
+      void loadLogs();
     }
   }, [userId]);
 
-  async function loadLogs(id: string) {
+  async function loadLogs() {
     setLoading(true);
     setError(null);
     try {
-      const data = await biomaApi.getLogs(id);
+      const data = await biomaApi.getLogs();
       setLogs(data);
     } catch (e) {
       setError(
@@ -209,7 +209,7 @@ export function MealHistoryScreen({
             meals: group.meals,
           })
         }
-        onRetry={() => userId && void loadLogs(userId)}
+        onRetry={() => userId && void loadLogs()}
       />
     );
   }

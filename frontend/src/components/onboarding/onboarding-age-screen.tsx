@@ -83,7 +83,7 @@ export function OnboardingAgeScreen({
   const handleNext = async () => {
     setLoading(true);
     try {
-      await biomaApi.onboardingStep6(userId, age);
+      await biomaApi.onboardingStep6(age);
       onNext();
     } catch (err) {
       Alert.alert(

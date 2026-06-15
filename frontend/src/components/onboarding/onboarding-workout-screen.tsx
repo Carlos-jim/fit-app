@@ -125,7 +125,7 @@ export function OnboardingWorkoutScreen({
     if (!selected) return;
     setLoading(true);
     try {
-      await biomaApi.onboardingStep2(userId, selected);
+      await biomaApi.onboardingStep2(selected);
       onNext();
     } catch (err) {
       Alert.alert(

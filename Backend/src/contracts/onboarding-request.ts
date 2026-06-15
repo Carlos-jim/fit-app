@@ -1,23 +1,19 @@
 import { z } from "zod";
 
 export const onboardingStep1Schema = z.object({
-  userId: z.string().min(1, "userId is required"),
   goal: z.enum(["LOSE_WEIGHT", "MAINTAIN", "GAIN_WEIGHT"]),
 });
 
 export const onboardingStep2Schema = z.object({
-  userId: z.string().min(1, "userId is required"),
   workoutFrequency: z.enum(["LOW", "MEDIUM", "HIGH"]),
 });
 
 export const onboardingStep3Schema = z.object({
-  userId: z.string().min(1, "userId is required"),
   weightKg: z.number().positive("weightKg must be positive").optional(),
   heightCm: z.number().positive("heightCm must be positive").optional(),
 });
 
 export const onboardingStep4Schema = z.object({
-  userId: z.string().min(1, "userId is required"),
   desiredWeightKg: z
     .number()
     .positive("desiredWeightKg must be positive")
@@ -25,17 +21,14 @@ export const onboardingStep4Schema = z.object({
 });
 
 export const onboardingStep5Schema = z.object({
-  userId: z.string().min(1, "userId is required"),
   gender: z.enum(["MALE", "FEMALE", "NON_BINARY"]),
 });
 
 export const onboardingStep6Schema = z.object({
-  userId: z.string().min(1, "userId is required"),
   age: z.number().int().positive("age must be positive"),
 });
 
 export const onboardingStep7Schema = z.object({
-  userId: z.string().min(1, "userId is required"),
   country: z.string().min(1, "country is required"),
 });
 

@@ -77,7 +77,7 @@ export function RegisterScreen({
     console.log("[Register] Starting Google Registration...");
     setLoading(true);
     try {
-      const user = await biomaApi.loginWithGoogle(idToken);
+      const { user } = await biomaApi.loginWithGoogle(idToken);
       console.log("[Register] Google Success:", user);
       onRegisterSuccess(user);
     } catch (err) {
@@ -106,20 +106,19 @@ export function RegisterScreen({
   const darkMode = theme.background === "#050505";
 
   const emailTrimmed = useMemo(() => email.trim().toLowerCase(), [email]);
-  const passwordTrimmed = useMemo(() => password.trim(), [password]);
   const canSubmit =
     firstName.trim().length >= 1 &&
     lastName.trim().length >= 1 &&
     emailTrimmed.length > 4 &&
-    passwordTrimmed.length >= 6 &&
-    confirmPassword.trim().length >= 6;
+    password.length >= 8 &&
+    confirmPassword.length >= 8;
 
   const handleRegister = async () => {
     if (!canSubmit) {
       Alert.alert("Completa los campos", "Revisa nombre, correo y contrasena.");
       return;
     }
-    if (passwordTrimmed !== confirmPassword.trim()) {
+    if (password !== confirmPassword) {
       Alert.alert("Contrasenas distintas", "Asegurate de que coincidan.");
       return;
     }
@@ -132,10 +131,10 @@ export function RegisterScreen({
       const result = await biomaApi.registerWithEmail({
         name: fullName,
         email: emailTrimmed,
-        password: passwordTrimmed,
+        password,
       });
-      console.log("[Register] Email Success:", result);
-      onRegisterSuccess(result);
+      console.log("[Register] Email Success:", result.user);
+      onRegisterSuccess(result.user);
     } catch (err) {
       console.error("[Register] Email Error:", err);
       Alert.alert(

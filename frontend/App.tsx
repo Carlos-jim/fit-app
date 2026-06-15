@@ -78,6 +78,15 @@ import { WaterCelebration } from "./src/components/water-celebration";
 import { useWaterStore } from "./src/store/water-store";
 import { ProfileScreen } from "./src/components/profile-screen";
 import { compressForUpload } from "./src/utils/image-utils";
+import * as Sentry from "@sentry/react-native";
+
+if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    environment: __DEV__ ? "development" : "production",
+    tracesSampleRate: __DEV__ ? 1.0 : 0.1,
+  });
+}
 import { HealthProviderStatusCard } from "./src/components/health-provider-status-card";
 import { MacroResultCard } from "./src/components/macro-result-card";
 import { MealHistoryScreen } from "./src/components/meal-history-screen";
@@ -958,7 +967,7 @@ function AppContent() {
       return;
     }
 
-    void loadStatsMealLogs(userId);
+    void loadStatsMealLogs();
   }, [userId]);
 
   useEffect(() => {
@@ -1008,10 +1017,10 @@ function AppContent() {
     }
   }
 
-  async function loadStatsMealLogs(id: string) {
+  async function loadStatsMealLogs() {
     try {
       setStatsMealLogsLoading(true);
-      const logs = await biomaApi.getLogs(id);
+      const logs = await biomaApi.getLogs();
       setStatsMealLogs(logs);
     } catch {
       setStatsMealLogs([]);
@@ -1214,7 +1223,7 @@ function AppContent() {
       );
 
       // Check for existing onboarding session
-      const session = await biomaApi.getOnboardingSession(profile.id);
+      const session = await biomaApi.getOnboardingSession();
       if (session && !session.completed && session.currentStep > 1) {
         // Resume from where they left off
         const stepMap: Record<number, typeof onboardingStep> = {
@@ -1262,10 +1271,9 @@ function AppContent() {
   };
 
   const loadTips = async () => {
-    if (!userId) return;
     try {
       setTipsLoading(true);
-      const data = await biomaApi.getTips(userId);
+      const data = await biomaApi.getTips();
       setTips(data);
     } catch {
       setTips([]);
@@ -1275,10 +1283,9 @@ function AppContent() {
   };
 
   const generateTips = async () => {
-    if (!userId) return;
     try {
       setTipsLoading(true);
-      const data = await biomaApi.generateTips(userId, true);
+      const data = await biomaApi.generateTips(true);
       setTips(data);
     } catch {
       Alert.alert("Error", "No se pudieron generar los consejos. Intenta más tarde.");
@@ -1483,7 +1490,6 @@ function AppContent() {
 
         setStatusMessage("Analizando comida por vision...");
         const result = await biomaApi.analyzeMealImage({
-          userId: resolvedUserId,
           base64Image: compressed.base64,
           localImageUrl,
           mealLabel: mealLabel.trim() || undefined,
@@ -1495,7 +1501,6 @@ function AppContent() {
       } else {
         setStatusMessage("Analizando descripcion con IA...");
         const result = await biomaApi.analyzeMealText({
-          userId: resolvedUserId,
           mealLabel: mealLabel.trim() || undefined,
           description: mealDescription.trim(),
           consumedAt: new Date().toISOString(),
@@ -1505,7 +1510,7 @@ function AppContent() {
       }
 
       if (env.apiBaseUrl) {
-        void loadStatsMealLogs(resolvedUserId);
+        void loadStatsMealLogs();
       }
 
       setStatusMessage("Analisis completado y guardado en el historial.");
@@ -3164,7 +3169,6 @@ function AppContent() {
       try {
         // Upload image to get signed URL
         const uploadResponse = await biomaApi.createMealUploadUrl({
-          userId,
           fileName: `menu-${Date.now()}.jpg`,
           contentType: "image/jpeg",
         });
@@ -3181,7 +3185,6 @@ function AppContent() {
         // Call menu analysis endpoint with the public URL
         const result = await biomaApi.analyzeMenuImage(
           uploadResponse.fileUrl,
-          userId,
         );
         setMenuAnalysis(result);
       } catch (err) {

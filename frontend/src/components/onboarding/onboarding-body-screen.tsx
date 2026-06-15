@@ -306,7 +306,6 @@ export function OnboardingBodyScreen({
     setLoading(true);
     try {
       await biomaApi.onboardingStep3(
-        userId,
         Number(weightKg.toFixed(1)),
         Number(heightCm.toFixed(1)),
       );
