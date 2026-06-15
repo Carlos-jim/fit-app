@@ -4,6 +4,7 @@ services:
     runtime: node
     plan: free
     region: ohio
+    rootDir: Backend
     buildCommand: npm install && npm run prisma:generate && npm run build
     startCommand: npm start
     healthCheckPath: /health
@@ -30,5 +31,7 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
+      - key: CORS_ORIGIN
+        sync: false
       - key: SENTRY_DSN
         sync: false

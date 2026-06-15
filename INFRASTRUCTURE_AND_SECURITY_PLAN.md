@@ -150,7 +150,7 @@ Criterios: económico, bueno, escalable hasta ~1.000 usuarios, compatible con GD
 > **Estado:** parcialmente implementado. Los archivos de configuración están creados; faltan pasos manuales de cuentas/dominio.
 
 - [x] Elegir host de backend: **Render**
-- [x] Crear `Backend/render.yaml` con build/start commands y variables de entorno
+- [x] Crear `render.yaml` en raíz con build/start commands y variables de entorno (`rootDir: Backend`)
 - [x] Agregar endpoint `/health` con check de base de datos (`Backend/src/server.ts`)
 - [x] Configurar CI/CD con GitHub Actions (`.github/workflows/ci.yml`)
 - [x] Integrar Sentry en backend (`@sentry/node`) y frontend (`@sentry/react-native`)
