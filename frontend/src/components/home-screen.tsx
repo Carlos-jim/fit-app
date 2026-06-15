@@ -1,4 +1,4 @@
-import { type ComponentProps, useMemo } from "react";
+import { type ComponentProps, useMemo, useState } from "react";
 import {
   Animated,
   Pressable,
@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import type { FitnessTheme } from "./fitness-ui";
 import type { MealLog } from "../types/api";
+import { CalendarModal } from "./calendar-modal";
 
 const WATER_COLOR = "#3B9EE2";
 const STEPS_COLOR = "#FF8C42";
@@ -40,6 +41,7 @@ export interface HomeScreenProps {
   lastMeal: MealLog | null;
   topBestMeals: MealLog[];
   topWorstMeals: MealLog[];
+  logs: MealLog[];
   waterGlasses: number;
   waterGoal: number;
   onWaterIncrement: () => void;
@@ -138,6 +140,7 @@ export function HomeScreen(props: HomeScreenProps) {
     lastMeal,
     topBestMeals,
     topWorstMeals,
+    logs,
     waterGlasses,
     waterGoal,
     onWaterIncrement,
@@ -214,6 +217,8 @@ export function HomeScreen(props: HomeScreenProps) {
   const today = new Date();
   const currentDayOfWeek = today.getDay() === 0 ? 6 : today.getDay();
 
+  const [calendarVisible, setCalendarVisible] = useState(false);
+
   return (
     <View style={styles.root}>
       {/* ────────────────── Greeting Header ─────────────────── */}
@@ -249,7 +254,10 @@ export function HomeScreen(props: HomeScreenProps) {
           </View>
         </View>
         <View style={styles.greetingIcons}>
-          <Pressable style={[styles.iconButton, { backgroundColor: panelColor }]}>
+          <Pressable
+            style={[styles.iconButton, { backgroundColor: panelColor }]}
+            onPress={() => setCalendarVisible(true)}
+          >
             <Ionicons name="calendar-outline" size={20} color={mutedText} />
           </Pressable>
           <Pressable style={[styles.iconButton, { backgroundColor: panelColor }]}>
@@ -832,6 +840,14 @@ export function HomeScreen(props: HomeScreenProps) {
           </Text>
         </LinearGradient>
       </Animated.View>
+
+      <CalendarModal
+        visible={calendarVisible}
+        onClose={() => setCalendarVisible(false)}
+        theme={theme}
+        logs={logs}
+        calorieGoal={calorieGoal}
+      />
     </View>
   );
 }

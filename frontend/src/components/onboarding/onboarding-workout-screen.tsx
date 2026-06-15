@@ -1,6 +1,15 @@
-import React, { useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Animated,
+  Easing,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import type { FitnessTheme } from "../fitness-ui";
 import {
   biomaApi,
@@ -11,62 +20,82 @@ import { NextButton, OnboardingShell } from "../onboarding";
 
 const TOTAL_STEPS = 7;
 const STEP = 2;
+const RECOMMENDED: WorkoutFrequency = "MEDIUM";
 
-const OPTIONS: {
+type PaceOption = {
   value: WorkoutFrequency;
   label: string;
   subtitle: string;
   description: string;
+  weeklyRange: string;
   icon: "walk-outline" | "bicycle-outline" | "flame-outline";
-  iconColor: string;
-  iconBg: string;
-  accentBorder: string;
-  badge: string;
-  badgeBg: string;
-  badgeColor: string;
-}[] = [
+  colors: {
+    start: string;
+    end: string;
+    soft: string;
+    border: string;
+    text: string;
+  };
+  level: number;
+  effortLabel: string;
+};
+
+const OPTIONS: PaceOption[] = [
   {
     value: "LOW",
     label: "Ritmo suave",
     subtitle: "Cambios graduales y sostenibles",
-    description: "Ideal si prefieres un camino tranquilo sin pasar hambre.",
+    description:
+      "Ideal si prefieres un camino tranquilo sin pasar hambre y con mínimo esfuerzo.",
+    weeklyRange: "0.1 – 0.5 kg / semana",
     icon: "walk-outline",
-    iconColor: "#76EFE5",
-    iconBg: "rgba(118,239,229,0.12)",
-    accentBorder: "rgba(118,239,229,0.35)",
-    badge: "0.1 – 0.5 kg / semana",
-    badgeBg: "rgba(118,239,229,0.1)",
-    badgeColor: "#76EFE5",
+    colors: {
+      start: "#22D3EE",
+      end: "#2DD4BF",
+      soft: "rgba(45,212,191,0.10)",
+      border: "rgba(45,212,191,0.35)",
+      text: "#0D9488",
+    },
+    level: 1,
+    effortLabel: "Bajo esfuerzo",
   },
   {
     value: "MEDIUM",
     label: "Ritmo moderado",
     subtitle: "Balance entre esfuerzo y resultado",
-    description: "Lo más recomendado. Verás cambios sin sacrificar tu vida social.",
+    description:
+      "Lo más recomendado. Verás cambios reales sin sacrificar tu vida social.",
+    weeklyRange: "0.5 – 1.0 kg / semana",
     icon: "bicycle-outline",
-    iconColor: "#F5B700",
-    iconBg: "rgba(245,183,0,0.12)",
-    accentBorder: "rgba(245,183,0,0.35)",
-    badge: "0.5 – 1.0 kg / semana",
-    badgeBg: "rgba(245,183,0,0.1)",
-    badgeColor: "#F5B700",
+    colors: {
+      start: "#FBBF24",
+      end: "#F59E0B",
+      soft: "rgba(251,191,36,0.12)",
+      border: "rgba(251,191,36,0.40)",
+      text: "#B45309",
+    },
+    level: 2,
+    effortLabel: "Esfuerzo medio",
   },
   {
     value: "HIGH",
     label: "Ritmo intenso",
     subtitle: "Máximo avance en menos tiempo",
-    description: "Para quienes quieren resultados rápidos y están dispuestos a todo.",
+    description:
+      "Para quienes quieren resultados rápidos y están dispuestos a todo.",
+    weeklyRange: "1.0 – 1.5 kg / semana",
     icon: "flame-outline",
-    iconColor: "#FF7272",
-    iconBg: "rgba(255,114,114,0.12)",
-    accentBorder: "rgba(255,114,114,0.35)",
-    badge: "1.0 – 1.5 kg / semana",
-    badgeBg: "rgba(255,114,114,0.1)",
-    badgeColor: "#FF7272",
+    colors: {
+      start: "#FB7185",
+      end: "#F43F5E",
+      soft: "rgba(244,63,94,0.10)",
+      border: "rgba(244,63,94,0.35)",
+      text: "#BE123C",
+    },
+    level: 3,
+    effortLabel: "Alto compromiso",
   },
 ];
-
-const RECOMMENDED: WorkoutFrequency = "MEDIUM";
 
 type VisualMode = "dark" | "light";
 
@@ -131,156 +160,390 @@ export function OnboardingWorkoutScreen({
       }
     >
       <View style={s.list}>
-        {OPTIONS.map((option) => {
-          const isSelected = selected === option.value;
-          const isRec = option.value === RECOMMENDED;
-          return (
-            <Pressable
-              key={option.value}
-              onPress={() => setSelected(option.value)}
+        {OPTIONS.map((option) => (
+          <PaceCard
+            key={option.value}
+            option={option}
+            selected={selected === option.value}
+            isRecommended={option.value === RECOMMENDED}
+            theme={theme}
+            onPress={() => setSelected(option.value)}
+          />
+        ))}
+      </View>
+
+      <View style={s.footerHint}>
+        <Ionicons name="information-circle-outline" size={16} color={theme.muted} />
+        <Text style={[s.footerHintText, { color: theme.muted }]}>
+          Puedes cambiar el ritmo más adelante desde tu perfil.
+        </Text>
+      </View>
+    </OnboardingShell>
+  );
+}
+
+function PaceCard({
+  option,
+  selected,
+  isRecommended,
+  theme,
+  onPress,
+}: {
+  option: PaceOption;
+  selected: boolean;
+  isRecommended: boolean;
+  theme: FitnessTheme;
+  onPress: () => void;
+}) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const expandAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(expandAnim, {
+      toValue: selected ? 1 : 0,
+      duration: 240,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [selected, expandAnim]);
+
+  const handlePressIn = () => {
+    Animated.timing(scaleAnim, {
+      toValue: 0.98,
+      duration: 120,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.timing(scaleAnim, {
+      toValue: 1,
+      duration: 160,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const s = getStyles(theme);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={({ pressed }) => [s.cardContainer, pressed && s.cardPressed]}
+    >
+      <Animated.View
+        style={[
+          s.card,
+          selected && {
+            borderColor: option.colors.border,
+            backgroundColor: option.colors.soft,
+          },
+          { transform: [{ scale: scaleAnim }] },
+        ]}
+      >
+        {/* Accent top bar */}
+        <LinearGradient
+          colors={
+            selected
+              ? [option.colors.start, option.colors.end]
+              : [theme.stroke, theme.stroke]
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={s.accentBar}
+        />
+
+        <View style={s.cardInner}>
+          {/* Icon */}
+          <View
+            style={[
+              s.iconCircle,
+              {
+                backgroundColor: selected
+                  ? option.colors.soft
+                  : theme.cardMuted,
+              },
+            ]}
+          >
+            <Ionicons
+              name={option.icon}
+              size={24}
+              color={selected ? option.colors.text : theme.muted}
+            />
+          </View>
+
+          {/* Text content */}
+          <View style={s.textBlock}>
+            <View style={s.titleRow}>
+              <Text
+                style={[
+                  s.cardLabel,
+                  { color: selected ? theme.text : theme.muted },
+                ]}
+              >
+                {option.label}
+              </Text>
+              {isRecommended && (
+                <View
+                  style={[
+                    s.recBadge,
+                    { backgroundColor: option.colors.soft },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      s.recBadgeText,
+                      { color: option.colors.text },
+                    ]}
+                  >
+                    Recomendado
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={[s.cardSubtitle, { color: theme.muted }]}>
+              {option.subtitle}
+            </Text>
+
+            {/* Expanded details */}
+            <Animated.View
               style={[
-                s.card,
-                isSelected && {
-                  borderColor: option.accentBorder,
-                  backgroundColor: option.iconBg,
+                s.details,
+                {
+                  maxHeight: expandAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 120],
+                  }),
+                  opacity: expandAnim,
                 },
               ]}
             >
-              <View style={s.cardTop}>
-                <View style={[s.iconCircle, { backgroundColor: option.iconBg }]}>
-                  <Ionicons name={option.icon} size={22} color={option.iconColor} />
-                </View>
-                {isRec && !isSelected ? (
-                  <View style={[s.recPill, { backgroundColor: option.badgeBg }]}>
-                    <Text style={[s.recPillText, { color: option.badgeColor }]}>
-                      Recomendado
-                    </Text>
-                  </View>
-                ) : null}
-                <View style={[s.radioOuter, isSelected && { borderColor: option.iconColor }]}>
-                  {isSelected ? (
-                    <View style={[s.radioDot, { backgroundColor: option.iconColor }]} />
-                  ) : null}
-                </View>
-              </View>
+              <Text style={[s.cardDescription, { color: theme.muted }]}>
+                {option.description}
+              </Text>
 
-              <View style={s.cardBody}>
-                <Text style={[s.cardLabel, isSelected && { color: theme.text }]}>
-                  {option.label}
-                </Text>
-                <Text style={s.cardSubtitle}>{option.subtitle}</Text>
-                <Text style={[s.cardDesc, isSelected && { color: theme.muted }]}>
-                  {option.description}
-                </Text>
-              </View>
-
-              {isSelected ? (
-                <View style={[s.badgeRow, { backgroundColor: option.badgeBg }]}>
-                  <Ionicons name="speedometer-outline" size={13} color={option.badgeColor} />
-                  <Text style={[s.badgeText, { color: option.badgeColor }]}>
-                    {option.badge}
+              <View style={s.metricsRow}>
+                <View
+                  style={[
+                    s.metricPill,
+                    { backgroundColor: option.colors.soft },
+                  ]}
+                >
+                  <Ionicons
+                    name="trending-down-outline"
+                    size={13}
+                    color={option.colors.text}
+                  />
+                  <Text
+                    style={[
+                      s.metricPillText,
+                      { color: option.colors.text },
+                    ]}
+                  >
+                    {option.weeklyRange}
                   </Text>
                 </View>
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </View>
-    </OnboardingShell>
+
+                <View
+                  style={[
+                    s.metricPill,
+                    { backgroundColor: theme.cardMuted },
+                  ]}
+                >
+                  <Ionicons
+                    name="speedometer-outline"
+                    size={13}
+                    color={theme.muted}
+                  />
+                  <Text style={[s.metricPillText, { color: theme.muted }]}>
+                    {option.effortLabel}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Pace dots */}
+              <View style={s.dotsRow}>
+                {[1, 2, 3].map((dot) => (
+                  <View
+                    key={dot}
+                    style={[
+                      s.paceDot,
+                      dot <= option.level && {
+                        backgroundColor: option.colors.end,
+                      },
+                      dot > option.level && {
+                        backgroundColor: theme.stroke,
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+            </Animated.View>
+          </View>
+
+          {/* Selection indicator */}
+          <View
+            style={[
+              s.checkCircle,
+              {
+                borderColor: selected
+                  ? option.colors.end
+                  : theme.stroke,
+                backgroundColor: selected
+                  ? option.colors.end
+                  : "transparent",
+              },
+            ]}
+          >
+            {selected && (
+              <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+            )}
+          </View>
+        </View>
+      </Animated.View>
+    </Pressable>
   );
 }
 
 function getStyles(theme: FitnessTheme) {
   return StyleSheet.create({
     list: {
-      gap: 12,
+      gap: 14,
+    },
+    cardContainer: {
+      borderRadius: 24,
+    },
+    cardPressed: {
+      opacity: 0.95,
     },
     card: {
       backgroundColor: theme.card,
-      borderRadius: 20,
+      borderRadius: 24,
       borderWidth: 1.5,
       borderColor: theme.stroke,
+      overflow: "hidden",
+      shadowColor: theme.text,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: theme.background === "#050505" ? 0.15 : 0.06,
+      shadowRadius: 12,
+      elevation: 3,
+    },
+    accentBar: {
+      height: 4,
+      width: "100%",
+    },
+    cardInner: {
+      flexDirection: "row",
+      alignItems: "flex-start",
       paddingVertical: 20,
-      paddingHorizontal: 20,
+      paddingHorizontal: 18,
       gap: 14,
     },
-    cardTop: {
+    iconCircle: {
+      width: 48,
+      height: 48,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+    },
+    textBlock: {
+      flex: 1,
+      gap: 4,
+    },
+    titleRow: {
       flexDirection: "row",
       alignItems: "center",
-    },
-    iconCircle: {
-      width: 44,
-      height: 44,
-      borderRadius: 14,
-      alignItems: "center",
-      justifyContent: "center",
-      marginRight: 12,
-      flexShrink: 0,
-    },
-    recPill: {
-      borderRadius: 999,
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      marginRight: 10,
-      flexShrink: 0,
-    },
-    recPillText: {
-      fontFamily: "Inter_600SemiBold",
-      fontSize: 11,
-      letterSpacing: 0.4,
-    },
-    radioOuter: {
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      borderWidth: 2,
-      borderColor: theme.stroke,
-      alignItems: "center",
-      justifyContent: "center",
-      marginLeft: "auto",
-      flexShrink: 0,
-    },
-    radioDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 5,
-    },
-    cardBody: {
-      gap: 4,
-      paddingLeft: 56,
+      flexWrap: "wrap",
+      gap: 8,
     },
     cardLabel: {
-      color: theme.muted,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "Manrope_800ExtraBold",
       fontSize: 17,
-      lineHeight: 22,
+      lineHeight: 24,
+    },
+    recBadge: {
+      borderRadius: 999,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      alignSelf: "flex-start",
+    },
+    recBadgeText: {
+      fontFamily: "Inter_700Bold",
+      fontSize: 10,
+      letterSpacing: 0.3,
+      textTransform: "uppercase",
     },
     cardSubtitle: {
-      color: theme.muted,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "Inter_600SemiBold",
       fontSize: 13,
-      lineHeight: 18,
+      lineHeight: 19,
     },
-    cardDesc: {
-      color: theme.muted,
+    details: {
+      overflow: "hidden",
+      gap: 10,
+      marginTop: 6,
+    },
+    cardDescription: {
       fontFamily: "Inter_400Regular",
       fontSize: 13,
-      lineHeight: 18,
+      lineHeight: 19,
+    },
+    metricsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
       marginTop: 2,
     },
-    badgeRow: {
+    metricPill: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
-      borderRadius: 12,
-      paddingVertical: 10,
-      paddingHorizontal: 14,
-      marginLeft: 56,
+      gap: 5,
+      borderRadius: 10,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
     },
-    badgeText: {
+    metricPillText: {
       fontFamily: "Inter_600SemiBold",
-      fontSize: 12,
+      fontSize: 11,
       letterSpacing: 0.2,
+    },
+    dotsRow: {
+      flexDirection: "row",
+      gap: 5,
+      marginTop: 4,
+    },
+    paceDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+    },
+    checkCircle: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      borderWidth: 2,
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+      marginTop: 2,
+    },
+    footerHint: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      marginTop: 20,
+      paddingHorizontal: 16,
+    },
+    footerHintText: {
+      fontFamily: "Inter_500Medium",
+      fontSize: 12,
+      lineHeight: 18,
+      textAlign: "center",
     },
   });
 }

@@ -657,14 +657,6 @@ function AppContent() {
     circadianPlan.nextAnchor,
     circadianPlan.city.timeZone,
   );
-  const homeHeroAuraPrimaryColor =
-    visualMode === "light"
-      ? "rgba(0, 200, 151, 0.12)"
-      : "rgba(118, 239, 229, 0.14)";
-  const homeHeroAuraSecondaryColor =
-    visualMode === "light"
-      ? "rgba(232, 255, 84, 0.10)"
-      : "rgba(232, 255, 84, 0.11)";
   const homeHeroPillDarkColor =
     visualMode === "light"
       ? "rgba(23, 19, 15, 0.04)"
@@ -706,10 +698,6 @@ function AppContent() {
   const profileTextStrong = visualMode === "light" ? "#17130F" : "#F5FBF8";
   const profileTextMuted = visualMode === "light" ? "#786F65" : "#8AA199";
   const profileTextSoft = visualMode === "light" ? "#A3988B" : "#5C7369";
-  const profileHeroGlowColor =
-    visualMode === "light"
-      ? "rgba(0, 200, 151, 0.12)"
-      : "rgba(118,239,229,0.16)";
   const profileHeroPillGlassColor =
     visualMode === "light"
       ? "rgba(23, 19, 15, 0.06)"
@@ -1597,6 +1585,7 @@ function AppContent() {
             lastMeal={homeLastMeal}
             topBestMeals={homeTopBestMeals}
             topWorstMeals={homeTopWorstMeals}
+            logs={statsMealLogs}
             waterGlasses={dailyWaterGlasses}
             waterGoal={waterGoal}
             onWaterIncrement={incrementWater}
@@ -1673,30 +1662,6 @@ function AppContent() {
     >
       <StatusBar
         barStyle={visualMode === "light" ? "dark-content" : "light-content"}
-      />
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.ambientGlow,
-          {
-            backgroundColor: theme.accent,
-            opacity: visualMode === "light" ? 0.14 : 0.18,
-            transform: [
-              {
-                translateY: ambientPulse.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-18, 26],
-                }),
-              },
-              {
-                scale: ambientPulse.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.9, 1.12],
-                }),
-              },
-            ],
-          },
-        ]}
       />
       <Animated.ScrollView
         contentContainerStyle={[
@@ -2094,47 +2059,6 @@ function AppContent() {
             end={{ x: 1, y: 1 }}
             style={styles.homeHeroCard}
           >
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.homeHeroAuraPrimary,
-                { backgroundColor: homeHeroAuraPrimaryColor },
-                {
-                  transform: [
-                    {
-                      translateX: ambientPulse.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-10, 18],
-                      }),
-                    },
-                    {
-                      scale: ambientPulse.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.92, 1.08],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            />
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.homeHeroAuraSecondary,
-                { backgroundColor: homeHeroAuraSecondaryColor },
-                {
-                  transform: [
-                    {
-                      translateY: ambientPulse.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [10, -10],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            />
-
             <View style={styles.homeHeroTopRow}>
               <View
                 style={[
@@ -3979,11 +3903,10 @@ function AppContent() {
   }
 
   function renderTextOnlyScreen() {
-    const quickLabels = ["Desayuno", "Almuerzo", "Cena"];
     const suggestions = [
-      "Arepa con queso, huevos y cafe.",
-      "Pollo a la plancha con arroz y ensalada.",
-      "Yogur griego con cambur y avena.",
+      { icon: "sunny-outline" as const, text: "Arepa con queso, huevos y cafe." },
+      { icon: "flame-outline" as const, text: "Pollo a la plancha con arroz y ensalada." },
+      { icon: "nutrition-outline" as const, text: "Yogur griego con cambur y avena." },
     ];
 
     return (
@@ -3993,44 +3916,58 @@ function AppContent() {
         <StatusBar
           barStyle={visualMode === "light" ? "dark-content" : "light-content"}
         />
-        <View style={styles.textModeTopRow}>
-          <Pressable
-            style={[
-              styles.textModeBackButton,
-              {
-                backgroundColor:
-                  visualMode === "light"
-                    ? "rgba(23, 19, 15, 0.06)"
-                    : "rgba(255,255,255,0.10)",
-              },
-            ]}
-            onPress={closeCameraScreen}
-          >
-            <Ionicons name="arrow-back" size={20} color={theme.text} />
-          </Pressable>
-        </View>
+
         <ScrollView
           contentContainerStyle={styles.textModeContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={[styles.textModeTitle, { color: theme.text }]}>
-            ¿Qué comiste hoy?
-          </Text>
-          <Text style={[styles.textModeSubtitle, { color: theme.muted }]}>
-            Escribe lo que comiste y calculamos las calorías y macros.
-          </Text>
+          {/* Header visual */}
+          <View style={styles.textModeHeader}>
+            <View
+              style={[
+                styles.textModeIconCircle,
+                {
+                  backgroundColor: theme.card,
+                  borderColor: theme.stroke,
+                },
+              ]}
+            >
+              <Ionicons
+                name="restaurant-outline"
+                size={32}
+                color={theme.accent}
+              />
+            </View>
+            <Text style={[styles.textModeTitle, { color: theme.text }]}>
+              Describe tu comida
+            </Text>
+            <Text style={[styles.textModeSubtitle, { color: theme.muted }]}>
+              Nuestra IA calculará calorías y macros en segundos.
+            </Text>
+          </View>
 
+          {/* Card principal */}
           <View
             style={[
-              styles.textModeFormCard,
+              styles.textModeCard,
               { backgroundColor: theme.card, borderColor: theme.stroke },
             ]}
           >
+            {/* Título */}
             <View style={styles.textModeFieldBlock}>
-              <Text style={[styles.textModeFieldLabel, { color: theme.muted }]}>
-                Título
-              </Text>
+              <View style={styles.textModeFieldHeader}>
+                <Ionicons
+                  name="pricetag-outline"
+                  size={14}
+                  color={theme.muted}
+                />
+                <Text
+                  style={[styles.textModeFieldLabel, { color: theme.muted }]}
+                >
+                  Título de la comida
+                </Text>
+              </View>
               <TextInput
                 value={mealLabel}
                 onChangeText={setMealLabel}
@@ -4047,14 +3984,24 @@ function AppContent() {
               />
             </View>
 
+            {/* Descripción */}
             <View style={styles.textModeFieldBlock}>
-              <Text style={[styles.textModeFieldLabel, { color: theme.muted }]}>
-                Descripción
-              </Text>
+              <View style={styles.textModeFieldHeader}>
+                <Ionicons
+                  name="create-outline"
+                  size={14}
+                  color={theme.muted}
+                />
+                <Text
+                  style={[styles.textModeFieldLabel, { color: theme.muted }]}
+                >
+                  ¿Qué comiste?
+                </Text>
+              </View>
               <TextInput
                 value={mealDescription}
                 onChangeText={setMealDescription}
-                placeholder="Ej. Dos arepas medianas con queso blanco y dos huevos revueltos."
+                placeholder="Dos arepas medianas con queso blanco y dos huevos revueltos..."
                 placeholderTextColor={theme.muted}
                 multiline
                 textAlignVertical="top"
@@ -4069,66 +4016,120 @@ function AppContent() {
               />
             </View>
 
-            <View style={styles.textModeSuggestionRow}>
-              {suggestions.map((suggestion) => (
-                <Pressable
-                  key={suggestion}
-                  style={[
-                    styles.textModeSuggestionChip,
-                    {
-                      backgroundColor: theme.cardMuted,
-                      borderColor: theme.stroke,
-                    },
-                  ]}
-                  onPress={() => setMealDescription(suggestion)}
+            {/* Sugerencias */}
+            <View style={styles.textModeSuggestionsSection}>
+              <View style={styles.textModeFieldHeader}>
+                <Ionicons
+                  name="bulb-outline"
+                  size={14}
+                  color={theme.muted}
+                />
+                <Text
+                  style={[styles.textModeFieldLabel, { color: theme.muted }]}
                 >
-                  <Text
+                  Ejemplos rápidos
+                </Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.textModeSuggestionRow}
+              >
+                {suggestions.map((suggestion, index) => (
+                  <Pressable
+                    key={index}
                     style={[
-                      styles.textModeSuggestionText,
-                      { color: theme.text },
+                      styles.textModeSuggestionChip,
+                      {
+                        backgroundColor: theme.cardMuted,
+                        borderColor: theme.stroke,
+                      },
                     ]}
-                    numberOfLines={2}
+                    onPress={() => setMealDescription(suggestion.text)}
                   >
-                    {suggestion}
-                  </Text>
-                </Pressable>
-              ))}
+                    <Ionicons
+                      name={suggestion.icon}
+                      size={14}
+                      color={theme.accent}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text
+                      style={[
+                        styles.textModeSuggestionText,
+                        { color: theme.text },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {suggestion.text}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
             </View>
+          </View>
 
-            <Pressable
-              style={[
-                styles.textModePrimaryButton,
-                { backgroundColor: theme.accent },
-                (loading || mealDescription.trim().length < 5) &&
+          {/* Botón */}
+          <Pressable
+            style={[
+              styles.textModePrimaryButton,
+              { backgroundColor: theme.accent },
+              (loading || mealDescription.trim().length < 5) &&
                 styles.buttonDisabled,
-              ]}
-              onPress={analyzeCurrentMeal}
-              disabled={loading || mealDescription.trim().length < 5}
-            >
-              {loading ? (
-                <ActivityIndicator color={theme.background} />
-              ) : (
+            ]}
+            onPress={analyzeCurrentMeal}
+            disabled={loading || mealDescription.trim().length < 5}
+          >
+            {loading ? (
+              <ActivityIndicator color={theme.background} />
+            ) : (
+              <>
+                <Ionicons
+                  name="sparkles"
+                  size={18}
+                  color={theme.background}
+                />
                 <Text
                   style={[
                     styles.textModePrimaryButtonText,
                     { color: theme.background },
                   ]}
                 >
-                  Calcular macros
+                  Analizar con IA
                 </Text>
-              )}
-            </Pressable>
+              </>
+            )}
+          </Pressable>
 
-            <Text style={[styles.textModeHelper, { color: theme.muted }]}>
-              {statusMessage ??
-                "Sé natural. Cuanto más detalle, más preciso el cálculo."}
-            </Text>
-          </View>
+          <Text style={[styles.textModeHelper, { color: theme.muted }]}>
+            {statusMessage ??
+              "Cuanto más detalle des, más preciso será el resultado."}
+          </Text>
 
+          {/* Resultados */}
           {analysis ? (
-            <MacroResultCard analysis={analysis} mode={wellnessCardMode} />
+            <View style={{ marginTop: 8 }}>
+              <MacroResultCard analysis={analysis} mode={wellnessCardMode} />
+            </View>
           ) : null}
         </ScrollView>
+
+        {/* Back button flotante */}
+        <View style={styles.textModeTopRow}>
+          <Pressable
+            style={[
+              styles.textModeBackButton,
+              {
+                backgroundColor:
+                  visualMode === "light"
+                    ? "rgba(23, 19, 15, 0.06)"
+                    : "rgba(255,255,255,0.10)",
+              },
+            ]}
+            onPress={closeCameraScreen}
+          >
+            <Ionicons name="arrow-back" size={20} color={theme.text} />
+          </Pressable>
+        </View>
       </SafeAreaView>
     );
   }
@@ -4640,30 +4641,6 @@ function AppContent() {
             end={{ x: 1, y: 1 }}
             style={styles.profileHeroCard}
           >
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.profileHeroGlow,
-                { backgroundColor: profileHeroGlowColor },
-                {
-                  transform: [
-                    {
-                      translateX: ambientPulse.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-8, 16],
-                      }),
-                    },
-                    {
-                      scale: ambientPulse.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.94, 1.08],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            />
-
             <View style={styles.profileHeroTopRow}>
               <View
                 style={[
@@ -5418,16 +5395,21 @@ const styles = StyleSheet.create({
   },
   textModeContent: {
     paddingHorizontal: 24,
-    paddingTop: 8,
+    paddingTop: 12,
     paddingBottom: 140,
-    gap: 8,
+    gap: 20,
   },
   textModeTopRow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 24,
     paddingTop: 12,
     paddingBottom: 8,
+    zIndex: 10,
   },
   textModeBackButton: {
     width: 40,
@@ -5436,25 +5418,45 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  textModeHeader: {
+    alignItems: "center",
+    marginTop: 56,
+    marginBottom: 8,
+    gap: 12,
+  },
+  textModeIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
   textModeTitle: {
     fontFamily: "Manrope_800ExtraBold",
-    fontSize: 28,
-    lineHeight: 34,
-    marginTop: 8,
+    fontSize: 26,
+    lineHeight: 32,
+    textAlign: "center",
   },
   textModeSubtitle: {
     fontFamily: "Inter_500Medium",
     fontSize: 15,
     lineHeight: 22,
-    marginBottom: 20,
+    textAlign: "center",
+    maxWidth: 280,
   },
-  textModeFormCard: {
+  textModeCard: {
     borderRadius: 24,
     borderWidth: 1,
     padding: 20,
-    gap: 16,
+    gap: 18,
   },
   textModeFieldBlock: {
+    gap: 8,
+  },
+  textModeFieldHeader: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   textModeFieldLabel: {
@@ -5470,7 +5472,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   textModeTextarea: {
-    minHeight: 120,
+    minHeight: 130,
     borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: 16,
@@ -5480,14 +5482,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
-  textModeSuggestionRow: {
+  textModeSuggestionsSection: {
     gap: 10,
   },
+  textModeSuggestionRow: {
+    gap: 10,
+    paddingRight: 4,
+  },
   textModeSuggestionChip: {
-    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 24,
     borderWidth: 1,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   textModeSuggestionText: {
     fontFamily: "Inter_500Medium",
@@ -5495,22 +5503,24 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   textModePrimaryButton: {
-    minHeight: 52,
+    minHeight: 56,
     borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 10,
+    marginTop: 4,
   },
   textModePrimaryButtonText: {
     fontFamily: "Inter_800ExtraBold",
-    fontSize: 15,
+    fontSize: 16,
   },
   textModeHelper: {
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     lineHeight: 18,
     textAlign: "center",
+    marginTop: -8,
   },
   safeArea: {
     flex: 1,
@@ -5524,14 +5534,6 @@ const styles = StyleSheet.create({
   },
   screenMotion: {
     marginTop: 22,
-  },
-  ambientGlow: {
-    position: "absolute",
-    top: 58,
-    right: -90,
-    width: 230,
-    height: 230,
-    borderRadius: 115,
   },
   screen: {
     gap: 16,
@@ -5548,24 +5550,6 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingBottom: 20,
     overflow: "hidden",
-  },
-  homeHeroAuraPrimary: {
-    position: "absolute",
-    top: -34,
-    right: -10,
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: "rgba(118, 239, 229, 0.14)",
-  },
-  homeHeroAuraSecondary: {
-    position: "absolute",
-    bottom: -52,
-    left: -32,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: "rgba(232, 255, 84, 0.11)",
   },
   homeHeroTopRow: {
     flexDirection: "row",
@@ -5877,15 +5861,6 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingBottom: 20,
     overflow: "hidden",
-  },
-  profileHeroGlow: {
-    position: "absolute",
-    top: -40,
-    right: -6,
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: "rgba(118,239,229,0.16)",
   },
   profileHeroTopRow: {
     flexDirection: "row",

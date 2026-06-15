@@ -60,24 +60,19 @@ export function ProfileScreen(props: ProfileScreenProps) {
 
   // ─── Tokens ───────────────────────────────────────────────────
   const heroGradient: readonly [string, string, string] = isDark
-    ? ["#050D0B", "#10211B", "#18332A"]
-    : ["#FFFDF8", "#F6EFE4", "#EEE4D6"];
+    ? ["#091612", "#0F241E", "#14332A"]
+    : ["#E8F9F1", "#D8F4E8", "#C8EFDF"];
 
-  const glowColor = isDark
-    ? "rgba(118,239,229,0.14)"
-    : "rgba(0, 200, 151, 0.10)";
+  const avatarGradient: readonly [string, string] = isDark
+    ? ["#1A3D33", "#0F241E"]
+    : ["#FFFFFF", "#F0FAF5"];
 
-  const panelBg = isDark ? "#0F1513" : "#FBF8F1";
-  const panelAlt = isDark ? "#121C18" : "#F2ECE1";
-  const panelStroke = isDark ? "#1E2A25" : "#E8DED0";
   const strongText = isDark ? "#F5FBF8" : "#17130F";
-  const mutedText = isDark ? "#8AA199" : "#786F65";
-  const softText = isDark ? "#5C7369" : "#A3988B";
-  const avatarBg = isDark ? "rgba(255,255,255,0.12)" : "rgba(23,19,15,0.07)";
-  const pillBg = isDark ? "rgba(255,255,255,0.09)" : "rgba(23,19,15,0.05)";
-  const pillText = isDark ? "#F4FBF8" : "#2A241F";
-  const rowSeparator = isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)";
-  const btnTextColor = isDark ? "#07110E" : "#FFFFFF";
+  const mutedText = isDark ? "#8AA199" : "#5E6B65";
+  const softText = isDark ? "#5C7369" : "#8A9A90";
+  const panelBg = isDark ? "#0F1513" : "#FFFFFF";
+  const panelStroke = isDark ? "#1E2A25" : "#E8E8E0";
+  const inputBg = isDark ? "#141D19" : "#F8FAF8";
 
   const profileInitial = (fullName.trim() || email.trim() || "B")
     .slice(0, 1)
@@ -96,7 +91,7 @@ export function ProfileScreen(props: ProfileScreenProps) {
             {
               translateY: ambientPulse.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0, -6],
+                outputRange: [0, -5],
               }),
             },
           ],
@@ -108,51 +103,38 @@ export function ProfileScreen(props: ProfileScreenProps) {
           end={{ x: 1, y: 1 }}
           style={styles.heroCard}
         >
-          {/* Ambient glow */}
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.heroGlow,
-              { backgroundColor: glowColor },
-              {
-                transform: [
-                  {
-                    scale: ambientPulse.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.94, 1.08],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          />
-
-          {/* Status pill */}
+          {/* Top status row */}
           <View style={styles.heroTopRow}>
-            <View style={[styles.pill, { backgroundColor: pillBg }]}>
+            <View
+              style={[
+                styles.statusPill,
+                { backgroundColor: isDark ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.7)" },
+              ]}
+            >
               <View
                 style={[
-                  styles.pillDot,
+                  styles.statusDot,
                   { backgroundColor: userId ? theme.accent : mutedText },
                 ]}
               />
-              <Text style={[styles.pillText, { color: pillText }]}>
+              <Text style={[styles.statusPillText, { color: strongText }]}>
                 {userId ? "Conectado" : "Sin conexión"}
               </Text>
             </View>
 
-            {/* Visual mode icon badge */}
             <Pressable
-              style={[styles.pill, { backgroundColor: pillBg }]}
+              style={[
+                styles.statusPill,
+                { backgroundColor: isDark ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.7)" },
+              ]}
               onPress={onToggleMode}
-              accessibilityLabel="Cambiar modo visual"
             >
               <Ionicons
                 name={isDark ? "moon" : "sunny"}
                 size={14}
                 color={isDark ? "#A0C4FF" : "#F59E0B"}
               />
-              <Text style={[styles.pillText, { color: pillText }]}>
+              <Text style={[styles.statusPillText, { color: strongText }]}>
                 {isDark ? "Oscuro" : "Claro"}
               </Text>
             </Pressable>
@@ -160,11 +142,15 @@ export function ProfileScreen(props: ProfileScreenProps) {
 
           {/* Avatar + identity */}
           <View style={styles.identityRow}>
-            <View style={[styles.avatar, { backgroundColor: avatarBg }]}>
+            <LinearGradient
+              colors={avatarGradient}
+              style={styles.avatar}
+            >
               <Text style={[styles.avatarText, { color: strongText }]}>
                 {profileInitial}
               </Text>
-            </View>
+            </LinearGradient>
+
             <View style={styles.identityText}>
               <Text
                 style={[styles.heroName, { color: strongText }]}
@@ -178,6 +164,12 @@ export function ProfileScreen(props: ProfileScreenProps) {
               >
                 {email.trim() || "Sin correo vinculado"}
               </Text>
+              <View style={styles.completionRow}>
+                <Ionicons name="checkmark-circle" size={14} color={theme.accent} />
+                <Text style={[styles.completionText, { color: mutedText }]}>
+                  Perfil {profileCompletionPct}% completo
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -186,7 +178,7 @@ export function ProfileScreen(props: ProfileScreenProps) {
             <View
               style={[
                 styles.progressTrack,
-                { backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)" },
+                { backgroundColor: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)" },
               ]}
             >
               <View
@@ -199,14 +191,11 @@ export function ProfileScreen(props: ProfileScreenProps) {
                 ]}
               />
             </View>
-            <Text style={[styles.progressLabel, { color: mutedText }]}>
-              Perfil {profileCompletionPct}% completo
-            </Text>
           </View>
         </LinearGradient>
       </Animated.View>
 
-      {/* ─── Settings Card ──────────────────────────────────────── */}
+      {/* ─── Account Section ─────────────────────────────────────── */}
       <Animated.View
         style={{
           opacity: mainScrollY.interpolate({
@@ -225,93 +214,54 @@ export function ProfileScreen(props: ProfileScreenProps) {
           ],
         }}
       >
-        <LinearGradient
-          colors={isDark ? ["#111917", "#0D1412"] : ["#FFFFFF", "#F6F1E8"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.card, { borderColor: panelStroke }]}
-        >
-          {/* Theme toggle row */}
-          <SettingsRow
-            icon={isDark ? "moon-outline" : "sunny-outline"}
-            iconColor={isDark ? "#A0C4FF" : "#F59E0B"}
-            label={isDark ? "Modo oscuro" : "Modo claro"}
-            panelAlt={panelAlt}
-            panelStroke={panelStroke}
-            strongText={strongText}
-            mutedText={softText}
-            rowSeparator={rowSeparator}
-            right={
-              <Pressable
-                style={[
-                  styles.toggleTrack,
-                  {
-                    backgroundColor:
-                      !isDark ? theme.accent : panelAlt,
-                    borderColor: panelStroke,
-                  },
-                ]}
-                onPress={onToggleMode}
-                accessibilityLabel="Cambiar modo visual"
-              >
-                <Animated.View
-                  style={[
-                    styles.toggleKnob,
-                    {
-                      transform: [
-                        { translateX: !isDark ? 22 : 2 },
-                      ],
-                    },
-                  ]}
-                />
-              </Pressable>
-            }
-          />
+        <View style={[styles.card, { backgroundColor: panelBg, borderColor: panelStroke }]}>
+          <SectionTitle title="Cuenta" theme={theme} />
 
           {/* Name field */}
-          <FieldRow
+          <InputField
             icon="person-outline"
-            iconColor={theme.accent}
-            label="Nombre"
-            panelAlt={panelAlt}
-            panelStroke={panelStroke}
+            label="Nombre completo"
+            value={fullName}
+            onChangeText={setFullName}
+            placeholder="Tu nombre"
+            theme={theme}
+            inputBg={inputBg}
             strongText={strongText}
             softText={softText}
-            rowSeparator={rowSeparator}
-          >
-            <TextInput
-              value={fullName}
-              onChangeText={setFullName}
-              placeholder="Nombre completo"
-              placeholderTextColor={softText}
-              style={[styles.fieldInput, { color: strongText }]}
-            />
-          </FieldRow>
+          />
 
           {/* Email field */}
-          <FieldRow
+          <InputField
             icon="mail-outline"
-            iconColor={theme.accent}
-            label="Correo"
-            panelAlt={panelAlt}
-            panelStroke={panelStroke}
+            label="Correo electrónico"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="correo@bioma.app"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            theme={theme}
+            inputBg={inputBg}
             strongText={strongText}
             softText={softText}
-            rowSeparator={rowSeparator}
-            isLast
-          >
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="correo@bioma.app"
-              placeholderTextColor={softText}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              style={[styles.fieldInput, { color: strongText }]}
-            />
-          </FieldRow>
+          />
 
-          {/* Connect button */}
+          {/* Theme toggle */}
+          <View style={styles.toggleRow}>
+            <View style={[styles.toggleIconWrap, { backgroundColor: `${isDark ? "#A0C4FF" : "#F59E0B"}18` }]}>
+              <Ionicons name={isDark ? "moon-outline" : "sunny-outline"} size={18} color={isDark ? "#A0C4FF" : "#F59E0B"} />
+            </View>
+            <View style={styles.toggleTextWrap}>
+              <Text style={[styles.toggleLabel, { color: strongText }]}>
+                Modo {isDark ? "oscuro" : "claro"}
+              </Text>
+              <Text style={[styles.toggleHint, { color: softText }]}>
+                Cambia la apariencia de la app
+              </Text>
+            </View>
+            <Switch value={!isDark} onToggle={onToggleMode} accent={theme.accent} />
+          </View>
+
+          {/* Primary action */}
           <Pressable
             style={[
               styles.primaryBtn,
@@ -322,56 +272,33 @@ export function ProfileScreen(props: ProfileScreenProps) {
             disabled={bootstrapLoading}
           >
             {bootstrapLoading ? (
-              <ActivityIndicator color={btnTextColor} />
+              <ActivityIndicator color={isDark ? "#050505" : "#FFFFFF"} />
             ) : (
               <>
                 <Ionicons
                   name={userId ? "sync-outline" : "link-outline"}
                   size={18}
-                  color={btnTextColor}
+                  color={isDark ? "#050505" : "#FFFFFF"}
                 />
-                <Text style={[styles.primaryBtnText, { color: btnTextColor }]}>
+                <Text style={[styles.primaryBtnText, { color: isDark ? "#050505" : "#FFFFFF" }]}>
                   {userId ? "Actualizar perfil" : "Conectar perfil"}
                 </Text>
               </>
             )}
           </Pressable>
 
-          {/* Compact status */}
           {userId != null ? (
-            <View style={styles.statusRow}>
-              <Ionicons
-                name="checkmark-circle"
-                size={14}
-                color={theme.accent}
-              />
-              <Text style={[styles.statusText, { color: mutedText }]}>
-                ID: {userId.slice(0, 16)}…
+            <View style={styles.idRow}>
+              <Ionicons name="id-card-outline" size={14} color={mutedText} />
+              <Text style={[styles.idText, { color: mutedText }]}>
+                ID: {userId.slice(0, 18)}…
               </Text>
             </View>
           ) : null}
-
-          {/* Logout button */}
-          <Pressable
-            style={[
-              styles.primaryBtn,
-              { backgroundColor: isDark ? "#2A181C" : "#FFE5E5", marginTop: 12 },
-            ]}
-            onPress={onLogout}
-          >
-            <Ionicons
-              name="log-out-outline"
-              size={18}
-              color="#F43F5E"
-            />
-            <Text style={[styles.primaryBtnText, { color: "#F43F5E" }]}>
-              Cerrar sesión
-            </Text>
-          </Pressable>
-        </LinearGradient>
+        </View>
       </Animated.View>
 
-      {/* ─── Health Provider Card ───────────────────────────────── */}
+      {/* ─── Devices Section ─────────────────────────────────────── */}
       <Animated.View
         style={{
           opacity: mainScrollY.interpolate({
@@ -390,12 +317,8 @@ export function ProfileScreen(props: ProfileScreenProps) {
           ],
         }}
       >
-        <View
-          style={[
-            styles.deviceWrap,
-            { backgroundColor: panelBg, borderColor: panelStroke },
-          ]}
-        >
+        <View style={[styles.card, { backgroundColor: panelBg, borderColor: panelStroke }]}>
+          <SectionTitle title="Dispositivos" theme={theme} />
           <HealthProviderStatusCard
             provider={healthProvider}
             mode={wellnessCardMode}
@@ -403,89 +326,100 @@ export function ProfileScreen(props: ProfileScreenProps) {
           />
         </View>
       </Animated.View>
+
+      {/* ─── Logout ──────────────────────────────────────────────── */}
+      <Pressable
+        style={[
+          styles.logoutBtn,
+          { backgroundColor: isDark ? "#2A181C" : "#FFF0F0", borderColor: isDark ? "#3D2228" : "#FFD6D6" },
+        ]}
+        onPress={onLogout}
+      >
+        <Ionicons name="log-out-outline" size={18} color="#F43F5E" />
+        <Text style={[styles.logoutText, { color: "#F43F5E" }]}>
+          Cerrar sesión
+        </Text>
+      </Pressable>
     </View>
   );
 }
 
 // ─── Sub-components ───────────────────────────────────────────────
 
-function SettingsRow(props: {
+function SectionTitle({ title, theme }: { title: string; theme: FitnessTheme }) {
+  return (
+    <Text style={[styles.sectionTitle, { color: theme.accent }]}>{title}</Text>
+  );
+}
+
+function InputField({
+  icon,
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  keyboardType,
+  autoCapitalize,
+  theme,
+  inputBg,
+  strongText,
+  softText,
+}: {
   icon: IoniconName;
-  iconColor: string;
   label: string;
-  panelAlt: string;
-  panelStroke: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder: string;
+  keyboardType?: "default" | "email-address";
+  autoCapitalize?: "none" | "sentences";
+  theme: FitnessTheme;
+  inputBg: string;
   strongText: string;
-  mutedText: string;
-  rowSeparator: string;
-  right?: React.ReactNode;
-  isLast?: boolean;
+  softText: string;
 }) {
   return (
-    <View
-      style={[
-        styles.settingsRow,
-        !props.isLast && {
-          borderBottomWidth: 1,
-          borderBottomColor: props.rowSeparator,
-        },
-      ]}
-    >
-      <View
-        style={[
-          styles.settingsIconWrap,
-          { backgroundColor: `${props.iconColor}18` },
-        ]}
-      >
-        <Ionicons name={props.icon} size={16} color={props.iconColor} />
+    <View style={styles.inputWrap}>
+      <Text style={[styles.inputLabel, { color: softText }]}>{label}</Text>
+      <View style={[styles.inputBox, { backgroundColor: inputBg, borderColor: theme.stroke }]}>
+        <Ionicons name={icon} size={18} color={theme.accent} />
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={softText}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          style={[styles.input, { color: strongText }]}
+        />
       </View>
-      <Text style={[styles.settingsLabel, { color: props.strongText }]}>
-        {props.label}
-      </Text>
-      {props.right != null ? (
-        <View style={styles.settingsRight}>{props.right}</View>
-      ) : null}
     </View>
   );
 }
 
-function FieldRow(props: {
-  icon: IoniconName;
-  iconColor: string;
-  label: string;
-  panelAlt: string;
-  panelStroke: string;
-  strongText: string;
-  softText: string;
-  rowSeparator: string;
-  isLast?: boolean;
-  children: React.ReactNode;
+function Switch({
+  value,
+  onToggle,
+  accent,
+}: {
+  value: boolean;
+  onToggle: () => void;
+  accent: string;
 }) {
   return (
-    <View
+    <Pressable
+      onPress={onToggle}
       style={[
-        styles.fieldRow,
-        !props.isLast && {
-          borderBottomWidth: 1,
-          borderBottomColor: props.rowSeparator,
-        },
+        styles.switchTrack,
+        { backgroundColor: value ? accent : "rgba(120,120,120,0.25)" },
       ]}
     >
-      <View
+      <Animated.View
         style={[
-          styles.settingsIconWrap,
-          { backgroundColor: `${props.iconColor}18` },
+          styles.switchKnob,
+          { transform: [{ translateX: value ? 24 : 2 }] },
         ]}
-      >
-        <Ionicons name={props.icon} size={16} color={props.iconColor} />
-      </View>
-      <View style={styles.fieldBody}>
-        <Text style={[styles.fieldLabel, { color: props.softText }]}>
-          {props.label}
-        </Text>
-        {props.children}
-      </View>
-    </View>
+      />
+    </Pressable>
   );
 }
 
@@ -497,79 +431,80 @@ const styles = StyleSheet.create({
 
   // ── Hero ──────────────────────────────────────────────────────
   heroCard: {
-    borderRadius: 34,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 22,
-    gap: 18,
+    borderRadius: 32,
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    paddingBottom: 26,
+    gap: 22,
     overflow: "hidden",
-  },
-  heroGlow: {
-    position: "absolute",
-    top: -40,
-    right: -10,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
   },
   heroTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  pill: {
+  statusPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     borderRadius: 999,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 7,
   },
-  pillDot: {
+  statusDot: {
     width: 7,
     height: 7,
     borderRadius: 4,
   },
-  pillText: {
+  statusPillText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 12,
   },
   identityRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 18,
   },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
   },
   avatarText: {
     fontFamily: "Manrope_800ExtraBold",
-    fontSize: 28,
+    fontSize: 30,
   },
   identityText: {
     flex: 1,
-    gap: 4,
+    gap: 5,
   },
   heroName: {
     fontFamily: "Manrope_800ExtraBold",
     fontSize: 26,
-    lineHeight: 30,
+    lineHeight: 32,
   },
   heroEmail: {
     fontFamily: "Inter_500Medium",
     fontSize: 14,
     lineHeight: 20,
   },
+  completionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 4,
+  },
+  completionText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
   progressWrap: {
     gap: 6,
   },
   progressTrack: {
-    height: 5,
+    height: 6,
     borderRadius: 999,
     overflow: "hidden",
   },
@@ -577,55 +512,85 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 999,
   },
-  progressLabel: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-  },
 
-  // ── Settings card ─────────────────────────────────────────────
+  // ── Card ──────────────────────────────────────────────────────
   card: {
     borderRadius: 28,
     borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    gap: 0,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    gap: 16,
     overflow: "hidden",
   },
-  settingsRow: {
+  sectionTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+
+  // ── Inputs ────────────────────────────────────────────────────
+  inputWrap: {
+    gap: 6,
+  },
+  inputLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    letterSpacing: 0.3,
+  },
+  inputBox: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 14,
+    gap: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  settingsIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  settingsLabel: {
+  input: {
     flex: 1,
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
-  },
-  settingsRight: {
-    flexShrink: 0,
+    paddingVertical: 0,
   },
 
-  // Toggle switch
-  toggleTrack: {
-    width: 46,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 1,
+  // ── Toggle ────────────────────────────────────────────────────
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 4,
+  },
+  toggleIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
     justifyContent: "center",
   },
-  toggleKnob: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  toggleTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  toggleLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+  },
+  toggleHint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+  },
+  switchTrack: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+  },
+  switchKnob: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: "#FFFFFF",
     shadowColor: "#000",
     shadowOpacity: 0.18,
@@ -634,38 +599,15 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 
-  // Field rows
-  fieldRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
-  },
-  fieldBody: {
-    flex: 1,
-    gap: 2,
-  },
-  fieldLabel: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 0.7,
-  },
-  fieldInput: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    paddingVertical: 0,
-  },
-
-  // Button
+  // ── Buttons ───────────────────────────────────────────────────
   primaryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
     minHeight: 52,
-    borderRadius: 999,
-    marginTop: 8,
+    borderRadius: 16,
+    marginTop: 4,
   },
   primaryBtnText: {
     fontFamily: "Inter_700Bold",
@@ -674,24 +616,29 @@ const styles = StyleSheet.create({
   btnDisabled: {
     opacity: 0.6,
   },
-
-  // Status
-  statusRow: {
+  idRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 4,
-    marginTop: 4,
+    justifyContent: "center",
+    gap: 5,
   },
-  statusText: {
+  idText: {
     fontFamily: "Inter_500Medium",
-    fontSize: 12,
+    fontSize: 11,
   },
 
-  // Device wrap
-  deviceWrap: {
-    borderRadius: 28,
+  // ── Logout ────────────────────────────────────────────────────
+  logoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 50,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 10,
+  },
+  logoutText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
   },
 });
