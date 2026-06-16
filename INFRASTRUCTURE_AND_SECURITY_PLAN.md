@@ -177,29 +177,31 @@ Criterios: económico, bueno, escalable hasta ~1.000 usuarios, compatible con GD
   - [ ] Confirmar uso de connection pooler (`-pooler`).
   - [ ] Configurar IP allow list.
   - [ ] Habilitar backups automáticos.
-- [ ] Supabase Storage
-  - [ ] Aplicar políticas RLS en SQL Editor.
-  - [ ] Verificar bucket privado.
+- [x] Supabase Storage
+  - [x] Políticas RLS preparadas en `Backend/infrastructure/supabase-storage-rls.sql`.
+  - [ ] Aplicar políticas RLS en SQL Editor de Supabase.
+  - [x] Bucket privado configurado.
 - [x] CI/CD avanzado
   - [x] Crear rama `develop` para staging.
   - [x] Deploy automático a staging desde `develop` (`.github/workflows/deploy.yml`).
   - [x] Deploy a producción solo con manual trigger (`workflow_dispatch`).
   - [ ] Crear API keys en Render y agregarlas como secrets en GitHub (`RENDER_API_KEY`, `RENDER_SERVICE_ID_STAGING`, `RENDER_SERVICE_ID_PRODUCTION`).
-- [ ] Monitoreo
-  - [ ] Crear proyecto Sentry y copiar DSN a variables de entorno.
-  - [ ] Configurar UptimeRobot ping cada 5 minutos.
+- [x] Monitoreo
+  - [x] Sentry configurado con PII scrubbing (cookies, auth headers, request body, email, IP).
+  - [x] Sample rate: 10% producción, 0% desarrollo.
+  - [ ] Configurar UptimeRobot.
   - [ ] Logs centralizados (del propio host inicialmente).
 
 ### Fase 3 — Hardering y GDPR
 
 > Objetivo: reducir superficie de ataque y cumplir regulaciones básicas.
 
-- [ ] Seguridad adicional
+- [x] Seguridad adicional
   - [x] bcrypt/Argon2 para hashes (verificar configuración actual). — bcrypt con 10 salt rounds.
   - [x] Validación estricta de uploads.
   - [x] Prompt injection mitigation (delimitadores + validación de output).
   - [x] Sanitizar `imageUrl` en `/logs/analyze-menu-image`.
-  - [ ] Auditoría de dependencias (`npm audit --audit-level high`).
+  - [x] Auditoría de dependencias (`npm audit --audit-level high`) — 0 vulnerabilidades en backend post-fix.
 - [ ] GDPR
   - [ ] Política de privacidad clara (qué datos, por qué, cuánto tiempo).
   - [ ] Términos de servicio.
@@ -216,8 +218,8 @@ Criterios: económico, bueno, escalable hasta ~1.000 usuarios, compatible con GD
 
 - [ ] Penetration testing básico manual.
 - [ ] Revisión de permisos de la app móvil.
-- [ ] Plan de respuesta a incidentes (contacto, rollback, rotación de secrets).
-- [ ] Documentar runbook de deploy y rollback.
+- [x] Plan de respuesta a incidentes (contacto, rollback, rotación de secrets).
+- [x] Documentar runbook de deploy y rollback.
 - [ ] Test de carga mínimo (k6 o Artillery gratis).
 
 ---

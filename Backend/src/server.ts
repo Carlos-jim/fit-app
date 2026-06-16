@@ -39,15 +39,31 @@ import { NutritionAnalysisService } from "./services/nutrition-analysis.service.
 import { SupabaseStorageService } from "./services/supabase-storage.service.js";
 import { TipsService } from "./services/tips.service.js";
 
+const isProduction = process.env.NODE_ENV === "production";
+
 if (env.SENTRY_DSN) {
   Sentry.init({
     dsn: env.SENTRY_DSN,
     environment: process.env.NODE_ENV || "development",
-    tracesSampleRate: 0.1,
+    tracesSampleRate: isProduction ? 0.1 : 0.0,
+    beforeSend(event) {
+      // Scrub PII from Sentry events
+      if (event.request) {
+        delete event.request.cookies;
+        delete event.request.headers?.authorization;
+        delete event.request.headers?.["x-api-key"];
+        if (event.request.data && typeof event.request.data === "string") {
+          event.request.data = "[REDACTED]";
+        }
+      }
+      if (event.user) {
+        delete event.user.email;
+        delete event.user.ip_address;
+      }
+      return event;
+    },
   });
 }
-
-const isProduction = process.env.NODE_ENV === "production";
 
 const app = express();
 const userRepository = new UserRepository(prisma);
