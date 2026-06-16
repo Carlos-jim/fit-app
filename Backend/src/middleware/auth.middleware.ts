@@ -43,17 +43,25 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
 }
 
 export function authorizeResource(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
-  if (!req.user) {
-    return next(
-      new AppError("Authentication required.", {
-        statusCode: 401,
-        code: "UNAUTHORIZED",
-      }),
-    );
-  }
-  next();
+  resourceUserId: string,
+): (req: Request, _res: Response, next: NextFunction) => void {
+  return (req, _res, next) => {
+    if (!req.user) {
+      return next(
+        new AppError("Authentication required.", {
+          statusCode: 401,
+          code: "UNAUTHORIZED",
+        }),
+      );
+    }
+    if (req.user.id !== resourceUserId) {
+      return next(
+        new AppError("Forbidden.", {
+          statusCode: 403,
+          code: "FORBIDDEN",
+        }),
+      );
+    }
+    next();
+  };
 }

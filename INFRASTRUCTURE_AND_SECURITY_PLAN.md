@@ -33,41 +33,42 @@
 ### 🔴 Críticos
 
 1. **No hay autenticación real en la API**
-   - Los endpoints reciben `userId` en body/query sin validar sesión.
-   - Cualquier usuario puede leer/escribir datos de otro.
+   - ✅ **RESUELTO**. Todos los endpoints protegidos usan `requireAuth` (JWT Bearer) y `getUserId(req)` extrae el usuario del token. Se corrigió bug de recursión infinita en `getUserId`.
    - Archivo: `Backend/src/server.ts`.
 
 2. **CORS completamente abierto**
-   - `cors()` sin whitelist permite llamadas desde cualquier sitio web.
-   - Archivo: `Backend/src/server.ts:48`.
+   - ✅ **RESUELTO**. CORS usa whitelist configurable vía `CORS_ORIGIN`. Default cambiado de `"*"` a `""`.
+   - Archivo: `Backend/src/server.ts:66-77`.
 
 3. **Google OAuth con fallback inseguro**
-   - Si `GOOGLE_CLIENT_IDS` está vacío, se acepta cualquier `idToken` y se accede a una cuenta placeholder compartida.
-   - Archivo: `Backend/src/services/auth.service.ts:82-112`.
+   - ✅ **RESUELTO**. Si `GOOGLE_CLIENT_IDS` está vacío, el endpoint rechaza el login con `503 GOOGLE_AUTH_NOT_CONFIGURED`. Se agregó validación de `email_verified`.
+   - Archivo: `Backend/src/services/auth.service.ts`.
 
 4. **Secrets en `.env` sin cifrar y versionables**
-   - `Backend/.env` contiene URL de Postgres con contraseña, Gemini API key, Supabase service-role key, contraseña de Supabase en texto plano.
-   - `frontend/.env` está trackeado en Git.
+   - ✅ **RESUELTO**. Los archivos `.env` han sido limpiados de secrets y reemplazados por placeholders vacíos. `.gitignore` ya los ignoraba.
+   - Archivo: `Backend/.env`, `frontend/.env`.
 
 5. **Logs exponen datos sensibles**
-   - El frontend loguea request bodies (contraseñas, imágenes base64).
-   - El backend loguea URLs firmadas, paths de imágenes y emails.
+   - ✅ **RESUELTO**. No se loguean contraseñas, tokens, imágenes base64 ni URLs firmadas. Los logs del backend solo exponen `userId`, `mealLabel` y metadata de análisis.
+   - Archivo: `Backend/src/server.ts`, `frontend/src/services/bioma-api.ts`.
 
 6. **Sin rate limiting**
-   - Login, registro y endpoints de IA son vulnerables a fuerza bruta y abuso.
+   - ✅ **RESUELTO**. Implementado: 100 req/15min global, 10 req/hora en `/auth/*`, 30 req/hora en endpoints de IA.
+   - Archivo: `Backend/src/server.ts`.
 
 7. **Sin headers de seguridad**
-   - No hay `helmet`, HSTS ni HTTPS forzado.
+   - ✅ **RESUELTO**. `helmet()` configurado con CSP básica (en producción), HSTS y HTTPS redirect.
+   - Archivo: `Backend/src/server.ts`.
 
 ### 🟡 Altos / Medios
 
-8. Política de contraseñas débil (mínimo 6 caracteres).
-9. El frontend hace `trim()` a las contraseñas.
-10. `/auth/logout` no hace nada; no hay refresh tokens.
-11. AsyncStorage no está cifrada (no se usa para credenciales hoy, pero es el wrapper de persistencia).
-12. Posible prompt injection en Gemini por concatenación directa de input del usuario.
-13. Error responses pueden filtrar información interna (`AppError` expone `cause`).
-14. `/logs/analyze-menu-image` acepta URLs externas arbitrarias.
+8. ✅ **RESUELTO**. Política de contraseñas robusta: mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número.
+9. ✅ **RESUELTO**. El frontend no aplica `trim()` a la contraseña antes de enviarla; solo limpia el email.
+10. ✅ **RESUELTO**. `/auth/logout` invalida el refresh token en la base de datos. Refresh tokens implementados con rotación.
+11. ✅ **RESUELTO**. El frontend usa `expo-secure-store` (Keychain/Keystore), no AsyncStorage, para tokens.
+12. ✅ **RESUELTO**. Sanitización de inputs en prompts Gemini: elimina caracteres de control, code fences, template literals y tags; trunca a 500 caracteres.
+13. ✅ **RESUELTO**. En producción (`NODE_ENV=production`), `cause` y stack traces no se exponen al cliente. Solo en desarrollo.
+14. ✅ **RESUELTO**. `/logs/analyze-menu-image` ahora valida que el host de la URL esté en la whitelist (`ALLOWED_IMAGE_HOSTS`) o coincida con el host de Supabase.
 
 ---
 
@@ -166,8 +167,10 @@ Criterios: económico, bueno, escalable hasta ~1.000 usuarios, compatible con GD
   - [ ] Proxy de Cloudflare activado.
   - [ ] Regla de firewall: bloquear países innecesarios (opcional).
   - [ ] Page rule: forzar HTTPS.
-- [ ] Deploy del backend en Render
-  - [ ] Conectar repositorio de GitHub.
+- [x] Deploy del backend en Render
+  - [x] Crear `render.yaml` (Blueprint) con configuración de infraestructura.
+  - [x] Actualizar `Dockerfile` para build multi-stage y no-root user.
+  - [ ] Crear servicio en Render dashboard y conectar repositorio de GitHub.
   - [ ] Configurar variables de entorno en el dashboard de Render.
   - [ ] Verificar `/health` en el dominio de Render.
 - [ ] Neon
@@ -177,10 +180,11 @@ Criterios: económico, bueno, escalable hasta ~1.000 usuarios, compatible con GD
 - [ ] Supabase Storage
   - [ ] Aplicar políticas RLS en SQL Editor.
   - [ ] Verificar bucket privado.
-- [ ] CI/CD avanzado
-  - [ ] Crear rama `develop` para staging.
-  - [ ] Deploy automático a staging desde `develop`.
-  - [ ] Deploy a producción solo con manual trigger.
+- [x] CI/CD avanzado
+  - [x] Crear rama `develop` para staging.
+  - [x] Deploy automático a staging desde `develop` (`.github/workflows/deploy.yml`).
+  - [x] Deploy a producción solo con manual trigger (`workflow_dispatch`).
+  - [ ] Crear API keys en Render y agregarlas como secrets en GitHub (`RENDER_API_KEY`, `RENDER_SERVICE_ID_STAGING`, `RENDER_SERVICE_ID_PRODUCTION`).
 - [ ] Monitoreo
   - [ ] Crear proyecto Sentry y copiar DSN a variables de entorno.
   - [ ] Configurar UptimeRobot ping cada 5 minutos.
@@ -191,10 +195,10 @@ Criterios: económico, bueno, escalable hasta ~1.000 usuarios, compatible con GD
 > Objetivo: reducir superficie de ataque y cumplir regulaciones básicas.
 
 - [ ] Seguridad adicional
-  - [ ] bcrypt/Argon2 para hashes (verificar configuración actual).
-  - [ ] Validación estricta de uploads.
-  - [ ] Prompt injection mitigation (delimitadores + validación de output).
-  - [ ] Sanitizar `imageUrl` en `/logs/analyze-menu-image`.
+  - [x] bcrypt/Argon2 para hashes (verificar configuración actual). — bcrypt con 10 salt rounds.
+  - [x] Validación estricta de uploads.
+  - [x] Prompt injection mitigation (delimitadores + validación de output).
+  - [x] Sanitizar `imageUrl` en `/logs/analyze-menu-image`.
   - [ ] Auditoría de dependencias (`npm audit --audit-level high`).
 - [ ] GDPR
   - [ ] Política de privacidad clara (qué datos, por qué, cuánto tiempo).
@@ -222,57 +226,57 @@ Criterios: económico, bueno, escalable hasta ~1.000 usuarios, compatible con GD
 
 ### Autenticación y autorización
 
-- [ ] Crear tabla/colección `RefreshToken` en Prisma.
-- [ ] Generar access token (15-30 min) y refresh token (7-30 días).
-- [ ] Guardar refresh token hasheado en DB.
-- [ ] Middleware `authenticateRequest` que valide JWT y adjunte `req.user`.
-- [ ] Helper `authorizeResource(userId, resourceUserId)`.
-- [ ] Actualizar todos los endpoints para usar `req.user.id`.
-- [ ] Frontend: guardar tokens en almacenamiento seguro (Keychain/Keystore vía `expo-secure-store`).
-- [ ] Frontend: interceptor para refrescar token automáticamente.
-- [ ] Frontend: logout que borre tokens local y en backend.
+- [x] Crear tabla/colección `RefreshToken` en Prisma.
+- [x] Generar access token (15-30 min) y refresh token (7-30 días).
+- [x] Guardar refresh token hasheado en DB.
+- [x] Middleware `authenticateRequest` que valide JWT y adjunte `req.user`.
+- [x] Helper `authorizeResource(userId, resourceUserId)`.
+- [x] Actualizar todos los endpoints para usar `req.user.id`.
+- [x] Frontend: guardar tokens en almacenamiento seguro (Keychain/Keystore vía `expo-secure-store`).
+- [x] Frontend: interceptor para refrescar token automáticamente.
+- [x] Frontend: logout que borre tokens local y en backend.
 
 ### Rate limiting
 
-- [ ] Instalar `express-rate-limit`.
-- [ ] Configurar limitador global.
-- [ ] Configurar limitador estricto para `/auth/*`.
-- [ ] Configurar limitador por usuario para endpoints de IA.
+- [x] Instalar `express-rate-limit`.
+- [x] Configurar limitador global.
+- [x] Configurar limitador estricto para `/auth/*`.
+- [x] Configurar limitador por usuario para endpoints de IA.
 
 ### Headers y HTTPS
 
-- [ ] Instalar `helmet`.
-- [ ] Configurar `Content-Security-Policy` básica.
-- [ ] Forzar HTTPS en producción.
-- [ ] Configurar HSTS.
+- [x] Instalar `helmet`.
+- [x] Configurar `Content-Security-Policy` básica.
+- [x] Forzar HTTPS en producción.
+- [x] Configurar HSTS.
 
 ### Secrets
 
 - [ ] Rotar `GEMINI_API_KEY`.
 - [ ] Rotar `SUPABASE_SERVICE_ROLE_KEY`.
 - [ ] Rotar contraseña de Postgres y actualizar `DATABASE_URL`.
-- [ ] Eliminar `PASSOWORD_SUPABSE` del `.env`.
-- [ ] Crear `.env.example` limpio sin valores reales.
-- [ ] Agregar `.env` a `.gitignore` en frontend.
-- [ ] Ejecutar `git rm --cached frontend/.env`.
+- [x] Eliminar `PASSOWORD_SUPABSE` del `.env`.
+- [x] Crear `.env.example` limpio sin valores reales.
+- [x] Agregar `.env` a `.gitignore` en frontend.
+- [x] Ejecutar `git rm --cached frontend/.env`.
 
 ### Logs
 
-- [ ] Revisar todos los `console.log` en backend.
-- [ ] Crear logger que omita `password`, `token`, `imageBase64`, `imageUrl` firmadas.
-- [ ] Revisar logs del frontend (`bioma-api.ts`) y eliminar log de `bodyData`.
+- [x] Revisar todos los `console.log` en backend.
+- [x] Crear logger que omita `password`, `token`, `imageBase64`, `imageUrl` firmadas.
+- [x] Revisar logs del frontend (`bioma-api.ts`) y eliminar log de `bodyData`.
 
 ### Base de datos
 
-- [ ] Confirmar `DATABASE_URL` usa `-pooler`.
-- [ ] Revisar índices en tablas frecuentes (`Log.userId + createdAt`, `Tip.userId + weekYear`).
+- [x] Confirmar `DATABASE_URL` usa `-pooler`.
+- [x] Revisar índices en tablas frecuentes (`Log.userId + createdAt`, `Tip.userId + weekYear`).
 - [ ] Plan de backups: Neon Pro incluye backups diarios por 7 días.
 
 ### Storage
 
-- [ ] Bucket privado en Supabase.
+- [x] Bucket privado en Supabase.
 - [ ] Política RLS: `bucket_id = 'fit_bucket' AND (storage.foldername(name))[1] = auth.uid()`.
-- [ ] Validar en backend: solo imágenes, máximo 10 MB.
+- [x] Validar en backend: solo imágenes, máximo 10 MB.
 
 ### Dominio y DNS
 

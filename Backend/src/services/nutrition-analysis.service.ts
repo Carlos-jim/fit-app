@@ -572,6 +572,16 @@ export class NutritionAnalysisService {
     return value.replace(/^```json\s*/u, "").replace(/\s*```$/u, "");
   }
 
+  private sanitizePromptInput(value: string, maxLength = 500): string {
+    return value
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
+      .replace(/```/g, "'")
+      .replace(/\$\{/g, "")
+      .replace(/<[\/]?\w+>/g, "")
+      .slice(0, maxLength)
+      .trim();
+  }
+
   private buildImagePrompt(input: AnalyzeNutritionInput): string {
     const promptLines = [
       "Analyze this meal photo for nutrition tracking.",
@@ -583,11 +593,11 @@ export class NutritionAnalysisService {
     ];
 
     if (input.mealLabel) {
-      promptLines.push(`Meal label from user: ${input.mealLabel}`);
+      promptLines.push(`Meal label from user: ${this.sanitizePromptInput(input.mealLabel)}`);
     }
 
     if (input.notes) {
-      promptLines.push(`User notes about the photo: ${input.notes}`);
+      promptLines.push(`User notes about the photo: ${this.sanitizePromptInput(input.notes)}`);
     }
 
     return promptLines.join("\n");
@@ -600,11 +610,11 @@ export class NutritionAnalysisService {
       "Return calories and macronutrients for the whole meal and for each item.",
       "Use grams and mg as units.",
       "Reflect uncertainty through confidence and warnings instead of inventing precision.",
-      `Meal description: ${input.description?.trim() ?? ""}`,
+      `Meal description: ${this.sanitizePromptInput(input.description?.trim() ?? "")}`,
     ];
 
     if (input.mealLabel) {
-      promptLines.push(`Meal label from user: ${input.mealLabel}`);
+      promptLines.push(`Meal label from user: ${this.sanitizePromptInput(input.mealLabel)}`);
     }
 
     return promptLines.join("\n");
@@ -612,7 +622,7 @@ export class NutritionAnalysisService {
 
   private buildSuggestionPrompt(input: SuggestMealRequest): string {
     const lines = [
-      `El usuario registró una comida llamada: "${input.mealTitle}".`,
+      `El usuario registró una comida llamada: "${this.sanitizePromptInput(input.mealTitle)}".`,
       `Macronutrientes totales:`,
       `- Calorías: ${Math.round(input.calories)} kcal`,
       `- Proteína: ${Math.round(input.proteinGrams)} g`,
@@ -637,7 +647,7 @@ export class NutritionAnalysisService {
 
       for (const ing of input.ingredients) {
         lines.push(
-          `- ${ing.name}: ~${Math.round(ing.estimatedGrams)}g (${Math.round(ing.calories)} kcal, P:${Math.round(ing.proteinGrams)}g, C:${Math.round(ing.carbsGrams)}g, G:${Math.round(ing.fatGrams)}g)`,
+          `- ${this.sanitizePromptInput(ing.name)}: ~${Math.round(ing.estimatedGrams)}g (${Math.round(ing.calories)} kcal, P:${Math.round(ing.proteinGrams)}g, C:${Math.round(ing.carbsGrams)}g, G:${Math.round(ing.fatGrams)}g)`,
         );
       }
     }

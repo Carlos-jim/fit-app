@@ -60,14 +60,47 @@ const tipsService = new TipsService();
 const storageService = new SupabaseStorageService();
 
 // Security headers
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: isProduction
+      ? {
+          directives: {
+            defaultSrc: ["'self'"],
+            connectSrc: ["'self'", "https://*.googleusercontent.com", "https://*.supabase.co"],
+            imgSrc: ["'self'", "data:", "https://*.supabase.co", "https://*.googleusercontent.com"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            objectSrc: ["'none'"],
+            frameAncestors: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"],
+          },
+        }
+      : false,
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+  }),
+);
+
+// Force HTTPS in production
+if (isProduction) {
+  app.use((req, res, next) => {
+    if (req.headers["x-forwarded-proto"] === "https" || req.secure) {
+      return next();
+    }
+    res.redirect(301, `https://${req.headers.host}${req.url}`);
+  });
+}
 
 // CORS
 const corsOrigins = env.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean);
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || corsOrigins.includes("*") || corsOrigins.includes(origin)) {
+      if (!origin || corsOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
@@ -469,6 +502,23 @@ app.post("/logs/analyze-menu-image", requireAuth, aiLimiter, async (req, res) =>
       });
     }
 
+    const allowedHosts = env.ALLOWED_IMAGE_HOSTS
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+
+    const supabaseHost = new URL(env.SUPABASE_URL).host.toLowerCase();
+    const isAllowedHost =
+      allowedHosts.includes(url.host.toLowerCase()) ||
+      url.host.toLowerCase() === supabaseHost;
+
+    if (!isAllowedHost) {
+      throw new AppError("Image URL host is not allowed.", {
+        statusCode: 400,
+        code: "INVALID_IMAGE_URL_HOST",
+      });
+    }
+
     console.log("[analyze-menu-image] Request received", {
       userId: getUserId(req),
     });
@@ -681,7 +731,7 @@ function getUserId(req: Request): string {
       code: "UNAUTHORIZED",
     });
   }
-  return getUserId(req);
+  return req.user.id;
 }
 
 function handleError(res: Response, error: unknown, context: string): void {

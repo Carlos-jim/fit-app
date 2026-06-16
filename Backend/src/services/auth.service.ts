@@ -143,6 +143,12 @@ export class AuthService {
           code: "INVALID_GOOGLE_TOKEN",
         });
       }
+      if (!payload.email_verified) {
+        throw new AppError("Google account email is not verified.", {
+          statusCode: 401,
+          code: "UNVERIFIED_GOOGLE_EMAIL",
+        });
+      }
       email = payload.email;
       name = payload.name || payload.given_name || "Google User";
     } catch (error) {

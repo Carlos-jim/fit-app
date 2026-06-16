@@ -1,0 +1,46 @@
+# Render Blueprint for Bioma Backend
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: bioma-backend
+    runtime: docker
+    rootDir: .
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash-lite
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: fit_bucket
+      - key: STORAGE_SIGNED_UPLOAD_TTL_SECONDS
+        value: 7200
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: GOOGLE_CLIENT_IDS
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: ALLOWED_IMAGE_HOSTS
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+    healthCheckPath: /health
+    autoDeploy: false

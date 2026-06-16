@@ -23,7 +23,8 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
   JWT_ACCESS_EXPIRES_IN: z.string().optional().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().optional().default("7d"),
-  CORS_ORIGIN: z.string().optional().default("*"),
+  CORS_ORIGIN: z.string().optional().default(""),
+  ALLOWED_IMAGE_HOSTS: z.string().optional().default(""),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

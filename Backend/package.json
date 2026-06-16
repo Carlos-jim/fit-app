@@ -13,6 +13,7 @@
     "start": "node --env-file=.env dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:validate": "prisma validate"
   },
   "dependencies": {
