@@ -149,11 +149,26 @@ export class LogRepository {
     return log?.aiSuggestion ?? null;
   }
 
-  async saveMealSuggestion(logId: string, suggestion: unknown): Promise<void> {
+  async saveMealSuggestion(
+    userId: string,
+    logId: string,
+    suggestion: unknown,
+  ): Promise<void> {
+    const existing = await this.db.log.findFirst({
+      where: { id: logId, userId },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new AppError("Log not found.", {
+        statusCode: 404,
+        code: "LOG_NOT_FOUND",
+      });
+    }
     await this.db.log.update({
-      where: { id: logId },
+      where: { id: existing.id },
       data: {
-        aiSuggestion: suggestion !== undefined ? (suggestion as Prisma.InputJsonValue) : Prisma.DbNull,
+        aiSuggestion:
+          suggestion !== undefined ? (suggestion as Prisma.InputJsonValue) : Prisma.DbNull,
       },
     });
   }

@@ -7,6 +7,9 @@ import {
   type TipsResponse,
 } from "../contracts/generate-tips-request.js";
 import { AppError } from "../lib/app-error.js";
+import { logger } from "../lib/logger.js";
+
+const log = logger.child("tips-service");
 
 const geminiClient = new GoogleGenAI({
   apiKey: env.GEMINI_API_KEY,
@@ -62,8 +65,10 @@ export class TipsService {
 
     let lastError: unknown;
 
-    console.log("[TipsService] Starting tips generation with models:", candidateModels);
-    console.log("[TipsService] Prompt length:", prompt.length);
+    log.debug("Starting tips generation", {
+      models: candidateModels,
+      promptLength: prompt.length,
+    });
 
     for (const modelName of candidateModels) {
       try {
@@ -72,7 +77,11 @@ export class TipsService {
 
         for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
           try {
-            console.log(`[TipsService] Trying model ${modelName}, attempt ${attempt}/${maxAttempts}`);
+            log.debug("Trying model", {
+              model: modelName,
+              attempt,
+              maxAttempts,
+            });
 
             const response = await geminiClient.models.generateContent({
               model: modelName,
@@ -92,12 +101,14 @@ export class TipsService {
               },
             });
 
-            console.log("[TipsService] Gemini response received, model:", response.modelVersion);
+            log.debug("Gemini response received", {
+              model: response.modelVersion,
+            });
 
             const rawOutput = response.text?.trim();
 
             if (!rawOutput) {
-              console.error("[TipsService] Gemini returned empty response");
+              log.error("Gemini returned empty response");
               throw new AppError(
                 "Gemini returned an empty response for tips generation.",
                 {
@@ -107,15 +118,14 @@ export class TipsService {
               );
             }
 
-            console.log("[TipsService] Raw output length:", rawOutput.length);
-            console.log("[TipsService] Raw output preview:", rawOutput.slice(0, 200));
+            log.debug("Gemini raw output length", { length: rawOutput.length });
 
             let parsedJson: unknown;
 
             try {
               parsedJson = JSON.parse(this.stripCodeFences(rawOutput));
             } catch (error) {
-              console.error("[TipsService] JSON parse failed:", error);
+              log.error("JSON parse failed", { error });
               throw new AppError(
                 "Gemini returned invalid JSON for tips generation.",
                 {
@@ -129,7 +139,9 @@ export class TipsService {
             const parsed = tipsResponseSchema.safeParse(parsedJson);
 
             if (!parsed.success) {
-              console.error("[TipsService] Schema validation failed:", parsed.error.flatten());
+              log.error("Schema validation failed", {
+                issues: parsed.error.flatten(),
+              });
               throw new AppError(
                 "Gemini tips response did not match schema.",
                 {
@@ -140,10 +152,10 @@ export class TipsService {
               );
             }
 
-            console.log("[TipsService] Successfully generated", parsed.data.tips.length, "tips");
+            log.info("Generated tips", { count: parsed.data.tips.length });
             return parsed.data;
           } catch (error) {
-            console.error(`[TipsService] Error on model ${modelName}, attempt ${attempt}:`, error);
+            log.error("Model error", { model: modelName, attempt, error });
 
             if (error instanceof AppError) {
               throw error;
@@ -161,7 +173,7 @@ export class TipsService {
           `Gemini tips attempts exhausted for model ${modelName}.`,
         );
       } catch (error) {
-        console.error(`[TipsService] Model ${modelName} failed:`, error);
+        log.error("Model failed", { model: modelName, error });
 
         if (error instanceof AppError) {
           throw error;
@@ -175,7 +187,7 @@ export class TipsService {
       }
     }
 
-    console.error("[TipsService] All models exhausted. Last error:", lastError);
+    log.error("All models exhausted", { lastError });
 
     const isRateLimited =
       typeof lastError === "object" &&
@@ -184,7 +196,7 @@ export class TipsService {
       (lastError as { status?: number }).status === 429;
 
     if (isRateLimited) {
-      console.warn("[TipsService] Gemini rate limited (429). Returning fallback mock tips.");
+      log.warn("Gemini rate limited (429) — returning fallback tips");
       return this.getMockTips();
     }
 

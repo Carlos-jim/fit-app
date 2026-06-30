@@ -28,6 +28,7 @@ export interface HomeScreenProps {
   todayMealsCount: number;
   calorieGoal: number;
   stepsGoal: number;
+  currentSteps: number;
   todayMacros: {
     protein: number;
     carbs: number;
@@ -44,8 +45,8 @@ export interface HomeScreenProps {
   logs: MealLog[];
   waterGlasses: number;
   waterGoal: number;
-  onWaterIncrement: () => void;
-  onWaterDecrement: () => void;
+  onWaterIncrement: () => void | Promise<void>;
+  onWaterDecrement: () => void | Promise<void>;
   onOpenCamera: () => void;
   ambientPulse: Animated.Value;
   heroScale: Animated.Value;
@@ -135,6 +136,7 @@ export function HomeScreen(props: HomeScreenProps) {
     todayMealsCount,
     calorieGoal,
     stepsGoal,
+    currentSteps,
     todayMacros,
     macroGoals,
     lastMeal,
@@ -169,8 +171,19 @@ export function HomeScreen(props: HomeScreenProps) {
   const monthYear = useMemo(() => getMonthYear(), []);
 
   const calorieProgress = calorieGoal > 0 ? todayCalories / calorieGoal : 0;
-  const stepsProgress = stepsGoal > 0 ? 3500 / stepsGoal : 0;
+  const stepsProgress = stepsGoal > 0 ? currentSteps / stepsGoal : 0;
   const waterProgress = waterGoal > 0 ? waterGlasses / waterGoal : 0;
+
+  // Per-meal calorie estimates use 25 % breakfast / 35 % lunch / 30 % dinner
+  // splits of the user's daily target. Replace the previous hardcoded
+  // "456 - 512 kcal" copy that had no relation to the real user.
+  const breakfastKcal = Math.round(calorieGoal * 0.25);
+  const lunchKcal = Math.round(calorieGoal * 0.35);
+  const formatRange = (kcal: number) => {
+    const low = Math.max(0, Math.round(kcal * 0.85));
+    const high = Math.round(kcal * 1.15);
+    return `${low} - ${high} kcal`;
+  };
 
   const carbsProgress = macroGoals.carbs > 0 ? todayMacros.carbs / macroGoals.carbs : 0;
   const fatProgress = macroGoals.fat > 0 ? todayMacros.fat / macroGoals.fat : 0;
@@ -358,7 +371,7 @@ export function HomeScreen(props: HomeScreenProps) {
             Pasos para caminar
           </Text>
           <Text style={[styles.smallCardValue, { color: strongText }]}>
-            5,500{" "}
+            {Math.max(0, stepsGoal - currentSteps).toLocaleString()}{" "}
             <Text style={[styles.smallCardUnit, { color: mutedText }]}>pasos</Text>
           </Text>
           <View style={[styles.smallProgressTrack, { backgroundColor: ringTrackColor }]}>
@@ -637,7 +650,7 @@ export function HomeScreen(props: HomeScreenProps) {
               </Text>
             </View>
             <Text style={[styles.mealCalories, { color: mutedText }]}>
-              456 - 512 kcal
+              {formatRange(breakfastKcal)}
             </Text>
           </View>
           <View style={styles.mealImagesRow}>
@@ -689,7 +702,7 @@ export function HomeScreen(props: HomeScreenProps) {
               </Text>
             </View>
             <Text style={[styles.mealCalories, { color: mutedText }]}>
-              456 - 512 kcal
+              {formatRange(lunchKcal)}
             </Text>
           </View>
           <View style={styles.mealImagesRow}>

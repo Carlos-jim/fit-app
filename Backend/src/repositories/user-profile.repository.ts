@@ -1,53 +1,54 @@
-import { type PrismaClient } from "@prisma/client";
+import { type PrismaClient, type UserProfile } from "@prisma/client";
 
+import {
+  type UserProfileSource,
+  serialize,
+  toCreateInput,
+  toUpdateInput,
+} from "../services/user-profile.mapper.js";
+
+/**
+ * Repository for {@link UserProfile} persistence.
+ *
+ * SOLID notes
+ * ───────────
+ * • SRP — this class only owns CRUD. It delegates wire-format
+ *   normalization (string → enum narrowing) to the mapper, keeping the
+ *   `Prisma.*Input` types honest.
+ * • DIP — every public method accepts a {@link UserProfileSource} (a
+ *   plain shape), not a Prisma row. Callers depend on this abstraction
+ *   rather than on `@prisma/client` itself.
+ */
 export class UserProfileRepository {
   constructor(private prisma: PrismaClient) {}
 
-  async upsertFromOnboarding(userId: string, session: {
-    goal?: string | null;
-    weightKg?: number | null;
-    heightCm?: number | null;
-    desiredWeightKg?: number | null;
-    gender?: string | null;
-    age?: number | null;
-    country?: string | null;
-    workoutFrequency?: string | null;
-    activityLevel?: string | null;
-    dietaryPrefs?: unknown;
-  }) {
+  async upsertFromOnboarding(
+    userId: string,
+    session: UserProfileSource,
+  ): Promise<UserProfile> {
     return this.prisma.userProfile.upsert({
       where: { userId },
-      update: {
-        goal: session.goal as never ?? undefined,
-        weightKg: session.weightKg ?? undefined,
-        heightCm: session.heightCm ?? undefined,
-        desiredWeightKg: session.desiredWeightKg ?? undefined,
-        gender: session.gender as never ?? undefined,
-        age: session.age ?? undefined,
-        country: session.country ?? undefined,
-        workoutFrequency: session.workoutFrequency as never ?? undefined,
-        activityLevel: session.activityLevel as never ?? undefined,
-        dietaryPrefs: session.dietaryPrefs ?? undefined,
-      },
-      create: {
-        userId,
-        goal: session.goal as never ?? undefined,
-        weightKg: session.weightKg ?? undefined,
-        heightCm: session.heightCm ?? undefined,
-        desiredWeightKg: session.desiredWeightKg ?? undefined,
-        gender: session.gender as never ?? undefined,
-        age: session.age ?? undefined,
-        country: session.country ?? undefined,
-        workoutFrequency: session.workoutFrequency as never ?? undefined,
-        activityLevel: session.activityLevel as never ?? undefined,
-        dietaryPrefs: session.dietaryPrefs ?? undefined,
-      },
+      update: toUpdateInput(session),
+      create: toCreateInput(session, userId),
     });
   }
 
-  async getByUserId(userId: string) {
-    return this.prisma.userProfile.findUnique({
+  async update(
+    userId: string,
+    patch: UserProfileSource,
+  ): Promise<UserProfile> {
+    return this.prisma.userProfile.update({
       where: { userId },
+      data: toUpdateInput(patch),
     });
+  }
+
+  async getByUserId(userId: string): Promise<UserProfile | null> {
+    return this.prisma.userProfile.findUnique({ where: { userId } });
+  }
+
+  async getSerializedByUserId(userId: string) {
+    const profile = await this.getByUserId(userId);
+    return profile ? serialize(profile) : null;
   }
 }

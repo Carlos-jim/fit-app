@@ -29,6 +29,7 @@ interface AuthScreenProps {
   onLoginSuccess: (user: { id: string; email: string; fullName?: string | null; plan: string }) => void;
   onBack: () => void;
   onShowRegister: () => void;
+  onForgotPassword: () => void;
   onToggleMode: () => void;
 }
 
@@ -38,6 +39,7 @@ export function AuthScreen({
   onLoginSuccess,
   onBack,
   onShowRegister,
+  onForgotPassword,
   onToggleMode,
 }: AuthScreenProps) {
   const insets = useSafeAreaInsets();
@@ -56,7 +58,7 @@ export function AuthScreen({
   });
 
   useEffect(() => {
-    console.log("[Auth] Google Client ID:", env.googleWebClientId ? "Configurado" : "VACÍO");
+if (__DEV__) console.log("[Auth] Google Client ID:", env.googleWebClientId ? "Configurado" : "VACÍO");
   }, []);
 
   useEffect(() => {
@@ -67,14 +69,14 @@ export function AuthScreen({
   }, [response]);
 
   const handleGoogleAuth = async (idToken: string) => {
-    console.log("[Auth] Starting Google Auth with ID Token...");
+    if (__DEV__) console.log("[Auth] Starting Google Auth");
     setLoading(true);
     try {
       const { user } = await biomaApi.loginWithGoogle(idToken);
-      console.log("[Auth] Google Login Success:", user);
+      if (__DEV__) console.log("[Auth] Google Login Success");
       onLoginSuccess(user);
     } catch (err) {
-      console.error("[Auth] Google Login Error:", err);
+      if (__DEV__) console.error("[Auth] Google Login Error:", err);
       Alert.alert(
         "Error de Google",
         err instanceof Error ? err.message : "No se pudo iniciar sesion con Google.",
@@ -95,17 +97,17 @@ export function AuthScreen({
       return;
     }
 
-    console.log("[Auth] Starting Email Login for:", emailTrimmed);
+if (__DEV__) console.log("[Auth] Starting Email Login");
     setLoading(true);
     try {
       const result = await biomaApi.loginWithEmail({
         email: emailTrimmed,
         password,
       });
-      console.log("[Auth] Email Login Success:", result.user);
+      if (__DEV__) console.log("[Auth] Email Login Success");
       onLoginSuccess(result.user);
     } catch (err) {
-      console.error("[Auth] Email Login Error:", err);
+      if (__DEV__) console.error("[Auth] Email Login Error:", err);
       Alert.alert(
         "No se pudo iniciar sesion",
         err instanceof Error ? err.message : "Intenta de nuevo.",
@@ -302,6 +304,12 @@ export function AuthScreen({
               </Text>
             </Pressable>
 
+            <Pressable onPress={onForgotPassword} hitSlop={8}>
+              <Text style={[styles.forgotText, { color: theme.accent }]}>
+                ¿Olvidaste tu contraseña?
+              </Text>
+            </Pressable>
+
             <Pressable
               style={[
                 styles.socialButton,
@@ -479,5 +487,11 @@ const styles = StyleSheet.create({
   },
   linkAccent: {
     fontFamily: "Inter_700Bold",
+  },
+  forgotText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    textAlign: "center",
+    paddingVertical: 6,
   },
 });

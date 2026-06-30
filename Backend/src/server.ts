@@ -12,10 +12,29 @@ import { analyzeMealTextRequestSchema } from "./contracts/analyze-meal-text-requ
 import { bootstrapUserRequestSchema } from "./contracts/bootstrap-user-request.js";
 import { createMealUploadUrlRequestSchema } from "./contracts/create-meal-upload-url-request.js";
 import {
+  forgotPasswordRequestSchema,
   googleLoginRequestSchema,
   loginRequestSchema,
   registerRequestSchema,
+  resendVerificationRequestSchema,
+  resetPasswordRequestSchema,
+  verifyEmailRequestSchema,
 } from "./contracts/auth-request.js";
+import {
+  createBodyMetricRequestSchema,
+  deleteBodyMetricParamsSchema,
+  listBodyMetricsQuerySchema,
+} from "./contracts/body-metric-request.js";
+import {
+  createHydrationRequestSchema,
+  deleteHydrationParamsSchema,
+  listHydrationQuerySchema,
+} from "./contracts/hydration-request.js";
+import {
+  createWorkoutRequestSchema,
+  listWorkoutsQuerySchema,
+  workoutIdParamsSchema,
+} from "./contracts/workout-request.js";
 import {
   onboardingStep1Schema,
   onboardingStep2Schema,
@@ -24,20 +43,28 @@ import {
   onboardingStep5Schema,
   onboardingStep6Schema,
   onboardingStep7Schema,
+  updateProfileSchema,
 } from "./contracts/onboarding-request.js";
 import { generateTipsRequestSchema } from "./contracts/generate-tips-request.js";
 import { suggestMealRequestSchema } from "./contracts/suggest-meal-request.js";
 import { requireAuth } from "./middleware/auth.middleware.js";
 import { AppError } from "./lib/app-error.js";
 import { prisma } from "./lib/prisma.js";
+import { logger } from "./lib/logger.js";
 import { LogRepository } from "./repositories/log.repository.js";
 import { OnboardingRepository } from "./repositories/onboarding.repository.js";
 import { UserProfileRepository } from "./repositories/user-profile.repository.js";
 import { UserRepository } from "./repositories/user.repository.js";
+import { AuthEmailService } from "./services/auth-email.service.js";
 import { AuthService } from "./services/auth.service.js";
 import { NutritionAnalysisService } from "./services/nutrition-analysis.service.js";
+import { AccountDeletionService } from "./services/account-deletion.service.js";
+import { DataExportService } from "./services/data-export.service.js";
+import { HydrationService } from "./services/hydration.service.js";
+import { BodyMetricRepository, NutritionPlanService } from "./services/nutrition-plan.service.js";
 import { SupabaseStorageService } from "./services/supabase-storage.service.js";
 import { TipsService } from "./services/tips.service.js";
+import { WorkoutService } from "./services/workout.service.js";
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -70,7 +97,14 @@ const userRepository = new UserRepository(prisma);
 const logRepository = new LogRepository(prisma);
 const onboardingRepository = new OnboardingRepository(prisma);
 const userProfileRepository = new UserProfileRepository(prisma);
-const authService = new AuthService(prisma);
+const bodyMetricRepository = new BodyMetricRepository(prisma);
+const nutritionPlanService = new NutritionPlanService(prisma);
+const authEmailService = new AuthEmailService(prisma);
+const accountDeletionService = new AccountDeletionService(prisma);
+const dataExportService = new DataExportService(prisma);
+const hydrationService = new HydrationService(prisma);
+const workoutService = new WorkoutService(prisma);
+const authService = new AuthService(prisma, authEmailService);
 const nutritionAnalysisService = new NutritionAnalysisService();
 const tipsService = new TipsService();
 const storageService = new SupabaseStorageService();
@@ -178,9 +212,20 @@ app.get("/health", async (_req, res) => {
   }
 });
 
-app.post("/users/bootstrap", async (req, res) => {
+app.post("/users/bootstrap", requireAuth, async (req, res) => {
   try {
     const request = parseBody(bootstrapUserRequestSchema, req.body);
+
+    // Auth-protected: the JWT identifies the user; we only let them
+    // refresh their own fullName. This used to be unauthenticated and
+    // allowed an attacker to mutate anyone's profile by email.
+    if (req.user && req.user.email.toLowerCase() !== request.email.toLowerCase()) {
+      throw new AppError("Cannot bootstrap another user's profile.", {
+        statusCode: 403,
+        code: "BOOTSTRAP_EMAIL_MISMATCH",
+      });
+    }
+
     const user = await userRepository.ensureUser(request);
 
     res.status(200).json({
@@ -255,6 +300,60 @@ app.post("/auth/logout", async (req, res) => {
     res.status(200).json({ data: { success: true } });
   } catch (error) {
     handleError(res, error, "logging out");
+  }
+});
+
+// ─── Password reset & email verification ───────────────────────────
+
+app.post("/auth/forgot-password", async (req, res) => {
+  try {
+    const request = parseBody(forgotPasswordRequestSchema, req.body);
+    const result = await authEmailService.requestPasswordReset({ email: request.email });
+    res.status(200).json({ data: result });
+  } catch (error) {
+    handleError(res, error, "requesting password reset");
+  }
+});
+
+app.post("/auth/reset-password", async (req, res) => {
+  try {
+    const request = parseBody(resetPasswordRequestSchema, req.body);
+    await authEmailService.resetPassword({
+      token: request.token,
+      newPassword: request.password,
+    });
+    res.status(200).json({ data: { success: true } });
+  } catch (error) {
+    handleError(res, error, "resetting password");
+  }
+});
+
+app.post("/auth/verify-email", async (req, res) => {
+  try {
+    const request = parseBody(verifyEmailRequestSchema, req.body);
+    const user = await authEmailService.verifyEmail({ token: request.token });
+    res.status(200).json({
+      data: {
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          emailVerified: user.emailVerified,
+        },
+      },
+    });
+  } catch (error) {
+    handleError(res, error, "verifying email");
+  }
+});
+
+app.post("/auth/resend-verification", async (req, res) => {
+  try {
+    const request = parseBody(resendVerificationRequestSchema, req.body);
+    const result = await authEmailService.resendVerification({ email: request.email });
+    res.status(200).json({ data: result });
+  } catch (error) {
+    handleError(res, error, "resending verification email");
   }
 });
 
@@ -365,6 +464,310 @@ app.delete("/onboarding/session", requireAuth, async (req, res) => {
   }
 });
 
+// ─── Me (profile + plan) ───────────────────────────────────────────
+
+app.get("/me/profile", requireAuth, async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const profile = await userProfileRepository.getByUserId(userId);
+    const onboarding = await onboardingRepository.getSession(userId);
+    res.status(200).json({
+      data: {
+        profile: profile ?? null,
+        onboarding: onboarding ?? null,
+        onboardingComplete: profile !== null,
+      },
+    });
+  } catch (error) {
+    handleError(res, error, "fetching user profile");
+  }
+});
+
+app.patch("/me/profile", requireAuth, async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const patch = parseBody(updateProfileSchema, req.body);
+
+    const current = await userProfileRepository.getByUserId(userId);
+    const merged = await userProfileRepository.update(userId, {
+      goal: patch.goal ?? current?.goal ?? null,
+      weightKg: patch.weightKg ?? current?.weightKg ?? null,
+      heightCm: patch.heightCm ?? current?.heightCm ?? null,
+      desiredWeightKg:
+        patch.desiredWeightKg ?? current?.desiredWeightKg ?? null,
+      gender: patch.gender ?? current?.gender ?? null,
+      age: patch.age ?? current?.age ?? null,
+      country: patch.country ?? current?.country ?? null,
+      workoutFrequency:
+        patch.workoutFrequency ?? current?.workoutFrequency ?? null,
+      activityLevel: patch.activityLevel ?? current?.activityLevel ?? null,
+      dietaryPrefs:
+        patch.dietaryPrefs !== undefined
+          ? patch.dietaryPrefs
+          : current?.dietaryPrefs ?? null,
+    });
+
+    // If goal / weight / height / age changed the plan is now stale.
+    const planStaleFields = [
+      "goal",
+      "weightKg",
+      "heightCm",
+      "age",
+      "activityLevel",
+    ] as const;
+    const planTouched = planStaleFields.some((k) => k in patch);
+    if (planTouched) {
+      await nutritionPlanService.recompute(userId);
+    }
+
+    res.status(200).json({ data: merged });
+  } catch (error) {
+    handleError(res, error, "updating profile");
+  }
+});
+
+app.get("/me/plan", requireAuth, async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const profile = await userProfileRepository.getByUserId(userId);
+
+    let plan = await nutritionPlanService.get(userId);
+    if (!plan && profile) {
+      plan = await nutritionPlanService.ensurePlanForProfile(userId, profile);
+    }
+
+    res.status(200).json({ data: plan ?? null });
+  } catch (error) {
+    handleError(res, error, "fetching nutrition plan");
+  }
+});
+
+app.post("/me/plan/recompute", requireAuth, async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const plan = await nutritionPlanService.recompute(userId);
+    if (!plan) {
+      throw new AppError("Profile is incomplete. Complete onboarding first.", {
+        statusCode: 409,
+        code: "PROFILE_INCOMPLETE",
+      });
+    }
+    res.status(200).json({ data: plan });
+  } catch (error) {
+    handleError(res, error, "recomputing nutrition plan");
+  }
+});
+
+// ─── GDPR data-portability (right to access) ─────────────────────
+
+app.get("/me/data-export", requireAuth, async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const payload = await dataExportService.exportFor(userId);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="bioma-export-${userId}.json"`,
+    );
+    res.status(200).json({ data: payload });
+  } catch (error) {
+    handleError(res, error, "exporting user data");
+  }
+});
+
+// ─── GDPR right-to-erasure (account deletion) ─────────────────────
+
+app.delete("/me/account", requireAuth, async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const result = await accountDeletionService.deleteAccount(userId);
+    res.status(200).json({ data: result });
+  } catch (error) {
+    handleError(res, error, "deleting account");
+  }
+});
+
+// ─── Body metrics (weight, waist, etc.) ────────────────────────────
+
+app.post("/body-metrics", requireAuth, async (req, res) => {
+  try {
+    const request = parseBody(createBodyMetricRequestSchema, req.body);
+    const metric = await bodyMetricRepository.create({
+      userId: getUserId(req),
+      type: request.type,
+      value: request.value,
+      unit: request.unit,
+      notes: request.notes,
+      recordedAt: request.recordedAt ? new Date(request.recordedAt) : undefined,
+    });
+    res.status(201).json({ data: serializeBodyMetric(metric) });
+  } catch (error) {
+    handleError(res, error, "creating body metric");
+  }
+});
+
+app.get("/body-metrics", requireAuth, async (req, res) => {
+  try {
+    const query = listBodyMetricsQuerySchema.parse(req.query);
+    const metrics = await bodyMetricRepository.list(getUserId(req), {
+      type: query.type,
+      from: query.from ? new Date(query.from) : undefined,
+      to: query.to ? new Date(query.to) : undefined,
+      limit: query.limit,
+    });
+    res.status(200).json({ data: metrics.map(serializeBodyMetric) });
+  } catch (error) {
+    handleError(res, error, "listing body metrics");
+  }
+});
+
+app.delete("/body-metrics/:id", requireAuth, async (req, res) => {
+  try {
+    const params = deleteBodyMetricParamsSchema.parse(req.params);
+    const deleted = await bodyMetricRepository.delete(getUserId(req), params.id);
+    if (!deleted) {
+      throw new AppError("Body metric not found.", {
+        statusCode: 404,
+        code: "BODY_METRIC_NOT_FOUND",
+      });
+    }
+    res.status(200).json({ data: { id: deleted.id } });
+  } catch (error) {
+    handleError(res, error, "deleting body metric");
+  }
+});
+
+// ─── Hydration tracking ────────────────────────────────────────────
+
+app.post("/hydration", requireAuth, async (req, res) => {
+  try {
+    const request = parseBody(createHydrationRequestSchema, req.body);
+    const entry = await hydrationService.recordEntry({
+      userId: getUserId(req),
+      glasses: request.glasses,
+      notes: request.notes,
+      recordedAt: request.recordedAt ? new Date(request.recordedAt) : undefined,
+    });
+    res.status(201).json({ data: serializeHydrationEntry(entry) });
+  } catch (error) {
+    handleError(res, error, "recording hydration entry");
+  }
+});
+
+app.get("/hydration/today", requireAuth, async (req, res) => {
+  try {
+    const total = await hydrationService.getDailyTotal(
+      getUserId(req),
+      new Date(),
+    );
+    res.status(200).json({ data: total });
+  } catch (error) {
+    handleError(res, error, "fetching today's hydration");
+  }
+});
+
+app.get("/hydration", requireAuth, async (req, res) => {
+  try {
+    const query = listHydrationQuerySchema.parse(req.query);
+    const entries = await hydrationService.list(getUserId(req), {
+      from: query.from ? new Date(query.from) : undefined,
+      to: query.to ? new Date(query.to) : undefined,
+      limit: query.limit,
+    });
+    res.status(200).json({ data: entries.map(serializeHydrationEntry) });
+  } catch (error) {
+    handleError(res, error, "listing hydration entries");
+  }
+});
+
+app.delete("/hydration/:id", requireAuth, async (req, res) => {
+  try {
+    const params = deleteHydrationParamsSchema.parse(req.params);
+    const deleted = await hydrationService.deleteEntry(
+      getUserId(req),
+      params.id,
+    );
+    if (!deleted) {
+      throw new AppError("Hydration entry not found.", {
+        statusCode: 404,
+        code: "HYDRATION_NOT_FOUND",
+      });
+    }
+    res.status(200).json({ data: { id: deleted.id } });
+  } catch (error) {
+    handleError(res, error, "deleting hydration entry");
+  }
+});
+
+// ─── Workouts ──────────────────────────────────────────────────────
+
+app.post("/workouts", requireAuth, async (req, res) => {
+  try {
+    const request = parseBody(createWorkoutRequestSchema, req.body);
+    const workout = await workoutService.create({
+      userId: getUserId(req),
+      type: request.type,
+      name: request.name,
+      durationMinutes: request.durationMinutes,
+      caloriesBurned: request.caloriesBurned,
+      intensity: request.intensity,
+      notes: request.notes,
+      performedAt: request.performedAt
+        ? new Date(request.performedAt)
+        : undefined,
+      sets: request.sets,
+    });
+    res.status(201).json({ data: serializeWorkout(workout) });
+  } catch (error) {
+    handleError(res, error, "creating workout");
+  }
+});
+
+app.get("/workouts", requireAuth, async (req, res) => {
+  try {
+    const query = listWorkoutsQuerySchema.parse(req.query);
+    const workouts = await workoutService.list(getUserId(req), {
+      from: query.from ? new Date(query.from) : undefined,
+      to: query.to ? new Date(query.to) : undefined,
+      limit: query.limit,
+    });
+    res.status(200).json({ data: workouts.map(serializeWorkout) });
+  } catch (error) {
+    handleError(res, error, "listing workouts");
+  }
+});
+
+app.get("/workouts/:id", requireAuth, async (req, res) => {
+  try {
+    const params = workoutIdParamsSchema.parse(req.params);
+    const workout = await workoutService.getById(getUserId(req), params.id);
+    if (!workout) {
+      throw new AppError("Workout not found.", {
+        statusCode: 404,
+        code: "WORKOUT_NOT_FOUND",
+      });
+    }
+    res.status(200).json({ data: serializeWorkout(workout) });
+  } catch (error) {
+    handleError(res, error, "fetching workout");
+  }
+});
+
+app.delete("/workouts/:id", requireAuth, async (req, res) => {
+  try {
+    const params = workoutIdParamsSchema.parse(req.params);
+    const ok = await workoutService.delete(getUserId(req), params.id);
+    if (!ok) {
+      throw new AppError("Workout not found.", {
+        statusCode: 404,
+        code: "WORKOUT_NOT_FOUND",
+      });
+    }
+    res.status(200).json({ data: { id: params.id } });
+  } catch (error) {
+    handleError(res, error, "deleting workout");
+  }
+});
+
 app.post("/uploads/meal-image-url", requireAuth, async (req, res) => {
   try {
     const request = parseBody(createMealUploadUrlRequestSchema, req.body);
@@ -374,19 +777,16 @@ app.post("/uploads/meal-image-url", requireAuth, async (req, res) => {
       contentType: request.contentType,
     });
 
-    console.log("[upload-meal-image-url] Signed URL created", {
+    logger.child("uploads").info("Signed URL created", {
       userId: getUserId(req),
-      fileName: request.fileName,
       contentType: request.contentType,
       bucket: upload.bucket,
-      path: upload.path,
     });
 
     res.status(200).json({
       data: upload,
     });
   } catch (error) {
-    console.error("[upload-meal-image-url] Error:", error);
     handleError(res, error, "creating upload URL");
   }
 });
@@ -395,62 +795,15 @@ app.post("/logs/analyze-meal-image", requireAuth, aiLimiter, async (req, res) =>
   try {
     const request = parseBody(analyzeMealRequestSchema, req.body);
 
-    console.log("[analyze-meal-image] Request received", {
-      userId: getUserId(req),
-      hasPath: !!request.path,
-      hasBase64: !!request.base64Image,
-      mealLabel: request.mealLabel,
-      consumedAt: request.consumedAt,
+    const imageAsset = await storageService.getImage({
+      bucket: request.bucket,
+      path: request.path,
     });
-
-    let imageDataUrl: string;
-    let imageBucket: string | undefined = undefined;
-    let imageKey: string | undefined = undefined;
-    let imageUrl: string | undefined = undefined;
-
-    if (request.base64Image) {
-      imageDataUrl = request.base64Image.startsWith("data:")
-        ? request.base64Image
-        : `data:image/jpeg;base64,${request.base64Image}`;
-      imageUrl = request.localImageUrl;
-
-      console.log("[analyze-meal-image] Using provided base64 image", {
-        length: request.base64Image.length,
-      });
-    } else {
-      if (!request.path) {
-        throw new AppError("Path is required when base64Image is not provided.", { statusCode: 400, code: "MISSING_PATH" });
-      }
-
-      const imageAsset = await storageService.getImage({
-        bucket: request.bucket,
-        path: request.path,
-      });
-
-      console.log("[analyze-meal-image] Image fetched from storage", {
-        bucket: imageAsset.bucket,
-        path: imageAsset.path,
-        contentType: imageAsset.contentType,
-        bytes: imageAsset.bytes.length,
-      });
-
-      imageBucket = imageAsset.bucket;
-      imageKey = imageAsset.path;
-      imageUrl = imageAsset.publicUrl;
-      imageDataUrl = storageService.toDataUrl(imageAsset);
-    }
 
     const analysisResult = await nutritionAnalysisService.analyzeFromImage({
-      imageDataUrl,
+      imageDataUrl: storageService.toDataUrl(imageAsset),
       mealLabel: request.mealLabel,
       notes: request.notes,
-    });
-
-    console.log("[analyze-meal-image] AI analysis done", {
-      model: analysisResult.model,
-      mealName: analysisResult.parsed.mealName,
-      confidence: analysisResult.parsed.confidence,
-      calories: analysisResult.parsed.total.calories,
     });
 
     const log = await logRepository.createMealAnalysisLog({
@@ -459,22 +812,17 @@ app.post("/logs/analyze-meal-image", requireAuth, aiLimiter, async (req, res) =>
       mealLabel: request.mealLabel,
       notes: request.notes,
       consumedAt: request.consumedAt,
-      imageBucket,
-      imageKey,
-      imageUrl,
+      imageBucket: imageAsset.bucket,
+      imageKey: imageAsset.path,
+      imageUrl: imageAsset.publicUrl,
       analysis: analysisResult.parsed,
       aiModel: analysisResult.model,
     });
 
-    console.log("[analyze-meal-image] Log saved", { logId: log.id });
-
-    const response = serializeMealLog(log);
-
     res.status(201).json({
-      data: response,
+      data: serializeMealLog(log),
     });
   } catch (error) {
-    console.error("[analyze-meal-image] Error:", error);
     handleError(res, error, "processing meal image analysis");
   }
 });
@@ -509,7 +857,6 @@ app.post("/logs/analyze-menu-image", requireAuth, aiLimiter, async (req, res) =>
   try {
     const request = parseBody(analyzeMenuRequestSchema, req.body);
 
-    // Basic URL validation to prevent SSRF / arbitrary fetches
     const url = new URL(request.imageUrl);
     if (!/^https?:$/.test(url.protocol)) {
       throw new AppError("Invalid image URL protocol.", {
@@ -524,6 +871,7 @@ app.post("/logs/analyze-menu-image", requireAuth, aiLimiter, async (req, res) =>
       .filter(Boolean);
 
     const supabaseHost = new URL(env.SUPABASE_URL).host.toLowerCase();
+    const supabaseProtocol = new URL(env.SUPABASE_URL).protocol;
     const isAllowedHost =
       allowedHosts.includes(url.host.toLowerCase()) ||
       url.host.toLowerCase() === supabaseHost;
@@ -535,25 +883,30 @@ app.post("/logs/analyze-menu-image", requireAuth, aiLimiter, async (req, res) =>
       });
     }
 
-    console.log("[analyze-menu-image] Request received", {
-      userId: getUserId(req),
-    });
+    // Ownership check: the signed public URL must live under the user's
+    // folder in our Supabase bucket. This prevents the service role from
+    // being tricked into fetching other users' (or other buckets') paths.
+    const userId = getUserId(req);
+    const expectedPrefix = `/storage/v1/object/public/${env.SUPABASE_STORAGE_BUCKET}/uploads/meals/${userId}/`;
+    const isSupabasePublicUrl =
+      url.host.toLowerCase() === supabaseHost &&
+      url.protocol === supabaseProtocol;
+
+    if (isSupabasePublicUrl && !url.pathname.startsWith(expectedPrefix)) {
+      throw new AppError("Image URL does not belong to the requesting user.", {
+        statusCode: 403,
+        code: "IMAGE_URL_NOT_OWNED",
+      });
+    }
 
     const menuAnalysisResult = await nutritionAnalysisService.analyzeMenuImage(
       request.imageUrl,
     );
 
-    console.log("[analyze-menu-image] AI analysis done", {
-      dishesDetected: menuAnalysisResult.dishesDetected.length,
-      recommendedDishes: menuAnalysisResult.recommendedDishes.length,
-      dishesToAvoid: menuAnalysisResult.dishesToAvoid.length,
-    });
-
     res.status(200).json({
       data: menuAnalysisResult,
     });
   } catch (error) {
-    console.error("[analyze-menu-image] Error:", error);
     handleError(res, error, "processing menu image analysis");
   }
 });
@@ -583,7 +936,7 @@ app.post("/logs/suggest-meal", requireAuth, aiLimiter, async (req, res) => {
       await nutritionAnalysisService.suggestMealAlternative(request);
 
     if (request.logId) {
-      await logRepository.saveMealSuggestion(request.logId, suggestion);
+      await logRepository.saveMealSuggestion(getUserId(req), request.logId, suggestion);
     }
 
     res.status(200).json({
@@ -721,6 +1074,27 @@ app.listen(env.PORT, () => {
   console.log("  POST /auth/login");
   console.log("  POST /auth/google");
   console.log("  POST /auth/logout");
+  console.log("  POST /auth/forgot-password");
+  console.log("  POST /auth/reset-password");
+  console.log("  POST /auth/verify-email");
+  console.log("  POST /auth/resend-verification");
+  console.log("  GET  /me/profile");
+  console.log("  PATCH /me/profile");
+  console.log("  GET  /me/plan");
+  console.log("  POST /me/plan/recompute");
+  console.log("  GET  /me/data-export");
+  console.log("  DELETE /me/account");
+  console.log("  POST /body-metrics");
+  console.log("  GET  /body-metrics");
+  console.log("  DELETE /body-metrics/:id");
+  console.log("  POST /hydration");
+  console.log("  GET  /hydration/today");
+  console.log("  GET  /hydration");
+  console.log("  DELETE /hydration/:id");
+  console.log("  POST /workouts");
+  console.log("  GET  /workouts");
+  console.log("  GET  /workouts/:id");
+  console.log("  DELETE /workouts/:id");
 });
 
 function parseBody<TSchema extends z.ZodTypeAny>(
@@ -801,6 +1175,92 @@ function serializeMealLog(log: {
     ingredients: Array.isArray(log.ingredients) ? log.ingredients : [],
     warnings: Array.isArray(log.warnings) ? log.warnings : [],
     createdAt: log.createdAt.toISOString(),
+  };
+}
+
+function serializeBodyMetric(metric: {
+  id: string;
+  userId: string;
+  type: string;
+  value: number;
+  unit: string;
+  notes: string | null;
+  recordedAt: Date;
+  createdAt: Date;
+}) {
+  return {
+    id: metric.id,
+    userId: metric.userId,
+    type: metric.type,
+    value: metric.value,
+    unit: metric.unit,
+    notes: metric.notes,
+    recordedAt: metric.recordedAt.toISOString(),
+    createdAt: metric.createdAt.toISOString(),
+  };
+}
+
+function serializeHydrationEntry(entry: {
+  id: string;
+  userId: string;
+  glasses: number;
+  notes: string | null;
+  recordedAt: Date;
+  createdAt: Date;
+}) {
+  return {
+    id: entry.id,
+    userId: entry.userId,
+    glasses: entry.glasses,
+    notes: entry.notes,
+    recordedAt: entry.recordedAt.toISOString(),
+    createdAt: entry.createdAt.toISOString(),
+  };
+}
+
+function serializeWorkout(workout: {
+  id: string;
+  userId: string;
+  type: string;
+  name: string;
+  durationMinutes: number;
+  caloriesBurned: number | null;
+  intensity: string | null;
+  notes: string | null;
+  performedAt: Date;
+  createdAt: Date;
+  sets: Array<{
+    id: string;
+    workoutId: string;
+    exercise: string;
+    reps: number | null;
+    weightKg: number | null;
+    durationSec: number | null;
+    distanceMeters: number | null;
+    orderIndex: number;
+  }>;
+}) {
+  return {
+    id: workout.id,
+    userId: workout.userId,
+    type: workout.type,
+    name: workout.name,
+    durationMinutes: workout.durationMinutes,
+    caloriesBurned: workout.caloriesBurned,
+    intensity: workout.intensity,
+    notes: workout.notes,
+    performedAt: workout.performedAt.toISOString(),
+    createdAt: workout.createdAt.toISOString(),
+    sets: workout.sets.map((set) => ({
+      id: set.id,
+      workoutId: set.workoutId,
+      exercise: set.exercise,
+      reps: set.reps,
+      weightKg: set.weightKg,
+      durationSec: set.durationSec,
+      distanceMeters: set.distanceMeters,
+      orderIndex: set.orderIndex,
+    })),
   };
 }
 

@@ -29,6 +29,11 @@ export interface ProfileScreenProps {
   onLogout: () => void;
   bootstrapLoading: boolean;
   onToggleMode: () => void;
+  onOpenWeightHistory?: () => void;
+  onOpenAccountSettings?: () => void;
+  onOpenEditProfile?: () => void;
+  onOpenWorkoutHistory?: () => void;
+  onForgotPassword?: () => void;
   ambientPulse: Animated.Value;
   mainScrollY: Animated.Value;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -54,6 +59,11 @@ export function ProfileScreen(props: ProfileScreenProps) {
     mainScrollY,
     healthProvider,
     wellnessCardMode,
+    onOpenWeightHistory,
+    onOpenAccountSettings,
+    onOpenEditProfile,
+    onOpenWorkoutHistory,
+    onForgotPassword,
   } = props;
 
   const isDark = visualMode === "dark";
@@ -326,6 +336,97 @@ export function ProfileScreen(props: ProfileScreenProps) {
           />
         </View>
       </Animated.View>
+
+      {/* ─── Quick links ───────────────────────────────────────── */}
+      <View style={styles.quickLinks}>
+        {onOpenWeightHistory ? (
+          <Pressable
+            style={[
+              styles.quickLink,
+              { backgroundColor: panelBg, borderColor: panelStroke },
+            ]}
+            onPress={onOpenWeightHistory}
+          >
+            <Ionicons name="fitness-outline" size={18} color={theme.accent} />
+            <Text style={[styles.quickLinkText, { color: strongText }]}>
+              Mi peso y medidas
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={mutedText} />
+          </Pressable>
+        ) : null}
+        {onForgotPassword ? (
+          <Pressable
+            style={[
+              styles.quickLink,
+              { backgroundColor: panelBg, borderColor: panelStroke },
+            ]}
+            onPress={onForgotPassword}
+          >
+            <Ionicons name="key-outline" size={18} color={theme.accent} />
+            <Text style={[styles.quickLinkText, { color: strongText }]}>
+              Cambiar contraseña
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={mutedText} />
+          </Pressable>
+        ) : null}
+        {onOpenEditProfile ? (
+          <Pressable
+            style={[
+              styles.quickLink,
+              { backgroundColor: panelBg, borderColor: panelStroke },
+            ]}
+            onPress={onOpenEditProfile}
+          >
+            <Ionicons
+              name="create-outline"
+              size={18}
+              color={theme.accent}
+            />
+            <Text style={[styles.quickLinkText, { color: strongText }]}>
+              Editar perfil físico
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={mutedText} />
+          </Pressable>
+        ) : null}
+        {onOpenWorkoutHistory ? (
+          <Pressable
+            style={[
+              styles.quickLink,
+              { backgroundColor: panelBg, borderColor: panelStroke },
+            ]}
+            onPress={onOpenWorkoutHistory}
+          >
+            <Ionicons
+              name="barbell-outline"
+              size={18}
+              color={theme.accent}
+            />
+            <Text style={[styles.quickLinkText, { color: strongText }]}>
+              Entrenamientos
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={mutedText} />
+          </Pressable>
+        ) : null}
+        {onOpenAccountSettings ? (
+          <Pressable
+            style={[
+              styles.quickLink,
+              { backgroundColor: panelBg, borderColor: panelStroke },
+            ]}
+            onPress={onOpenAccountSettings}
+          >
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={18}
+              color={theme.accent}
+            />
+            <Text style={[styles.quickLinkText, { color: strongText }]}>
+              Privacidad y datos
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={mutedText} />
+          </Pressable>
+        ) : null}
+      </View>
 
       {/* ─── Logout ──────────────────────────────────────────────── */}
       <Pressable
@@ -640,5 +741,23 @@ const styles = StyleSheet.create({
   logoutText: {
     fontFamily: "Inter_700Bold",
     fontSize: 15,
+  },
+  quickLinks: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  quickLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  quickLinkText: {
+    flex: 1,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
   },
 });

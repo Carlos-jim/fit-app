@@ -5,6 +5,97 @@ export interface BootstrapUserResponse {
   email: string;
   fullName?: string | null;
   plan: PlanType;
+  emailVerified?: boolean;
+}
+
+export type BodyMetricType =
+  | "WEIGHT_KG"
+  | "WAIST_CM"
+  | "HIP_CM"
+  | "CHEST_CM"
+  | "BODY_FAT_PCT";
+
+export interface BodyMetric {
+  id: string;
+  userId: string;
+  type: BodyMetricType;
+  value: number;
+  unit: string;
+  notes: string | null;
+  recordedAt: string;
+  createdAt: string;
+}
+
+export interface HydrationEntry {
+  id: string;
+  userId: string;
+  glasses: number;
+  notes: string | null;
+  recordedAt: string;
+  createdAt: string;
+}
+
+export interface DailyHydration {
+  date: string;
+  glasses: number;
+  target: number;
+  entries: number;
+}
+
+export type WorkoutType =
+  | "STRENGTH"
+  | "CARDIO"
+  | "FLEXIBILITY"
+  | "HIIT"
+  | "SPORT";
+
+export interface WorkoutSet {
+  id: string;
+  workoutId: string;
+  exercise: string;
+  reps: number | null;
+  weightKg: number | null;
+  durationSec: number | null;
+  distanceMeters: number | null;
+  orderIndex: number;
+}
+
+export interface Workout {
+  id: string;
+  userId: string;
+  type: WorkoutType;
+  name: string;
+  durationMinutes: number;
+  caloriesBurned: number | null;
+  intensity: string | null;
+  notes: string | null;
+  performedAt: string;
+  createdAt: string;
+  sets: WorkoutSet[];
+}
+
+export interface NutritionPlan {
+  id: string;
+  userId: string;
+  dailyCalories: number;
+  proteinGrams: number;
+  carbsGrams: number;
+  fatGrams: number;
+  proteinPercentage: number;
+  carbsPercentage: number;
+  fatPercentage: number;
+  bmr: number | null;
+  tdee: number | null;
+  source: string;
+  generatedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MeProfileResponse {
+  profile: UserProfile | null;
+  onboarding: OnboardingSession | null;
+  onboardingComplete: boolean;
 }
 
 export interface UploadMealImageResponse {
@@ -127,6 +218,23 @@ export interface OnboardingSession {
   completed: boolean;
   currentStep: number;
   totalSteps: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserProfile {
+  id: string;
+  userId: string;
+  goal: GoalType | null;
+  weightKg: number | null;
+  heightCm: number | null;
+  desiredWeightKg: number | null;
+  gender: Gender | null;
+  age: number | null;
+  country: string | null;
+  workoutFrequency: WorkoutFrequency | null;
+  activityLevel: ActivityLevel | null;
+  dietaryPrefs: unknown | null;
   createdAt: string;
   updatedAt: string;
 }

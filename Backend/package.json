@@ -11,6 +11,8 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch --env-file=.env src/server.ts",
     "start": "node --env-file=.env dist/server.js",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
@@ -28,15 +30,21 @@
     "google-auth-library": "^10.6.2",
     "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.3",
+    "resend": "^6.16.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/jest": "^29.5.14",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.14.0",
+    "@types/supertest": "^6.0.3",
+    "jest": "^29.7.0",
     "prisma": "^6.6.0",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.11",
     "tsx": "^4.19.3",
     "typescript": "^5.8.3"
   }

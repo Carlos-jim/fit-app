@@ -1,8 +1,8 @@
-import * as bcrypt from "bcrypt";
-import { type PrismaClient, AuthProvider } from "@prisma/client";
+import { type PrismaClient, AuthProvider, type User } from "@prisma/client";
 import { OAuth2Client } from "google-auth-library";
 
 import { AppError } from "../lib/app-error.js";
+import { logger } from "../lib/logger.js";
 import { env } from "../config/env.js";
 import {
   generateRefreshTokenId,
@@ -11,6 +11,7 @@ import {
   signRefreshToken,
   verifyRefreshToken,
 } from "../lib/jwt.js";
+import { type AuthEmailService } from "./auth-email.service.js";
 
 const SALT_ROUNDS = 10;
 const googleClient = new OAuth2Client();
@@ -24,14 +25,42 @@ export interface AuthResponse {
   user: {
     id: string;
     email: string;
+    emailVerified: boolean;
     fullName: string | null;
     plan: string;
   };
   tokens: AuthTokens;
 }
 
+export interface AuthServiceDeps {
+  hashPassword?: (password: string) => Promise<string>;
+  verifyPassword?: (password: string, hash: string) => Promise<boolean>;
+}
+
+const defaultBcryptDeps: Required<AuthServiceDeps> = {
+  hashPassword: async (password: string) => {
+    const bcrypt = await import("bcrypt");
+    return bcrypt.hash(password, SALT_ROUNDS);
+  },
+  verifyPassword: async (password: string, hash: string) => {
+    const bcrypt = await import("bcrypt");
+    return bcrypt.compare(password, hash);
+  },
+};
+
 export class AuthService {
-  constructor(private prisma: PrismaClient) {}
+  private hashPassword: (password: string) => Promise<string>;
+  private verifyPassword: (password: string, hash: string) => Promise<boolean>;
+
+  constructor(
+    private prisma: PrismaClient,
+    private emailService?: AuthEmailService,
+    deps: AuthServiceDeps = {},
+  ) {
+    this.hashPassword = deps.hashPassword ?? defaultBcryptDeps.hashPassword;
+    this.verifyPassword =
+      deps.verifyPassword ?? defaultBcryptDeps.verifyPassword;
+  }
 
   validatePassword(password: string): void {
     if (password.length < 8) {
@@ -77,7 +106,7 @@ export class AuthService {
       });
     }
 
-    const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
+    const passwordHash = await this.hashPassword(input.password);
 
     const user = await this.prisma.user.create({
       data: {
@@ -85,8 +114,19 @@ export class AuthService {
         fullName: input.name,
         passwordHash,
         authProvider: AuthProvider.EMAIL,
+        emailVerified: false,
       },
     });
+
+    if (this.emailService) {
+      try {
+        await this.emailService.sendVerificationEmail(user);
+      } catch (error) {
+        logger
+          .child("auth-service")
+          .error("Failed to send verification email", { userId: user.id, error });
+      }
+    }
 
     return this.createSession(user);
   }
@@ -103,7 +143,7 @@ export class AuthService {
       });
     }
 
-    const valid = await bcrypt.compare(input.password, user.passwordHash);
+    const valid = await this.verifyPassword(input.password, user.passwordHash);
 
     if (!valid) {
       throw new AppError("Invalid email or password.", {
@@ -169,7 +209,15 @@ export class AuthService {
           email,
           fullName: name,
           authProvider: AuthProvider.GOOGLE,
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
         },
+      });
+    } else if (!user.emailVerified) {
+      // Google has already verified the email, so backfill the flag.
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerified: true, emailVerifiedAt: new Date() },
       });
     }
 
@@ -220,12 +268,7 @@ export class AuthService {
     await this.prisma.refreshToken.deleteMany({ where: { userId } });
   }
 
-  private createSession(user: {
-    id: string;
-    email: string;
-    fullName: string | null;
-    plan: string;
-  }): AuthResponse {
+  private createSession(user: User): AuthResponse {
     const accessToken = signAccessToken({
       userId: user.id,
       email: user.email,
@@ -257,6 +300,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
+        emailVerified: user.emailVerified,
         fullName: user.fullName,
         plan: user.plan,
       },

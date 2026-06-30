@@ -14,7 +14,8 @@
       "backgroundColor": "#120F0A"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "app.bioma.mobile"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +23,8 @@
         "backgroundColor": "#120F0A"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "app.bioma.mobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -52,6 +54,11 @@
         }
       ],
       "expo-secure-store"
-    ]
+    ],
+    "scheme": ["bioma"],
+    "deepLinking": {
+      "enabled": true,
+      "schemes": ["bioma"]
+    }
   }
 }

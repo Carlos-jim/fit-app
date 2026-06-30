@@ -23,7 +23,6 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
-import * as FileSystem from "expo-file-system";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   CameraView,
@@ -77,6 +76,10 @@ import { HomeScreen } from "./src/components/home-screen";
 import { WaterCelebration } from "./src/components/water-celebration";
 import { useWaterStore } from "./src/store/water-store";
 import { ProfileScreen } from "./src/components/profile-screen";
+import { WeightHistoryScreen } from "./src/components/weight-history-screen";
+import { WorkoutHistoryScreen } from "./src/components/workout-history-screen";
+import { AccountSettingsModal } from "./src/components/account-settings-modal";
+import { EditProfileModal } from "./src/components/edit-profile-modal";
 import { compressForUpload } from "./src/utils/image-utils";
 import * as Sentry from "@sentry/react-native";
 
@@ -106,9 +109,11 @@ import {
 } from "./src/services/recovery-engine";
 import { mockHealthProvider } from "./src/services/wearables/mock-health-provider";
 import type {
+  BodyMetric,
   MealAnalysisSummary,
   MealLog,
   MenuAnalysisResponse,
+  NutritionPlan,
   UserTip,
 } from "./src/types/api";
 
@@ -300,7 +305,12 @@ function AppContent() {
   const [plan, setPlan] = useState<string>("FREE");
   const [paywallVisible, setPaywallVisible] = useState(false);
   const [selectedPaywallPlan, setSelectedPaywallPlan] = useState<"monthly" | "yearly">("yearly");
-  const [hasSeenPhotoPaywall, setHasSeenPhotoPaywall] = useState(false);
+  const [weightHistoryVisible, setWeightHistoryVisible] = useState(false);
+  const [accountSettingsVisible, setAccountSettingsVisible] = useState(false);
+  const [editProfileVisible, setEditProfileVisible] = useState(false);
+  const [workoutHistoryVisible, setWorkoutHistoryVisible] = useState(false);
+  const [profileData, setProfileData] =
+    useState<import("./src/types/api").UserProfile | null>(null);
   const [mealLabel, setMealLabel] = useState("Almuerzo");
   const [mealDescription, setMealDescription] = useState(
     "Me comi una arepa con queso y dos huevos.",
@@ -361,10 +371,19 @@ function AppContent() {
   const waterGoal = useWaterStore((state) => state.waterGoal);
   const incrementWater = useWaterStore((state) => state.increment);
   const decrementWater = useWaterStore((state) => state.decrement);
+  const waterHydrate = useWaterStore((state) => state.hydrate);
+  const waterReset = useWaterStore((state) => state.reset);
 
   // ─── Onboarding state ────────────────────────────────────────────
   const [authFlow, setAuthFlow] = useState<
-    "welcome" | "login" | "register" | "onboarding" | "done"
+    | "welcome"
+    | "login"
+    | "register"
+    | "forgot-password"
+    | "reset-password"
+    | "verify-email"
+    | "onboarding"
+    | "done"
   >("welcome");
   const [onboardingStep, setOnboardingStep] = useState<
     | "idle"
@@ -382,6 +401,10 @@ function AppContent() {
     "LOSE_WEIGHT" | "MAINTAIN" | "GAIN_WEIGHT"
   >("MAINTAIN");
   const [onboardingWeightKg, setOnboardingWeightKg] = useState(70);
+
+  // Server-side nutrition plan (cached locally; refresh after edits)
+  const [nutritionPlan, setNutritionPlan] =
+    useState<NutritionPlan | null>(null);
 
   const circadianPlan = useMemo(
     () => createCircadianPlan(circadianCity, now),
@@ -968,7 +991,8 @@ function AppContent() {
     }
 
     void loadStatsMealLogs();
-  }, [userId]);
+    void waterHydrate();
+  }, [userId, waterHydrate]);
 
   useEffect(() => {
     if (activeTab === "tips" && userId) {
@@ -1114,7 +1138,6 @@ function AppContent() {
   function handleGatedPhotoAction(action: () => void) {
     if (plan === "FREE") {
       setPaywallVisible(true);
-      setHasSeenPhotoPaywall(true);
       return;
     }
     action();
@@ -1267,6 +1290,7 @@ function AppContent() {
       setAuthFlow("welcome");
       setActiveTab("home");
       setBootstrapLoading(false);
+      waterReset();
     }
   };
 
@@ -1477,21 +1501,11 @@ function AppContent() {
           imageAsset.fileName,
         );
 
-        setStatusMessage("Guardando imagen localmente...");
-        const localImageUrl = `${FileSystem.documentDirectory}${compressed.fileName}`;
-        try {
-          await FileSystem.copyAsync({
-            from: compressed.uri,
-            to: localImageUrl,
-          });
-        } catch (e) {
-          console.error("Error copiando imagen a documentDirectory", e);
-        }
-
-        setStatusMessage("Analizando comida por vision...");
-        const result = await biomaApi.analyzeMealImage({
-          base64Image: compressed.base64,
-          localImageUrl,
+        setStatusMessage("Subiendo imagen y analizando...");
+        const result = await biomaApi.analyzeMealImageFromUri({
+          imageUri: compressed.uri,
+          fileName: compressed.fileName,
+          contentType: compressed.mimeType,
           mealLabel: mealLabel.trim() || undefined,
           notes: mealDescription.trim() || undefined,
           consumedAt: new Date().toISOString(),
@@ -1568,6 +1582,22 @@ function AppContent() {
             onToggleMode={() =>
               setVisualMode((cur) => (cur === "light" ? "dark" : "light"))
             }
+            onOpenWeightHistory={() => setWeightHistoryVisible(true)}
+            onOpenWorkoutHistory={() => setWorkoutHistoryVisible(true)}
+            onOpenAccountSettings={() => setAccountSettingsVisible(true)}
+            onOpenEditProfile={async () => {
+              try {
+                const me = await biomaApi.getMeProfile();
+                setProfileData(me.profile);
+                setEditProfileVisible(true);
+              } catch {
+                Alert.alert(
+                  "No se pudo cargar tu perfil",
+                  "Intenta de nuevo en unos segundos.",
+                );
+              }
+            }}
+            onForgotPassword={() => setAuthFlow("forgot-password")}
             ambientPulse={ambientPulse}
             mainScrollY={mainScrollY}
             healthProvider={mockHealthProvider}
@@ -1584,7 +1614,8 @@ function AppContent() {
             todayCalories={homeTodayCalories}
             todayMealsCount={homeTodayMealsCount}
             calorieGoal={homeCalorieGoal}
-            stepsGoal={homeStepsGoal}
+            stepsGoal={homeStepGoal}
+            currentSteps={wearableSnapshot.steps}
             todayMacros={homeTodayMacros}
             macroGoals={homeMacroGoals}
             lastMeal={homeLastMeal}
@@ -1616,6 +1647,70 @@ function AppContent() {
     return renderMenuScanScreen();
   }
 
+  // ─── Overlay modals (weight history + GDPR account settings) ────
+  if (weightHistoryVisible && userId) {
+    return (
+      <WeightHistoryScreen
+        theme={theme}
+        visualMode={visualMode}
+        userId={userId}
+        onClose={() => setWeightHistoryVisible(false)}
+      />
+    );
+  }
+
+  if (workoutHistoryVisible && userId) {
+    return (
+      <WorkoutHistoryScreen
+        theme={theme}
+        visualMode={visualMode}
+        userId={userId}
+        onClose={() => setWorkoutHistoryVisible(false)}
+      />
+    );
+  }
+
+  if (accountSettingsVisible && userId) {
+    return (
+      <AccountSettingsModal
+        theme={theme}
+        visualMode={visualMode}
+        visible
+        onClose={() => setAccountSettingsVisible(false)}
+        onDeleted={() => {
+          setAccountSettingsVisible(false);
+          handleLogout();
+        }}
+      />
+    );
+  }
+
+  if (editProfileVisible) {
+    return (
+      <EditProfileModal
+        theme={theme}
+        visualMode={visualMode}
+        visible
+        profile={profileData}
+        onClose={() => setEditProfileVisible(false)}
+        onSaved={async (next) => {
+          setProfileData(next);
+          setEditProfileVisible(false);
+          // Refresh local state that drives the home screen
+          setOnboardingWeightKg(next.weightKg ?? 70);
+          if (next.goal) setOnboardingGoal(next.goal);
+          // Pull the freshly-recomputed plan so the home rings update
+          try {
+            const plan = await biomaApi.getNutritionPlan();
+            setNutritionPlan(plan);
+          } catch {
+            // ignore — user can reload
+          }
+        }}
+      />
+    );
+  }
+
   // ─── Welcome / Auth flow ─────────────────────────────────────────
   if (authFlow === "welcome") {
     return (
@@ -1638,6 +1733,7 @@ function AppContent() {
         onLoginSuccess={handleAuthSuccess}
         onBack={() => setAuthFlow("welcome")}
         onShowRegister={() => setAuthFlow("register")}
+        onForgotPassword={() => setAuthFlow("forgot-password")}
         onToggleMode={toggleVisualMode}
       />
     );
@@ -2039,639 +2135,6 @@ function AppContent() {
     </SafeAreaView>
   );
 
-  function renderHomeScreen() {
-    return (
-      <View style={styles.homeScreen}>
-        <Animated.View
-          style={[
-            styles.homeHeroWrap,
-            {
-              transform: [
-                { scale: heroScale },
-                {
-                  translateY: ambientPulse.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, -8],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <LinearGradient
-            colors={homeHeroGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.homeHeroCard}
-          >
-            <View style={styles.homeHeroTopRow}>
-              <View
-                style={[
-                  styles.homeHeroPill,
-                  { backgroundColor: homeHeroPillDarkColor },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.homeHeroPillText,
-                    { color: homeHeroPillTextColor },
-                  ]}
-                >
-                  Resumen premium de hoy
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.homeHeroPill,
-                  { backgroundColor: homeHeroPillGlassColor },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.homeHeroPillText,
-                    { color: homeHeroPillTextColor },
-                  ]}
-                >
-                  {homeAnchorText}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.homeHeroHeadingBlock}>
-              <Text
-                style={[
-                  styles.homeHeroEyebrow,
-                  { color: homeHeroEyebrowColor },
-                ]}
-              >
-                Tu cuerpo hoy
-              </Text>
-              <Text
-                style={[styles.homeHeroTitle, { color: homeHeroTitleColor }]}
-              >
-                Todo lo importante, claro y en un solo lugar.
-              </Text>
-              <Text
-                style={[
-                  styles.homeHeroSummary,
-                  { color: homeHeroSummaryColor },
-                ]}
-              >
-                {dailyRecommendation.summary}
-              </Text>
-            </View>
-
-            <Animated.View
-              style={[
-                styles.homeFloatingBadge,
-                styles.homeFloatingBadgeLeft,
-                { backgroundColor: homeFloatingBadgeColor },
-                {
-                  transform: [
-                    {
-                      translateY: ambientPulse.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, -10],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.homeFloatingValue,
-                  { color: homeFloatingValueColor },
-                ]}
-              >
-                {wearableSnapshot.steps.toLocaleString()}
-              </Text>
-              <Text
-                style={[
-                  styles.homeFloatingLabel,
-                  { color: homeFloatingLabelColor },
-                ]}
-              >
-                pasos
-              </Text>
-            </Animated.View>
-
-            <Animated.View
-              style={[
-                styles.homeFloatingBadge,
-                styles.homeFloatingBadgeRight,
-                { backgroundColor: homeFloatingBadgeColor },
-                {
-                  transform: [
-                    {
-                      translateY: ambientPulse.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-4, 8],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.homeFloatingValue,
-                  { color: homeFloatingValueColor },
-                ]}
-              >
-                {wearableSnapshot.sleep.totalHours.toFixed(1)} h
-              </Text>
-              <Text
-                style={[
-                  styles.homeFloatingLabel,
-                  { color: homeFloatingLabelColor },
-                ]}
-              >
-                sueno
-              </Text>
-            </Animated.View>
-
-            <View style={styles.homeHeroBottomRow}>
-              <View style={styles.homeHeroScoreBlock}>
-                <Text
-                  style={[
-                    styles.homeHeroScoreLabel,
-                    { color: homeHeroScoreLabelColor },
-                  ]}
-                >
-                  Recovery score
-                </Text>
-                <Text
-                  style={[
-                    styles.homeHeroScoreValue,
-                    { color: homeHeroScoreValueColor },
-                  ]}
-                >
-                  {recoverySnapshot.score}
-                </Text>
-                <Text
-                  style={[
-                    styles.homeHeroScoreCaption,
-                    { color: homeHeroScoreCaptionColor },
-                  ]}
-                >
-                  {recoverySnapshot.label}
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.homeHeroDivider,
-                  { backgroundColor: homeHeroDividerColor },
-                ]}
-              />
-
-              <View style={styles.homeHeroMiniStats}>
-                <View style={styles.homeHeroMiniStat}>
-                  <Text
-                    style={[
-                      styles.homeHeroMiniValue,
-                      { color: homeHeroMiniValueColor },
-                    ]}
-                  >
-                    {homeTodayCalories || 0}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.homeHeroMiniLabel,
-                      { color: homeHeroMiniLabelColor },
-                    ]}
-                  >
-                    kcal hoy
-                  </Text>
-                </View>
-                <View style={styles.homeHeroMiniStat}>
-                  <Text
-                    style={[
-                      styles.homeHeroMiniValue,
-                      { color: homeHeroMiniValueColor },
-                    ]}
-                  >
-                    {homeTodayMealsCount}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.homeHeroMiniLabel,
-                      { color: homeHeroMiniLabelColor },
-                    ]}
-                  >
-                    comidas
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </LinearGradient>
-        </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.homeMetricsGrid,
-            {
-              opacity: mainScrollY.interpolate({
-                inputRange: [0, 70, 150],
-                outputRange: [0.68, 0.88, 1],
-                extrapolate: "clamp",
-              }),
-              transform: [
-                {
-                  translateY: mainScrollY.interpolate({
-                    inputRange: [0, 150],
-                    outputRange: [34, 0],
-                    extrapolate: "clamp",
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.homeMetricCard,
-              { backgroundColor: homePanelColor, borderColor: homePanelStroke },
-            ]}
-          >
-            <View style={styles.homeMetricHeader}>
-              <Text style={[styles.homeMetricLabel, { color: homeMutedText }]}>
-                Recuperacion
-              </Text>
-              <View
-                style={[
-                  styles.homeMetricDot,
-                  { backgroundColor: homeRecoveryAccent },
-                ]}
-              />
-            </View>
-            <Text style={[styles.homeMetricValue, { color: homeStrongText }]}>
-              {recoverySnapshot.score}
-            </Text>
-            <Text style={[styles.homeMetricFoot, { color: homeMutedText }]}>
-              {recoverySnapshot.label}
-            </Text>
-          </View>
-
-          <View
-            style={[
-              styles.homeMetricCard,
-              { backgroundColor: homePanelColor, borderColor: homePanelStroke },
-            ]}
-          >
-            <View style={styles.homeMetricHeader}>
-              <Text style={[styles.homeMetricLabel, { color: homeMutedText }]}>
-                Pasos
-              </Text>
-              <Text style={[styles.homeMetricHint, { color: homeSoftText }]}>
-                meta {homeStepGoal.toLocaleString()}
-              </Text>
-            </View>
-            <Text
-              style={[styles.homeMetricValueSmall, { color: homeStrongText }]}
-            >
-              {wearableSnapshot.steps.toLocaleString()}
-            </Text>
-            <View
-              style={[
-                styles.homeMetricTrack,
-                { backgroundColor: homePanelColorAlt },
-              ]}
-            >
-              <View
-                style={[
-                  styles.homeMetricFill,
-                  {
-                    width: `${homeStepProgress * 100}%`,
-                    backgroundColor: theme.accent,
-                  },
-                ]}
-              />
-            </View>
-          </View>
-
-          <View
-            style={[
-              styles.homeMetricCard,
-              { backgroundColor: homePanelColor, borderColor: homePanelStroke },
-            ]}
-          >
-            <View style={styles.homeMetricHeader}>
-              <Text style={[styles.homeMetricLabel, { color: homeMutedText }]}>
-                Sueno
-              </Text>
-              <Text style={[styles.homeMetricHint, { color: homeSoftText }]}>
-                deep {wearableSnapshot.sleep.deepHours.toFixed(1)} h
-              </Text>
-            </View>
-            <Text
-              style={[styles.homeMetricValueSmall, { color: homeStrongText }]}
-            >
-              {wearableSnapshot.sleep.totalHours.toFixed(1)} h
-            </Text>
-            <Text style={[styles.homeMetricFoot, { color: homeMutedText }]}>
-              REM {wearableSnapshot.sleep.remHours.toFixed(1)} h
-            </Text>
-          </View>
-
-          <View
-            style={[
-              styles.homeMetricCard,
-              { backgroundColor: homePanelColor, borderColor: homePanelStroke },
-            ]}
-          >
-            <View style={styles.homeMetricHeader}>
-              <Text style={[styles.homeMetricLabel, { color: homeMutedText }]}>
-                Cardio
-              </Text>
-              <Text style={[styles.homeMetricHint, { color: homeSoftText }]}>
-                HRV {wearableSnapshot.hrvMs} ms
-              </Text>
-            </View>
-            <Text
-              style={[styles.homeMetricValueSmall, { color: homeStrongText }]}
-            >
-              {wearableSnapshot.vo2Max.toFixed(1)}
-            </Text>
-            <Text style={[styles.homeMetricFoot, { color: homeMutedText }]}>
-              VO2 max estimado
-            </Text>
-          </View>
-        </Animated.View>
-
-        <Animated.View
-          style={{
-            opacity: mainScrollY.interpolate({
-              inputRange: [70, 180, 300],
-              outputRange: [0.55, 0.82, 1],
-              extrapolate: "clamp",
-            }),
-            transform: [
-              {
-                translateY: Animated.add(
-                  mainScrollY.interpolate({
-                    inputRange: [70, 280],
-                    outputRange: [42, 0],
-                    extrapolate: "clamp",
-                  }),
-                  ambientPulse.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, -5],
-                  }),
-                ),
-              },
-              {
-                scale: mainScrollY.interpolate({
-                  inputRange: [70, 280],
-                  outputRange: [0.96, 1],
-                  extrapolate: "clamp",
-                }),
-              },
-            ],
-          }}
-        >
-          <LinearGradient
-            colors={
-              visualMode === "light"
-                ? ["#FFFFFF", "#F6F1E8"]
-                : ["#111917", "#0D1412"]
-            }
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.homeStoryCard, { borderColor: homePanelStroke }]}
-          >
-            <View style={styles.homeStoryHeader}>
-              <View>
-                <Text
-                  style={[styles.homeSectionEyebrow, { color: theme.accent }]}
-                >
-                  PANORAMA
-                </Text>
-                <Text
-                  style={[styles.homeStoryTitle, { color: homeStrongText }]}
-                >
-                  Ritmo, energia y comida alineados.
-                </Text>
-                <Text style={[styles.homeStoryText, { color: homeMutedText }]}>
-                  Siguiente ancla circadiana a las {homeAnchorText} en{" "}
-                  {circadianPlan.city.name}. Hoy vas con{" "}
-                  {homeTodayCalories || 0} kcal y {homeTodayMealsCount} comidas
-                  registradas.
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.homeTrendRow}>
-              {weightTrend.map((value, index) => {
-                const height = 26 + value * 0.9;
-                const active = index === 4;
-
-                return (
-                  <View
-                    key={`${value}-${index}`}
-                    style={styles.homeTrendColumn}
-                  >
-                    <View
-                      style={[
-                        styles.homeTrendTrack,
-                        { backgroundColor: homePanelColorAlt },
-                      ]}
-                    >
-                      <Animated.View
-                        style={[
-                          styles.homeTrendFill,
-                          {
-                            height,
-                            backgroundColor: active
-                              ? theme.accent
-                              : visualMode === "light"
-                                ? "#CFC5B6"
-                                : "#28433A",
-                            opacity: mainScrollY.interpolate({
-                              inputRange: [100 + index * 10, 220 + index * 12],
-                              outputRange: [0.35, 1],
-                              extrapolate: "clamp",
-                            }),
-                            transform: [
-                              {
-                                translateY: Animated.add(
-                                  mainScrollY.interpolate({
-                                    inputRange: [
-                                      100 + index * 12,
-                                      240 + index * 16,
-                                    ],
-                                    outputRange: [height * 0.42, 0],
-                                    extrapolate: "clamp",
-                                  }),
-                                  ambientPulse.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [
-                                      0,
-                                      active ? -8 : -(4 + (index % 3)),
-                                    ],
-                                  }),
-                                ),
-                              },
-                              {
-                                scaleY: mainScrollY.interpolate({
-                                  inputRange: [
-                                    100 + index * 12,
-                                    240 + index * 16,
-                                  ],
-                                  outputRange: [0.42, 1],
-                                  extrapolate: "clamp",
-                                }),
-                              },
-                            ],
-                          },
-                        ]}
-                      />
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-
-            <View style={styles.homeActionRow}>
-              <Pressable
-                style={[
-                  styles.homeActionButtonPrimary,
-                  { backgroundColor: theme.accent },
-                ]}
-                onPress={() => setActiveTab("stats")}
-              >
-                <Text
-                  style={[
-                    styles.homeActionButtonPrimaryText,
-                    { color: visualMode === "light" ? "#FFFFFF" : "#07110E" },
-                  ]}
-                >
-                  Ver resumen
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.homeActionButtonSecondary,
-                  { backgroundColor: homePanelColorAlt },
-                ]}
-                onPress={() => handleGatedPhotoAction(() => openCameraScreen("home"))}
-              >
-                <Text
-                  style={[
-                    styles.homeActionButtonSecondaryText,
-                    { color: homeStrongText },
-                  ]}
-                >
-                  Escanear comida
-                </Text>
-              </Pressable>
-            </View>
-          </LinearGradient>
-        </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.homeInsightStack,
-            {
-              opacity: mainScrollY.interpolate({
-                inputRange: [180, 300, 420],
-                outputRange: [0.48, 0.82, 1],
-                extrapolate: "clamp",
-              }),
-              transform: [
-                {
-                  translateY: mainScrollY.interpolate({
-                    inputRange: [180, 420],
-                    outputRange: [40, 0],
-                    extrapolate: "clamp",
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.homeInsightCardLarge,
-              { backgroundColor: homePanelColor, borderColor: homePanelStroke },
-            ]}
-          >
-            <Text style={[styles.homeSectionEyebrow, { color: theme.accent }]}>
-              AI COACH
-            </Text>
-            <Text style={[styles.homeInsightTitle, { color: homeStrongText }]}>
-              {dailyRecommendation.title}
-            </Text>
-            <Text style={[styles.homeInsightText, { color: homeMutedText }]}>
-              {dailyRecommendation.summary}
-            </Text>
-          </View>
-
-          <View style={styles.homeMiniCardsRow}>
-            <View
-              style={[
-                styles.homeMiniCard,
-                {
-                  backgroundColor: homePanelColor,
-                  borderColor: homePanelStroke,
-                },
-              ]}
-            >
-              <Text
-                style={[styles.homeMiniCardLabel, { color: homeMutedText }]}
-              >
-                Ciudad solar
-              </Text>
-              <Text
-                style={[styles.homeMiniCardValue, { color: homeStrongText }]}
-              >
-                {circadianPlan.city.name}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.homeMiniCard,
-                {
-                  backgroundColor: homePanelColor,
-                  borderColor: homePanelStroke,
-                },
-              ]}
-            >
-              <Text
-                style={[styles.homeMiniCardLabel, { color: homeMutedText }]}
-              >
-                Fase actual
-              </Text>
-              <Text
-                style={[styles.homeMiniCardValue, { color: homeStrongText }]}
-              >
-                {circadianPlan.phase === "day" ? "Dia" : "Noche"}
-              </Text>
-            </View>
-          </View>
-        </Animated.View>
-      </View>
-    );
-  }
-
-  function updateSelectedStatsMonthYear(
-    monthIndex: number,
-    year: number,
-    closePicker = false,
-  ) {
-    const nextDate = clampDateToMonth(
-      year,
-      monthIndex,
-      selectedStatsDayOfMonth,
-    );
-    setSelectedStatsDate(getLocalDateKey(nextDate));
-
-    if (closePicker) {
-      setStatsMonthPickerExpanded(false);
-    }
-  }
-
   function renderMacroPill(
     label: string,
     value: number,
@@ -2763,9 +2226,10 @@ function AppContent() {
                   { backgroundColor: foodSurfaceStrong },
                 ]}
                 onPress={() =>
-                  updateSelectedStatsMonthYear(
-                    selectedStatsMonthIndex,
-                    selectedStatsYear - 1,
+                  setSelectedStatsDate(
+                    getLocalDateKey(
+                      new Date(selectedStatsYear - 1, selectedStatsMonthIndex, 1),
+                    ),
                   )
                 }
               >
@@ -2791,9 +2255,10 @@ function AppContent() {
                   { backgroundColor: foodSurfaceStrong },
                 ]}
                 onPress={() =>
-                  updateSelectedStatsMonthYear(
-                    selectedStatsMonthIndex,
-                    selectedStatsYear + 1,
+                  setSelectedStatsDate(
+                    getLocalDateKey(
+                      new Date(selectedStatsYear + 1, selectedStatsMonthIndex, 1),
+                    ),
                   )
                 }
               >
@@ -2821,10 +2286,8 @@ function AppContent() {
                       },
                     ]}
                     onPress={() =>
-                      updateSelectedStatsMonthYear(
-                        monthIndex,
-                        selectedStatsYear,
-                        true,
+                      setSelectedStatsDate(
+                        getLocalDateKey(new Date(selectedStatsYear, monthIndex, 1)),
                       )
                     }
                   >
@@ -4137,311 +3600,6 @@ function AppContent() {
     );
   }
 
-  function renderNutritionScreen() {
-    return (
-      <View style={styles.screen}>
-        <View
-          style={[
-            styles.scannerShell,
-            { backgroundColor: theme.card, borderColor: theme.stroke },
-          ]}
-        >
-          <View style={styles.scannerHeader}>
-            <View>
-              <Text style={[styles.scannerEyebrow, { color: theme.accent }]}>
-                Nutricion IA
-              </Text>
-              <Text style={[styles.scannerTitle, { color: theme.text }]}>
-                {scannerMode === "food"
-                  ? "Escanea tu comida"
-                  : "Escanea un barcode"}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.scannerModePill,
-                { backgroundColor: theme.cardMuted },
-              ]}
-            >
-              <Text style={[styles.scannerModeText, { color: theme.muted }]}>
-                {scannerMode === "food" ? "Foto" : "Codigo"}
-              </Text>
-            </View>
-          </View>
-
-          <View
-            style={[styles.cameraFrame, { backgroundColor: theme.cardMuted }]}
-          >
-            {cameraPermission?.granted ? (
-              imageAsset && scannerMode === "food" ? (
-                <Image
-                  source={{ uri: imageAsset.uri }}
-                  style={styles.cameraPreview}
-                />
-              ) : (
-                <CameraView
-                  ref={cameraRef}
-                  style={styles.cameraPreview}
-                  facing="back"
-                  barcodeScannerSettings={{
-                    barcodeTypes: [
-                      "ean13",
-                      "ean8",
-                      "upc_a",
-                      "upc_e",
-                      "code128",
-                      "code39",
-                      "qr",
-                    ],
-                  }}
-                  onBarcodeScanned={
-                    scannerMode === "barcode" ? handleBarcodeScanned : undefined
-                  }
-                  onCameraReady={() => setCameraReady(true)}
-                />
-              )
-            ) : (
-              <View style={styles.cameraPermissionBox}>
-                <Text style={[styles.previewTitle, { color: theme.text }]}>
-                  Camara no activada
-                </Text>
-                <Text style={[styles.previewText, { color: theme.muted }]}>
-                  Activa la camara para escanear comida o codigos de barra.
-                </Text>
-                <Pressable
-                  style={[styles.primaryButton, styles.cameraPermissionButton]}
-                  onPress={requestCameraPermission}
-                >
-                  <Text style={styles.primaryButtonText}>Activar camara</Text>
-                </Pressable>
-              </View>
-            )}
-
-            {cameraPermission?.granted ? (
-              <View
-                pointerEvents="none"
-                style={[styles.scanGuide, { borderColor: theme.accent }]}
-              >
-                <View
-                  style={[styles.scanDot, { backgroundColor: theme.accent }]}
-                />
-              </View>
-            ) : null}
-          </View>
-
-          <View
-            style={[
-              styles.scannerBottomSheet,
-              { backgroundColor: theme.cardMuted, borderColor: theme.stroke },
-            ]}
-          >
-            <View style={styles.scannerTabs}>
-              <Pressable
-                style={[
-                  styles.scannerTab,
-                  {
-                    backgroundColor:
-                      scannerMode === "food" ? theme.accent : theme.card,
-                  },
-                ]}
-                onPress={() => {
-                  setNutritionQuickMenuOpen(false);
-                  setScannerMode("food");
-                  setBarcodeResult(null);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.scannerTabText,
-                    {
-                      color:
-                        scannerMode === "food" ? theme.background : theme.text,
-                    },
-                  ]}
-                >
-                  Comida
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.scannerTab,
-                  {
-                    backgroundColor:
-                      scannerMode === "barcode" ? theme.accent : theme.card,
-                  },
-                ]}
-                onPress={() => {
-                  setNutritionQuickMenuOpen(false);
-                  setScannerMode("barcode");
-                  setBarcodeResult(null);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.scannerTabText,
-                    {
-                      color:
-                        scannerMode === "barcode"
-                          ? theme.background
-                          : theme.text,
-                    },
-                  ]}
-                >
-                  Barcode
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.scannerTab,
-                  {
-                    backgroundColor: theme.card,
-                  },
-                ]}
-                onPress={() => {
-                  setNutritionQuickMenuOpen(false);
-                  setMenuImage(null);
-                  setMenuAnalysis(null);
-                  setNutritionView("menuScan");
-                  setActiveTab("nutrition");
-                }}
-              >
-                <Text
-                  style={[
-                    styles.scannerTabText,
-                    { color: theme.text },
-                  ]}
-                >
-                  Menu
-                </Text>
-              </Pressable>
-            </View>
-
-            {scannerMode === "food" ? (
-              <>
-                <View style={styles.scannerActions}>
-                  <Pressable
-                    style={[
-                      styles.secondaryButton,
-                      styles.scannerActionButton,
-                      { backgroundColor: theme.card },
-                    ]}
-                    onPress={pickImage}
-                  >
-                    <Text
-                      style={[
-                        styles.secondaryButtonText,
-                        { color: theme.text },
-                      ]}
-                    >
-                      Galeria
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[
-                      styles.captureButton,
-                      { backgroundColor: theme.accent },
-                    ]}
-                    onPress={captureFoodPhoto}
-                  >
-                    <View
-                      style={[
-                        styles.captureButtonInner,
-                        { borderColor: theme.background },
-                      ]}
-                    />
-                  </Pressable>
-                  <Pressable
-                    style={[
-                      styles.secondaryButton,
-                      styles.scannerActionButton,
-                      { backgroundColor: theme.card },
-                    ]}
-                    onPress={() => {
-                      setImageAsset(null);
-                      setAnalysis(null);
-                      setStatusMessage("Camara lista para una nueva foto.");
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.secondaryButtonText,
-                        { color: theme.text },
-                      ]}
-                    >
-                      Repetir
-                    </Text>
-                  </Pressable>
-                </View>
-
-                <Pressable
-                  style={[
-                    styles.primaryButton,
-                    (!imageAsset || loading) && styles.buttonDisabled,
-                  ]}
-                  onPress={analyzeCurrentMeal}
-                  disabled={!imageAsset || loading}
-                >
-                  {loading ? (
-                    <ActivityIndicator color={theme.background} />
-                  ) : (
-                    <Text style={styles.primaryButtonText}>
-                      Analizar comida
-                    </Text>
-                  )}
-                </Pressable>
-              </>
-            ) : (
-              <View
-                style={[
-                  styles.barcodeResultCard,
-                  { backgroundColor: theme.card, borderColor: theme.stroke },
-                ]}
-              >
-                <Text style={[styles.barcodeLabel, { color: theme.muted }]}>
-                  Resultado del barcode
-                </Text>
-                <Text
-                  style={[styles.barcodeValue, { color: theme.text }]}
-                  numberOfLines={2}
-                >
-                  {barcodeResult?.data ??
-                    "Apunta la camara hacia el codigo de barras."}
-                </Text>
-                {barcodeResult ? (
-                  <Pressable
-                    style={[
-                      styles.secondaryButton,
-                      { backgroundColor: theme.cardMuted },
-                    ]}
-                    onPress={() => setBarcodeResult(null)}
-                  >
-                    <Text
-                      style={[
-                        styles.secondaryButtonText,
-                        { color: theme.text },
-                      ]}
-                    >
-                      Escanear otro
-                    </Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            )}
-
-            <Text style={[styles.helperText, { color: theme.muted }]}>
-              {statusMessage ??
-                "Escanea, captura y analiza tu comida desde la camara."}
-            </Text>
-          </View>
-        </View>
-
-        {analysis ? (
-          <MacroResultCard analysis={analysis} mode={wellnessCardMode} />
-        ) : null}
-      </View>
-    );
-  }
-
   function renderTipsScreen() {
     const iconMap: Record<string, ComponentProps<typeof Ionicons>["name"]> = {
       nutrition: "nutrition-outline",
@@ -4616,416 +3774,6 @@ function AppContent() {
     );
   }
 
-  function renderProfileScreen() {
-    return (
-      <View style={styles.profileScreen}>
-        <Animated.View
-          style={[
-            {
-              opacity: mainScrollY.interpolate({
-                inputRange: [0, 80],
-                outputRange: [1, 0.94],
-                extrapolate: "clamp",
-              }),
-              transform: [
-                {
-                  translateY: ambientPulse.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, -8],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <LinearGradient
-            colors={profileHeroGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.profileHeroCard}
-          >
-            <View style={styles.profileHeroTopRow}>
-              <View
-                style={[
-                  styles.profileHeroPill,
-                  { backgroundColor: profileHeroPillGlassColor },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.profileHeroPillText,
-                    { color: profileHeroPillTextColor },
-                  ]}
-                >
-                  Perfil premium
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.profileHeroPill,
-                  { backgroundColor: profileHeroPillDarkColor },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.profileHeroPillText,
-                    { color: profileHeroPillTextColor },
-                  ]}
-                >
-                  {profileStatusText}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.profileHeroIdentityRow}>
-              <View
-                style={[
-                  styles.profileAvatarHero,
-                  { backgroundColor: profileHeroAvatarColor },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.profileAvatarHeroText,
-                    { color: profileHeroAvatarTextColor },
-                  ]}
-                >
-                  {profileInitial}
-                </Text>
-              </View>
-
-              <View style={styles.profileHeroIdentityText}>
-                <Text
-                  style={[
-                    styles.profileHeroTitle,
-                    { color: profileHeroTitleColor },
-                  ]}
-                >
-                  {fullName.trim() || "Tu espacio Bioma"}
-                </Text>
-                <Text
-                  style={[
-                    styles.profileHeroSubtitle,
-                    { color: profileHeroSubtitleColor },
-                  ]}
-                >
-                  {email.trim() ||
-                    "Conecta tu cuenta para desbloquear historial, sincronizacion y continuidad."}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.profileHeroStatsRow}>
-              <View style={styles.profileHeroStat}>
-                <Text
-                  style={[
-                    styles.profileHeroStatValue,
-                    { color: profileHeroStatValueColor },
-                  ]}
-                >
-                  {profileCompletionValue}%
-                </Text>
-                <Text
-                  style={[
-                    styles.profileHeroStatLabel,
-                    { color: profileHeroStatLabelColor },
-                  ]}
-                >
-                  perfil listo
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.profileHeroDivider,
-                  { backgroundColor: profileHeroDividerColor },
-                ]}
-              />
-              <View style={styles.profileHeroStat}>
-                <Text
-                  style={[
-                    styles.profileHeroStatValue,
-                    { color: profileHeroStatValueColor },
-                  ]}
-                >
-                  {userId ? "Activa" : "Pendiente"}
-                </Text>
-                <Text
-                  style={[
-                    styles.profileHeroStatLabel,
-                    { color: profileHeroStatLabelColor },
-                  ]}
-                >
-                  sincronizacion
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.profileHeroDivider,
-                  { backgroundColor: profileHeroDividerColor },
-                ]}
-              />
-              <View style={styles.profileHeroStat}>
-                <Text
-                  style={[
-                    styles.profileHeroStatValue,
-                    { color: profileHeroStatValueColor },
-                  ]}
-                >
-                  {visualMode === "light" ? "Claro" : "Oscuro"}
-                </Text>
-                <Text
-                  style={[
-                    styles.profileHeroStatLabel,
-                    { color: profileHeroStatLabelColor },
-                  ]}
-                >
-                  modo visual
-                </Text>
-              </View>
-            </View>
-          </LinearGradient>
-        </Animated.View>
-
-        <Animated.View
-          style={{
-            opacity: mainScrollY.interpolate({
-              inputRange: [40, 180],
-              outputRange: [0.74, 1],
-              extrapolate: "clamp",
-            }),
-            transform: [
-              {
-                translateY: mainScrollY.interpolate({
-                  inputRange: [40, 180],
-                  outputRange: [28, 0],
-                  extrapolate: "clamp",
-                }),
-              },
-            ],
-          }}
-        >
-          <LinearGradient
-            colors={
-              visualMode === "light"
-                ? ["#FFFFFF", "#F6F0E7"]
-                : ["#111917", "#0D1412"]
-            }
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[
-              styles.profileAccountCard,
-              { borderColor: profilePanelStroke },
-            ]}
-          >
-            <View style={styles.profileSectionHeader}>
-              <Text
-                style={[styles.profileSectionEyebrow, { color: theme.accent }]}
-              >
-                CUENTA
-              </Text>
-              <Text
-                style={[
-                  styles.profileSectionTitle,
-                  { color: profileTextStrong },
-                ]}
-              >
-                Identidad, tema y conexion en una sola vista.
-              </Text>
-              <Text
-                style={[styles.profileSectionText, { color: profileTextMuted }]}
-              >
-                Todo esta ordenado para que la app se sienta personal,
-                consistente y lista para crecer contigo.
-              </Text>
-            </View>
-
-            <View
-              style={[
-                styles.profileThemeCard,
-                {
-                  backgroundColor: profilePanelAlt,
-                  borderColor: profilePanelStroke,
-                },
-              ]}
-            >
-              <View style={styles.themeToggleTextBlock}>
-                <Text
-                  style={[
-                    styles.themeToggleTitle,
-                    { color: profileTextStrong },
-                  ]}
-                >
-                  Modo claro
-                </Text>
-                <Text
-                  style={[styles.themeToggleText, { color: profileTextMuted }]}
-                >
-                  Cambia toda la interfaz entre el estilo fitness oscuro y una
-                  version clara.
-                </Text>
-              </View>
-              <Pressable
-                style={[
-                  styles.themeSwitch,
-                  {
-                    backgroundColor:
-                      visualMode === "light" ? theme.accent : theme.stroke,
-                  },
-                ]}
-                onPress={() =>
-                  setVisualMode((current) =>
-                    current === "light" ? "dark" : "light",
-                  )
-                }
-              >
-                <View
-                  style={[
-                    styles.themeSwitchKnob,
-                    visualMode === "light" && styles.themeSwitchKnobActive,
-                  ]}
-                />
-              </Pressable>
-            </View>
-
-            <View style={styles.profileFieldsStack}>
-              <View
-                style={[
-                  styles.profileFieldShell,
-                  {
-                    backgroundColor: profilePanelAlt,
-                    borderColor: profilePanelStroke,
-                  },
-                ]}
-              >
-                <Text
-                  style={[styles.profileFieldLabel, { color: profileTextSoft }]}
-                >
-                  Nombre
-                </Text>
-                <TextInput
-                  value={fullName}
-                  onChangeText={setFullName}
-                  placeholder="Nombre completo"
-                  placeholderTextColor={profileTextSoft}
-                  style={[
-                    styles.profileFieldInput,
-                    { color: profileTextStrong },
-                  ]}
-                />
-              </View>
-              <View
-                style={[
-                  styles.profileFieldShell,
-                  {
-                    backgroundColor: profilePanelAlt,
-                    borderColor: profilePanelStroke,
-                  },
-                ]}
-              >
-                <Text
-                  style={[styles.profileFieldLabel, { color: profileTextSoft }]}
-                >
-                  Correo
-                </Text>
-                <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="correo@bioma.app"
-                  placeholderTextColor={profileTextSoft}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  style={[
-                    styles.profileFieldInput,
-                    { color: profileTextStrong },
-                  ]}
-                />
-              </View>
-            </View>
-
-            <View style={styles.profileActionBlock}>
-              <Pressable
-                style={[
-                  styles.profilePrimaryButton,
-                  { backgroundColor: theme.accent },
-                  bootstrapLoading && styles.buttonDisabled,
-                ]}
-                onPress={connectProfile}
-                disabled={bootstrapLoading}
-              >
-                {bootstrapLoading ? (
-                  <ActivityIndicator
-                    color={visualMode === "light" ? "#FFFFFF" : "#07110E"}
-                  />
-                ) : (
-                  <Text
-                    style={[
-                      styles.profilePrimaryButtonText,
-                      { color: visualMode === "light" ? "#FFFFFF" : "#07110E" },
-                    ]}
-                  >
-                    {userId ? "Actualizar perfil" : "Conectar perfil"}
-                  </Text>
-                )}
-              </Pressable>
-
-              <View
-                style={[
-                  styles.profileStatusStrip,
-                  { backgroundColor: profilePanelAlt },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.profileStatusStripText,
-                    { color: profileTextMuted },
-                  ]}
-                >
-                  {userId
-                    ? `Perfil listo. ID de usuario: ${userId}`
-                    : "Aun no hay perfil enlazado."}
-                </Text>
-              </View>
-            </View>
-          </LinearGradient>
-        </Animated.View>
-
-        <Animated.View
-          style={{
-            opacity: mainScrollY.interpolate({
-              inputRange: [140, 320],
-              outputRange: [0.56, 1],
-              extrapolate: "clamp",
-            }),
-            transform: [
-              {
-                translateY: mainScrollY.interpolate({
-                  inputRange: [140, 320],
-                  outputRange: [36, 0],
-                  extrapolate: "clamp",
-                }),
-              },
-            ],
-          }}
-        >
-          <View
-            style={[
-              styles.profileDeviceWrap,
-              {
-                backgroundColor: profilePanelColor,
-                borderColor: profilePanelStroke,
-              },
-            ]}
-          >
-            <HealthProviderStatusCard
-              provider={mockHealthProvider}
-              mode={wellnessCardMode}
-              theme={theme}
-            />
-          </View>
-        </Animated.View>
-      </View>
-    );
-  }
 }
 
 const styles = StyleSheet.create({

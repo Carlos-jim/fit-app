@@ -1,5 +1,9 @@
 import type { PrismaClient, User } from "@prisma/client";
 
+import { logger } from "../lib/logger.js";
+
+const log = logger.child("user-repository");
+
 export class UserRepository {
   constructor(private readonly db: PrismaClient) {}
 
@@ -7,7 +11,7 @@ export class UserRepository {
     email: string;
     fullName?: string;
   }): Promise<User> {
-    console.log(`[Database] Syncing user: ${input.email}`);
+    log.info("Syncing user", { email: input.email });
     const user = await this.db.user.upsert({
       where: {
         email: input.email,
@@ -20,7 +24,7 @@ export class UserRepository {
         fullName: input.fullName,
       },
     });
-    console.log(`[Database] User synced: ${user.id}`);
+    log.info("User synced", { userId: user.id });
     return user;
   }
 

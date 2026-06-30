@@ -63,7 +63,7 @@ export function RegisterScreen({
   });
 
   useEffect(() => {
-    console.log("[Register] Google Client ID:", env.googleWebClientId ? "Configurado" : "VACÍO");
+    if (__DEV__) console.log("[Register] Google Client ID:", env.googleWebClientId ? "Configurado" : "VACÍO");
   }, []);
 
   useEffect(() => {
@@ -74,14 +74,14 @@ export function RegisterScreen({
   }, [response]);
 
   const handleGoogleAuth = async (idToken: string) => {
-    console.log("[Register] Starting Google Registration...");
+    if (__DEV__) console.log("[Register] Starting Google Registration...");
     setLoading(true);
     try {
       const { user } = await biomaApi.loginWithGoogle(idToken);
-      console.log("[Register] Google Success:", user);
+      if (__DEV__) console.log("[Register] Google Success:", user);
       onRegisterSuccess(user);
     } catch (err) {
-      console.error("[Register] Google Error:", err);
+      if (__DEV__) console.error("[Register] Google Error:", err);
       Alert.alert(
         "Error de Google",
         err instanceof Error ? err.message : "No se pudo registrar con Google.",
@@ -99,7 +99,7 @@ export function RegisterScreen({
       );
       return;
     }
-    console.log("[Register] Launching Google Login Prompt...");
+    if (__DEV__) console.log("[Register] Launching Google Login Prompt...");
     promptAsync();
   };
 
@@ -125,7 +125,7 @@ export function RegisterScreen({
 
     const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
 
-    console.log("[Register] Starting Email Registration for:", emailTrimmed);
+    if (__DEV__) console.log("[Register] Starting Email Registration for:", emailTrimmed);
     setLoading(true);
     try {
       const result = await biomaApi.registerWithEmail({
@@ -133,10 +133,10 @@ export function RegisterScreen({
         email: emailTrimmed,
         password,
       });
-      console.log("[Register] Email Success:", result.user);
+      if (__DEV__) console.log("[Register] Email Success:", result.user);
       onRegisterSuccess(result.user);
     } catch (err) {
-      console.error("[Register] Email Error:", err);
+      if (__DEV__) console.error("[Register] Email Error:", err);
       Alert.alert(
         "No se pudo crear la cuenta",
         err instanceof Error ? err.message : "Intenta de nuevo.",

@@ -36,6 +36,9 @@ jobs:
       - name: Typecheck
         run: npm run build
 
+      - name: Tests
+        run: npm test -- --ci
+
       - name: Security audit
         run: npm audit --audit-level high
         continue-on-error: true
@@ -62,6 +65,11 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: E2E smoke (auto-skip if backend unreachable)
+        run: |
+          (npm run test:e2e || echo "::warning::Playwright tests failed or backend unreachable")
+        continue-on-error: true
 
       - name: Security audit
         run: npm audit --audit-level high

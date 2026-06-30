@@ -631,16 +631,19 @@ function MealDetailView(props: {
             source={{ uri: meal.imageUrl }}
             style={styles.detailImage}
             resizeMode="cover"
-            onError={(e) =>
-              console.error(
-                "[MealDetail] Image load error:",
-                meal.imageUrl,
-                e.nativeEvent.error,
-              )
-            }
-            onLoad={() =>
-              console.log("[MealDetail] Image loaded OK:", meal.imageUrl)
-            }
+            onError={(e) => {
+              if (__DEV__) {
+                // Log without leaking the signed URL: the imageUrl
+                // embeds a capability token that grants read access.
+                console.error(
+                  "[MealDetail] Image load error (uri redacted):",
+                  e.nativeEvent.error,
+                );
+              }
+            }}
+            onLoad={() => {
+              if (__DEV__) console.log("[MealDetail] Image loaded OK");
+            }}
           />
         </View>
       ) : (

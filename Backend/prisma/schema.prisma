@@ -60,6 +60,19 @@ enum PlanType {
   ULTRA
 }
 
+enum EmailTokenType {
+  PASSWORD_RESET
+  EMAIL_VERIFICATION
+}
+
+enum BodyMetricType {
+  WEIGHT_KG
+  WAIST_CM
+  HIP_CM
+  CHEST_CM
+  BODY_FAT_PCT
+}
+
 model User {
   id               String             @id @default(cuid())
   email            String             @unique
@@ -69,11 +82,18 @@ model User {
   plan             PlanType           @default(FREE)
   planStartedAt    DateTime?
   planExpiresAt    DateTime?
+  emailVerified    Boolean            @default(false)
+  emailVerifiedAt  DateTime?
   logs             Log[]
   onboardingSession OnboardingSession?
   profile          UserProfile?
+  nutritionPlan    NutritionPlan?
+  bodyMetrics      BodyMetric[]
+  hydrationLogs    HydrationLog[]
+  workouts         Workout[]
   tips             Tip[]
   refreshTokens    RefreshToken[]
+  emailTokens      EmailToken[]
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 }
@@ -161,6 +181,54 @@ model UserProfile {
   updatedAt        DateTime          @updatedAt
 }
 
+model NutritionPlan {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dailyCalories     Int
+  proteinGrams      Int
+  carbsGrams        Int
+  fatGrams          Int
+  proteinPercentage Int
+  carbsPercentage   Int
+  fatPercentage     Int
+  bmr               Float?
+  tdee              Float?
+  source            String   @default("mifflin_st_jeor")
+  generatedAt       DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model BodyMetric {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      BodyMetricType
+  value     Float
+  unit      String
+  notes     String?
+  recordedAt DateTime     @default(now())
+  createdAt DateTime      @default(now())
+
+  @@index([userId, type, recordedAt(sort: Desc)])
+  @@index([userId, recordedAt(sort: Desc)])
+}
+
+model EmailToken {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      EmailTokenType
+  tokenHash String         @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime       @default(now())
+
+  @@index([userId, type])
+  @@index([expiresAt])
+}
+
 model Tip {
   id          String   @id @default(cuid())
   userId      String
@@ -175,4 +243,56 @@ model Tip {
   updatedAt   DateTime @updatedAt
 
   @@index([userId, weekYear])
+}
+
+model HydrationLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  glasses    Int
+  notes      String?
+  recordedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId, recordedAt])
+}
+
+enum WorkoutType {
+  STRENGTH
+  CARDIO
+  FLEXIBILITY
+  HIIT
+  SPORT
+}
+
+model Workout {
+  id         String      @id @default(cuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       WorkoutType
+  name       String
+  durationMinutes Int
+  caloriesBurned   Int?
+  intensity  String?
+  notes      String?
+  performedAt DateTime
+  createdAt  DateTime    @default(now())
+
+  sets       WorkoutSet[]
+
+  @@index([userId, performedAt])
+}
+
+model WorkoutSet {
+  id          String   @id @default(cuid())
+  workoutId   String
+  workout     Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise    String
+  reps        Int?
+  weightKg    Float?
+  durationSec Int?
+  distanceMeters Float?
+  orderIndex  Int      @default(0)
+
+  @@index([workoutId, orderIndex])
 }

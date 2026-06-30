@@ -25,6 +25,12 @@ const envSchema = z.object({
   JWT_REFRESH_EXPIRES_IN: z.string().optional().default("7d"),
   CORS_ORIGIN: z.string().optional().default(""),
   ALLOWED_IMAGE_HOSTS: z.string().optional().default(""),
+  // Email (Resend) — optional in dev (falls back to console transport)
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().optional().default("no-reply@bioma.app"),
+  EMAIL_LOG_ONLY: z.string().optional().default(""),
+  // Frontend origin for deep links in transactional emails
+  FRONTEND_URL: z.string().url().optional().default("https://bioma.app"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
