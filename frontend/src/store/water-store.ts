@@ -75,13 +75,18 @@ export const useWaterStore = create<WaterState>((set, get) => ({
 
     set({ waterGlasses: next });
     try {
-      // Decrement deletes the most recent entry today. If none exist,
-      // we just keep the local state (idempotent).
-      const entries = await biomaApi.listHydration({ limit: 20 });
-      if (entries.length > 0) {
-        await biomaApi.deleteHydration(entries[0]!.id);
-      }
+      // Use a dedicated endpoint that pops the latest entry for the
+      // user's current day, instead of fetching a list first. This is
+      // ~one round-trip instead of two and avoids race conditions with
+      // other clients modifying the list concurrently.
+      await biomaApi.deleteLatestHydrationToday();
     } catch (err) {
+      // 404 means there was nothing to delete on the server side
+      // (e.g. server was restarted and the local counter is stale).
+      // Treat that as a no-op rather than rolling back.
+      if (err instanceof Error && /NOT_FOUND|HYDRATION_NOT_FOUND/.test(err.message)) {
+        return;
+      }
       set({ waterGlasses: current });
       throw err;
     }

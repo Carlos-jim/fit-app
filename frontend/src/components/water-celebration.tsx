@@ -5,7 +5,25 @@ import { useWaterStore } from "../store/water-store";
 
 const WATER_COLOR = "#3B9EE2";
 
-export function WaterCelebration({ isDark }: { isDark: boolean }) {
+interface WaterCelebrationProps {
+  isDark: boolean;
+  /** Fires when the celebration animation finishes so the parent can
+   *  unmount this view and free the Animated.Value. */
+  onComplete?: () => void;
+}
+
+/**
+ * Glass-half-full overlay shown briefly when the user crosses their
+ * daily hydration goal.
+ *
+ * SOLID notes
+ * ───────────
+ * • SRP — owns the celebration animation. Persistence and goal
+ *   accounting live in {@link useWaterStore}.
+ * • OCP — new celebration styles can be added without touching callers
+ *   by passing an extra prop here.
+ */
+export function WaterCelebration({ isDark, onComplete }: WaterCelebrationProps) {
   const waterGlasses = useWaterStore((state) => state.waterGlasses);
   const waterGoal = useWaterStore((state) => state.waterGoal);
 
@@ -34,9 +52,11 @@ export function WaterCelebration({ isDark }: { isDark: boolean }) {
           duration: 500,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start(({ finished }) => {
+        if (finished) onComplete?.();
+      });
     }
-  }, [waterGlasses, waterGoal, celebAnim]);
+  }, [waterGlasses, waterGoal, celebAnim, onComplete]);
 
   return (
     <Animated.View

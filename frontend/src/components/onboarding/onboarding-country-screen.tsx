@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from "react";
 import {
-  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -10,6 +9,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import type { FitnessTheme } from "../fitness-ui";
 import { biomaApi } from "../../services/bioma-api";
+import { handleError } from "../../utils/toast";
 import { NextButton, OnboardingShell } from "../onboarding";
 
 const TOTAL_STEPS = 7;
@@ -77,10 +77,7 @@ export function OnboardingCountryScreen({
       await biomaApi.deleteOnboardingSession();
       onFinish();
     } catch (err) {
-      Alert.alert(
-        "No se pudo guardar",
-        err instanceof Error ? err.message : "Intenta de nuevo.",
-      );
+      handleError(err, "No se pudo guardar");
     } finally {
       setLoading(false);
     }

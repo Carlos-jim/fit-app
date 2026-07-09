@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   Easing,
   Pressable,
@@ -16,6 +15,7 @@ import {
   type GoalType,
   type WorkoutFrequency,
 } from "../../services/bioma-api";
+import { handleError } from "../../utils/toast";
 import { NextButton, OnboardingShell } from "../onboarding";
 
 const TOTAL_STEPS = 7;
@@ -128,10 +128,7 @@ export function OnboardingWorkoutScreen({
       await biomaApi.onboardingStep2(selected);
       onNext();
     } catch (err) {
-      Alert.alert(
-        "No se pudo guardar",
-        err instanceof Error ? err.message : "Intenta de nuevo.",
-      );
+      handleError(err, "No se pudo guardar");
     } finally {
       setLoading(false);
     }

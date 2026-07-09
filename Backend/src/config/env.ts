@@ -29,8 +29,30 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().optional().default("no-reply@bioma.app"),
   EMAIL_LOG_ONLY: z.string().optional().default(""),
-  // Frontend origin for deep links in transactional emails
-  FRONTEND_URL: z.string().url().optional().default("https://bioma.app"),
+  // Shared secret gating the maintenance/cleanup endpoint. When unset
+  // the endpoint refuses every request, so a missing var is the safe
+  // default.
+  CLEANUP_TOKEN: z.string().optional(),
+  // Frontend origin for deep links in transactional emails.
+  // Refuse anything other than http/https to prevent open-redirect
+  // attacks (e.g. javascript:, data:, file:, ftp://) being smuggled
+  // into password-reset / email-verification links.
+  FRONTEND_URL: z
+    .string()
+    .url()
+    .optional()
+    .default("https://bioma.app")
+    .refine(
+      (value) => {
+        try {
+          const proto = new URL(value).protocol.toLowerCase();
+          return proto === "https:" || proto === "http:";
+        } catch {
+          return false;
+        }
+      },
+      { message: "FRONTEND_URL must use http(s) protocol" },
+    ),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

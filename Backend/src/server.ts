@@ -5,6 +5,8 @@ import helmet from "helmet";
 import * as Sentry from "@sentry/node";
 import { z } from "zod";
 
+import { Prisma } from "@prisma/client";
+
 import { env } from "./config/env.js";
 import { analyzeMealRequestSchema } from "./contracts/analyze-meal-request.js";
 import { analyzeMenuRequestSchema } from "./contracts/analyze-menu-request.js";
@@ -15,6 +17,8 @@ import {
   forgotPasswordRequestSchema,
   googleLoginRequestSchema,
   loginRequestSchema,
+  logoutRequestSchema,
+  refreshTokenRequestSchema,
   registerRequestSchema,
   resendVerificationRequestSchema,
   resetPasswordRequestSchema,
@@ -28,6 +32,7 @@ import {
 import {
   createHydrationRequestSchema,
   deleteHydrationParamsSchema,
+  hydrationTodayQuerySchema,
   listHydrationQuerySchema,
 } from "./contracts/hydration-request.js";
 import {
@@ -35,6 +40,10 @@ import {
   listWorkoutsQuerySchema,
   workoutIdParamsSchema,
 } from "./contracts/workout-request.js";
+import {
+  barcodeLookupParamsSchema,
+  registerBarcodeMealSchema,
+} from "./contracts/food-lookup-request.js";
 import {
   onboardingStep1Schema,
   onboardingStep2Schema,
@@ -46,6 +55,7 @@ import {
   updateProfileSchema,
 } from "./contracts/onboarding-request.js";
 import { generateTipsRequestSchema } from "./contracts/generate-tips-request.js";
+import { listLogsQuerySchema } from "./contracts/log-request.js";
 import { suggestMealRequestSchema } from "./contracts/suggest-meal-request.js";
 import { requireAuth } from "./middleware/auth.middleware.js";
 import { AppError } from "./lib/app-error.js";
@@ -65,6 +75,7 @@ import { BodyMetricRepository, NutritionPlanService } from "./services/nutrition
 import { SupabaseStorageService } from "./services/supabase-storage.service.js";
 import { TipsService } from "./services/tips.service.js";
 import { WorkoutService } from "./services/workout.service.js";
+import { OpenFoodFactsService } from "./services/open-food-facts.service.js";
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -93,6 +104,17 @@ if (env.SENTRY_DSN) {
 }
 
 const app = express();
+
+// Trust the first proxy hop (Render, Cloudflare, etc.) so that
+// `req.ip`, `req.secure` and `x-forwarded-proto` reflect the real
+// client. Without this, rate-limiters keyed on `req.ip` see the
+// proxy address for every request and `aiLimiter` (keyed by user)
+// is still safe, but `generalLimiter` and `authLimiter` can be
+// trivially bypassed by spoofing X-Forwarded-For.
+if (isProduction) {
+  app.set("trust proxy", 1);
+}
+
 const userRepository = new UserRepository(prisma);
 const logRepository = new LogRepository(prisma);
 const onboardingRepository = new OnboardingRepository(prisma);
@@ -104,6 +126,7 @@ const accountDeletionService = new AccountDeletionService(prisma);
 const dataExportService = new DataExportService(prisma);
 const hydrationService = new HydrationService(prisma);
 const workoutService = new WorkoutService(prisma);
+const openFoodFactsService = new OpenFoodFactsService();
 const authService = new AuthService(prisma, authEmailService);
 const nutritionAnalysisService = new NutritionAnalysisService();
 const tipsService = new TipsService();
@@ -185,6 +208,7 @@ const aiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => req.user?.id || req.ip || "unknown",
+  validate: { ip: false },
   message: { error: "TOO_MANY_REQUESTS", message: "AI quota exceeded." },
 });
 
@@ -277,14 +301,8 @@ app.post("/auth/google", async (req, res) => {
 
 app.post("/auth/refresh", async (req, res) => {
   try {
-    const refreshToken = req.body?.refreshToken;
-    if (typeof refreshToken !== "string") {
-      throw new AppError("Refresh token is required.", {
-        statusCode: 400,
-        code: "MISSING_REFRESH_TOKEN",
-      });
-    }
-    const tokens = await authService.refreshAccessToken(refreshToken);
+    const request = parseBody(refreshTokenRequestSchema, req.body);
+    const tokens = await authService.refreshAccessToken(request.refreshToken);
     res.status(200).json({ data: tokens });
   } catch (error) {
     handleError(res, error, "refreshing token");
@@ -293,10 +311,8 @@ app.post("/auth/refresh", async (req, res) => {
 
 app.post("/auth/logout", async (req, res) => {
   try {
-    const refreshToken = req.body?.refreshToken;
-    if (typeof refreshToken === "string") {
-      await authService.logout(refreshToken);
-    }
+    const request = parseBody(logoutRequestSchema, req.body);
+    await authService.logout(request.refreshToken);
     res.status(200).json({ data: { success: true } });
   } catch (error) {
     handleError(res, error, "logging out");
@@ -440,24 +456,50 @@ app.get("/onboarding/session", requireAuth, async (req, res) => {
 
 app.delete("/onboarding/session", requireAuth, async (req, res) => {
   try {
-    const session = await onboardingRepository.getSession(getUserId(req));
+    const userId = getUserId(req);
 
-    if (session) {
-      await userProfileRepository.upsertFromOnboarding(getUserId(req), {
-        goal: session.goal,
-        weightKg: session.weightKg,
-        heightCm: session.heightCm,
-        desiredWeightKg: session.desiredWeightKg,
-        gender: session.gender,
-        age: session.age,
-        country: session.country,
-        workoutFrequency: session.workoutFrequency,
-        activityLevel: session.activityLevel,
-        dietaryPrefs: session.dietaryPrefs,
+    // Promote the onboarding session into the durable UserProfile and
+    // delete the session in a single transaction so we never end up
+    // with a session-less user that has no profile (or vice versa).
+    await prisma.$transaction(async (tx) => {
+      const session = await tx.onboardingSession.findUnique({
+        where: { userId },
       });
-    }
 
-    await onboardingRepository.deleteSession(getUserId(req));
+      if (session) {
+        await tx.userProfile.upsert({
+          where: { userId },
+          create: {
+            userId,
+            goal: session.goal,
+            weightKg: session.weightKg,
+            heightCm: session.heightCm,
+            desiredWeightKg: session.desiredWeightKg,
+            gender: session.gender,
+            age: session.age,
+            country: session.country,
+            workoutFrequency: session.workoutFrequency,
+            activityLevel: session.activityLevel,
+            dietaryPrefs: session.dietaryPrefs ?? Prisma.JsonNull,
+          },
+          update: {
+            goal: session.goal,
+            weightKg: session.weightKg,
+            heightCm: session.heightCm,
+            desiredWeightKg: session.desiredWeightKg,
+            gender: session.gender,
+            age: session.age,
+            country: session.country,
+            workoutFrequency: session.workoutFrequency,
+            activityLevel: session.activityLevel,
+            dietaryPrefs: session.dietaryPrefs ?? Prisma.JsonNull,
+          },
+        });
+      }
+
+      await tx.onboardingSession.deleteMany({ where: { userId } });
+    });
+
     res.status(200).json({ data: { ok: true } });
   } catch (error) {
     handleError(res, error, "deleting onboarding session");
@@ -586,6 +628,43 @@ app.delete("/me/account", requireAuth, async (req, res) => {
   }
 });
 
+// ─── Maintenance: cleanup of expired tokens & orphaned uploads ────
+// Protected by a shared secret (`CLEANUP_TOKEN`) so it can be invoked
+// from an external cron (Render Cron Job, GitHub Actions, etc.) without
+// requiring user auth. The endpoint is idempotent and only touches
+// rows older than the provided threshold.
+app.post("/maintenance/cleanup", async (req, res) => {
+  try {
+    const provided = req.header("x-cleanup-token");
+    if (!env.CLEANUP_TOKEN || provided !== env.CLEANUP_TOKEN) {
+      throw new AppError("Forbidden.", {
+        statusCode: 403,
+        code: "CLEANUP_FORBIDDEN",
+      });
+    }
+
+    const now = new Date();
+    const [refreshTokens, emailTokens] = await Promise.all([
+      prisma.refreshToken.deleteMany({
+        where: { expiresAt: { lt: now } },
+      }),
+      prisma.emailToken.deleteMany({
+        where: { expiresAt: { lt: now } },
+      }),
+    ]);
+
+    res.status(200).json({
+      data: {
+        refreshTokensDeleted: refreshTokens.count,
+        emailTokensDeleted: emailTokens.count,
+        ranAt: now.toISOString(),
+      },
+    });
+  } catch (error) {
+    handleError(res, error, "running maintenance cleanup");
+  }
+});
+
 // ─── Body metrics (weight, waist, etc.) ────────────────────────────
 
 app.post("/body-metrics", requireAuth, async (req, res) => {
@@ -655,9 +734,11 @@ app.post("/hydration", requireAuth, async (req, res) => {
 
 app.get("/hydration/today", requireAuth, async (req, res) => {
   try {
+    const query = hydrationTodayQuerySchema.parse(req.query);
     const total = await hydrationService.getDailyTotal(
       getUserId(req),
-      new Date(),
+      query.date ? new Date(query.date) : new Date(),
+      query.tz,
     );
     res.status(200).json({ data: total });
   } catch (error) {
@@ -695,6 +776,104 @@ app.delete("/hydration/:id", requireAuth, async (req, res) => {
     res.status(200).json({ data: { id: deleted.id } });
   } catch (error) {
     handleError(res, error, "deleting hydration entry");
+  }
+});
+
+// Pop the latest hydration entry for the user's current day. Idempotent
+// (404 if there's nothing to delete). Used by the "-1 glass" affordance
+// so the client doesn't have to list-then-delete.
+app.delete("/hydration/today/latest", requireAuth, async (req, res) => {
+  try {
+    const query = hydrationTodayQuerySchema.parse(req.query);
+    const deleted = await hydrationService.deleteLatestEntryForToday(
+      getUserId(req),
+      query.date ? new Date(query.date) : new Date(),
+      query.tz,
+    );
+    if (!deleted) {
+      throw new AppError("No hydration entry to remove.", {
+        statusCode: 404,
+        code: "HYDRATION_NOT_FOUND",
+      });
+    }
+    res.status(200).json({ data: { id: deleted.id, glasses: deleted.glasses } });
+  } catch (error) {
+    handleError(res, error, "deleting latest hydration entry");
+  }
+});
+
+// ─── Food lookup (barcode → OpenFoodFacts) ───────────────────────
+// Public on purpose: scanning a barcode is a read-only lookup and a user
+// who hasn't logged in yet still needs to identify products.
+
+app.get("/foods/barcode/:code", async (req, res) => {
+  try {
+    const params = barcodeLookupParamsSchema.parse(req.params);
+    const product = await openFoodFactsService.lookup(params.code);
+    res.status(200).json({ data: product });
+  } catch (error) {
+    handleError(res, error, "looking up barcode");
+  }
+});
+
+app.post("/foods/barcode/register", requireAuth, aiLimiter, async (req, res) => {
+  try {
+    const request = parseBody(registerBarcodeMealSchema, req.body);
+    const product = await openFoodFactsService.lookup(request.barcode);
+    if (!product) {
+      throw new AppError("Product not found in OpenFoodFacts.", {
+        statusCode: 404,
+        code: "FOOD_NOT_FOUND",
+      });
+    }
+
+    const servingGrams = request.servingGrams ?? 100;
+    const factor = servingGrams / 100;
+    const round1 = (value: number | null) =>
+      value === null ? null : Math.round(value * factor);
+
+    const analysis = {
+      mealName: product.productName,
+      summary: `${product.productName}${product.brand ? ` (${product.brand})` : ""} — ${servingGrams} g`,
+      estimatedServingGrams: servingGrams,
+      confidence: "HIGH" as const,
+      warnings: [],
+      total: {
+        calories: round1(product.nutriments.energyKcalPer100g) ?? 0,
+        proteinGrams: round1(product.nutriments.proteinGPer100g) ?? 0,
+        carbsGrams: round1(product.nutriments.carbsGPer100g) ?? 0,
+        fatGrams: round1(product.nutriments.fatGPer100g) ?? 0,
+        fiberGrams: round1(product.nutriments.fiberGPer100g),
+        sugarGrams: round1(product.nutriments.sugarGPer100g),
+        sodiumMg: round1(product.nutriments.sodiumMgPer100g),
+      },
+      items: [
+        {
+          name: product.productName,
+          estimatedGrams: servingGrams,
+          calories: round1(product.nutriments.energyKcalPer100g) ?? 0,
+          proteinGrams: round1(product.nutriments.proteinGPer100g) ?? 0,
+          carbsGrams: round1(product.nutriments.carbsGPer100g) ?? 0,
+          fatGrams: round1(product.nutriments.fatGPer100g) ?? 0,
+        },
+      ],
+    };
+
+    const log = await logRepository.createMealAnalysisLog({
+      userId: getUserId(req),
+      source: "TEXT",
+      mealLabel: request.mealLabel,
+      notes:
+        request.notes ??
+        `Código de barras: ${product.code} (OpenFoodFacts)`,
+      consumedAt: request.consumedAt,
+      analysis,
+      aiModel: "openfoodfacts/v2",
+    });
+
+    res.status(201).json({ data: serializeMealLog(log) });
+  } catch (error) {
+    handleError(res, error, "registering barcode meal");
   }
 });
 
@@ -913,8 +1092,17 @@ app.post("/logs/analyze-menu-image", requireAuth, aiLimiter, async (req, res) =>
 
 app.get("/logs", requireAuth, async (req, res) => {
   try {
-    const logs = await logRepository.getUserLogs(getUserId(req));
-    res.status(200).json({ data: logs });
+    const query = listLogsQuerySchema.parse(req.query);
+    const logs = await logRepository.getUserLogs(getUserId(req), {
+      from: query.from ? new Date(query.from) : undefined,
+      to: query.to ? new Date(query.to) : undefined,
+      limit: query.limit,
+      cursor: query.cursor,
+    });
+    res.status(200).json({
+      data: logs,
+      pagination: { nextCursor: logs.at(-1)?.id ?? null },
+    });
   } catch (error) {
     handleError(res, error, "fetching meal logs");
   }
@@ -923,9 +1111,10 @@ app.get("/logs", requireAuth, async (req, res) => {
 app.post("/logs/suggest-meal", requireAuth, aiLimiter, async (req, res) => {
   try {
     const request = parseBody(suggestMealRequestSchema, req.body);
+    const userId = getUserId(req);
 
     if (request.logId) {
-      const cached = await logRepository.getLogSuggestion(request.logId);
+      const cached = await logRepository.getLogSuggestion(userId, request.logId);
       if (cached) {
         res.status(200).json({ data: cached });
         return;
@@ -936,7 +1125,7 @@ app.post("/logs/suggest-meal", requireAuth, aiLimiter, async (req, res) => {
       await nutritionAnalysisService.suggestMealAlternative(request);
 
     if (request.logId) {
-      await logRepository.saveMealSuggestion(getUserId(req), request.logId, suggestion);
+      await logRepository.saveMealSuggestion(userId, request.logId, suggestion);
     }
 
     res.status(200).json({
@@ -950,7 +1139,8 @@ app.post("/logs/suggest-meal", requireAuth, aiLimiter, async (req, res) => {
 app.post("/tips/generate", requireAuth, aiLimiter, async (req, res) => {
   try {
     const request = parseBody(generateTipsRequestSchema, req.body);
-    const profile = await userProfileRepository.getByUserId(getUserId(req));
+    const userId = getUserId(req);
+    const profile = await userProfileRepository.getByUserId(userId);
 
     if (!profile) {
       throw new AppError("User profile not found. Complete onboarding first.", {
@@ -964,7 +1154,7 @@ app.post("/tips/generate", requireAuth, aiLimiter, async (req, res) => {
 
     const recentMeals = await prisma.log.findMany({
       where: {
-        userId: getUserId(req),
+        userId,
         type: "MEAL_ANALYSIS",
         createdAt: { gte: oneWeekAgo },
       },
@@ -984,12 +1174,12 @@ app.post("/tips/generate", requireAuth, aiLimiter, async (req, res) => {
 
     if (!request.force) {
       const existing = await prisma.tip.findFirst({
-        where: { userId: getUserId(req), weekYear: weekKey },
+        where: { userId, weekYear: weekKey },
       });
 
       if (existing) {
         const tips = await prisma.tip.findMany({
-          where: { userId: getUserId(req), weekYear: weekKey },
+          where: { userId, weekYear: weekKey },
           orderBy: { createdAt: "asc" },
         });
         res.status(200).json({ data: tips });
@@ -1019,24 +1209,25 @@ app.post("/tips/generate", requireAuth, aiLimiter, async (req, res) => {
       })),
     });
 
-    await prisma.tip.deleteMany({
-      where: { userId: getUserId(req), weekYear: weekKey },
-    });
-
-    await prisma.tip.createMany({
-      data: generated.tips.map((tip) => ({
-        userId: getUserId(req),
-        title: tip.title,
-        body: tip.body,
-        category: tip.category,
-        icon: tip.icon ?? null,
-        weekYear: weekKey,
-      })),
-    });
-
-    const tips = await prisma.tip.findMany({
-      where: { userId: getUserId(req), weekYear: weekKey },
-      orderBy: { createdAt: "asc" },
+    // Atomic rotate: delete the prior week's tips and insert the new
+    // set in a single transaction so two concurrent generations can
+    // never leave a duplicate or partial set behind.
+    const tips = await prisma.$transaction(async (tx) => {
+      await tx.tip.deleteMany({ where: { userId, weekYear: weekKey } });
+      await tx.tip.createMany({
+        data: generated.tips.map((tip) => ({
+          userId,
+          title: tip.title,
+          body: tip.body,
+          category: tip.category,
+          icon: tip.icon ?? null,
+          weekYear: weekKey,
+        })),
+      });
+      return tx.tip.findMany({
+        where: { userId, weekYear: weekKey },
+        orderBy: { createdAt: "asc" },
+      });
     });
 
     res.status(200).json({ data: tips });
@@ -1095,6 +1286,8 @@ app.listen(env.PORT, () => {
   console.log("  GET  /workouts");
   console.log("  GET  /workouts/:id");
   console.log("  DELETE /workouts/:id");
+  console.log("  GET  /foods/barcode/:code");
+  console.log("  POST /foods/barcode/register");
 });
 
 function parseBody<TSchema extends z.ZodTypeAny>(

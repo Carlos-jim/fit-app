@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { Alert, Animated, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { FitnessTheme } from "../fitness-ui";
 import type { GoalType } from "../../services/bioma-api";
 import { biomaApi } from "../../services/bioma-api";
+import { handleError } from "../../utils/toast";
 import { NextButton, OnboardingShell } from "../onboarding";
 
 const TOTAL_STEPS = 7;
@@ -163,10 +164,7 @@ export function OnboardingTargetWeightScreen({
       await biomaApi.onboardingStep4(Number(desiredWeightKg.toFixed(1)));
       onNext();
     } catch (err) {
-      Alert.alert(
-        "No se pudo guardar",
-        err instanceof Error ? err.message : "Intenta de nuevo.",
-      );
+      handleError(err, "No se pudo guardar");
     } finally {
       setLoading(false);
     }

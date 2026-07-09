@@ -9,6 +9,21 @@ import {
 import type { NutritionAnalysis } from "../contracts/nutrition-analysis.js";
 import { AppError } from "../lib/app-error.js";
 
+/**
+ * Map a Prisma "record not found" error (P2025 / foreign-key violation)
+ * into our standard AppError. Centralised here so the service layer can
+ * rely on a single shape regardless of where the lookup happens.
+ */
+function notFoundOrRethrow(error: unknown, message: string, code: string): never {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    (error.code === "P2025" || error.code === "P2003")
+  ) {
+    throw new AppError(message, { statusCode: 404, code, cause: error });
+  }
+  throw error;
+}
+
 export interface MealLogSummary {
   id: string;
   userId: string;
@@ -46,22 +61,9 @@ export class LogRepository {
   constructor(private readonly db: PrismaClient) {}
 
   async createMealAnalysisLog(params: CreateMealLogParams): Promise<Log> {
-    const user = await this.db.user.findUnique({
-      where: {
-        id: params.userId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!user) {
-      throw new AppError("User not found.", {
-        statusCode: 404,
-        code: "USER_NOT_FOUND",
-      });
-    }
-
+    // The JWT (validated by `requireAuth` upstream) guarantees the user
+    // exists, so we skip the redundant `findUnique` and let the FK
+    // constraint catch any stale state.
     const logData: Prisma.LogUncheckedCreateInput = {
       userId: params.userId,
       type: "MEAL_ANALYSIS",
@@ -89,16 +91,29 @@ export class LogRepository {
       rawAnalysis: params.analysis,
     };
 
-    return this.db.log.create({
-      data: logData,
-    });
+    try {
+      return await this.db.log.create({ data: logData });
+    } catch (error) {
+      notFoundOrRethrow(error, "User not found.", "USER_NOT_FOUND");
+    }
   }
 
-  async getUserLogs(userId: string): Promise<MealLogSummary[]> {
+  async getUserLogs(
+    userId: string,
+    opts?: { from?: Date; to?: Date; limit?: number; cursor?: string },
+  ): Promise<MealLogSummary[]> {
     const logs = await this.db.log.findMany({
-      where: { userId, type: "MEAL_ANALYSIS" },
+      where: {
+        userId,
+        type: "MEAL_ANALYSIS",
+        createdAt: {
+          gte: opts?.from,
+          lte: opts?.to,
+        },
+      },
       orderBy: { createdAt: "desc" },
-      take: 200,
+      take: Math.min(Math.max(opts?.limit ?? 50, 1), 200),
+      ...(opts?.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
       select: {
         id: true,
         userId: true,
@@ -141,9 +156,15 @@ export class LogRepository {
     }));
   }
 
-  async getLogSuggestion(logId: string): Promise<unknown | null> {
-    const log = await this.db.log.findUnique({
-      where: { id: logId },
+  async getLogSuggestion(
+    userId: string,
+    logId: string,
+  ): Promise<unknown | null> {
+    // Scope to userId to prevent cross-user `aiSuggestion` reads. The
+    // JWT identifies the caller; an attacker who guesses a foreign
+    // logId would otherwise get the suggestion back.
+    const log = await this.db.log.findFirst({
+      where: { id: logId, userId },
       select: { aiSuggestion: true },
     });
     return log?.aiSuggestion ?? null;

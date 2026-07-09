@@ -74,6 +74,26 @@ export interface Workout {
   sets: WorkoutSet[];
 }
 
+export interface FoodProductNutriments {
+  energyKcalPer100g: number | null;
+  proteinGPer100g: number | null;
+  carbsGPer100g: number | null;
+  fatGPer100g: number | null;
+  fiberGPer100g: number | null;
+  sugarGPer100g: number | null;
+  sodiumMgPer100g: number | null;
+}
+
+export interface FoodProduct {
+  code: string;
+  productName: string;
+  brand: string | null;
+  imageUrl: string | null;
+  categories: string | null;
+  servingSize: string | null;
+  nutriments: FoodProductNutriments;
+}
+
 export interface NutritionPlan {
   id: string;
   userId: string;

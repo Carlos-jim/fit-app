@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { Alert, View } from "react-native";
+import { View } from "react-native";
 import type { FitnessTheme } from "../fitness-ui";
 import { biomaApi, type GoalType } from "../../services/bioma-api";
+import { handleError } from "../../utils/toast";
 import {
   NextButton,
   OnboardingOptionCard,
@@ -74,10 +75,7 @@ export function OnboardingGoalScreen({
       await biomaApi.onboardingStep1(selected);
       onNext(selected);
     } catch (err) {
-      Alert.alert(
-        "No se pudo guardar",
-        err instanceof Error ? err.message : "Intenta de nuevo.",
-      );
+      handleError(err, "No se pudo guardar");
     } finally {
       setLoading(false);
     }

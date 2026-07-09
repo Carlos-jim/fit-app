@@ -4,6 +4,7 @@ import type {
   BodyMetricType,
   BootstrapUserResponse,
   DailyHydration,
+  FoodProduct,
   HydrationEntry,
   MealAnalysisSummary,
   MealLog,
@@ -19,6 +20,7 @@ import type {
   WorkoutType,
 } from "../types/api";
 import { tokenManager, type AuthTokens } from "./auth-token-manager";
+import type { IngredientSummary } from "../types/api";
 
 export interface AnalyzeMealPayload {
   path?: string;
@@ -84,6 +86,7 @@ interface ApiEnvelope<T> {
   data: T;
   error?: string;
   message?: string;
+  pagination?: { nextCursor: string | null };
 }
 
 class BiomaApi {
@@ -291,12 +294,26 @@ class BiomaApi {
     return response.data;
   }
 
-  async getLogs(): Promise<MealLog[]> {
-    const response = await this.request<MealLog[]>("/logs", {
-      method: "GET",
-    });
-
-    return response.data;
+  async getLogs(params?: {
+    from?: string;
+    to?: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<{ logs: MealLog[]; nextCursor: string | null }> {
+    const search = new URLSearchParams();
+    if (params?.from) search.set("from", params.from);
+    if (params?.to) search.set("to", params.to);
+    if (params?.limit) search.set("limit", String(params.limit));
+    if (params?.cursor) search.set("cursor", params.cursor);
+    const query = search.toString();
+    const response = await this.request<MealLog[]>(
+      `/logs${query ? `?${query}` : ""}`,
+      { method: "GET" },
+    );
+    return {
+      logs: response.data,
+      nextCursor: response.pagination?.nextCursor ?? null,
+    };
   }
 
   async suggestMeal(input: {
@@ -309,14 +326,7 @@ class BiomaApi {
     fiberGrams?: number | null;
     sugarGrams?: number | null;
     sodiumMg?: number | null;
-    ingredients: Array<{
-      name: string;
-      estimatedGrams: number;
-      calories: number;
-      proteinGrams: number;
-      carbsGrams: number;
-      fatGrams: number;
-    }>;
+    ingredients: IngredientSummary[];
   }): Promise<MealSuggestionResponse> {
     const response = await this.request<MealSuggestionResponse>(
       "/logs/suggest-meal",
@@ -496,9 +506,16 @@ class BiomaApi {
     return response.data;
   }
 
-  async getTodayHydration(): Promise<DailyHydration> {
+  async getTodayHydration(params?: {
+    date?: string;
+    tz?: string;
+  }): Promise<DailyHydration> {
+    const search = new URLSearchParams();
+    if (params?.date) search.set("date", params.date);
+    if (params?.tz) search.set("tz", params.tz);
+    const query = search.toString();
     const response = await this.request<DailyHydration>(
-      "/hydration/today",
+      `/hydration/today${query ? `?${query}` : ""}`,
       { method: "GET" },
     );
     return response.data;
@@ -525,6 +542,20 @@ class BiomaApi {
     await this.request<{ id: string }>(`/hydration/${id}`, {
       method: "DELETE",
     });
+  }
+
+  async deleteLatestHydrationToday(params?: {
+    date?: string;
+    tz?: string;
+  }): Promise<void> {
+    const search = new URLSearchParams();
+    if (params?.date) search.set("date", params.date);
+    if (params?.tz) search.set("tz", params.tz);
+    const query = search.toString();
+    await this.request<{ id: string; glasses: number }>(
+      `/hydration/today/latest${query ? `?${query}` : ""}`,
+      { method: "DELETE" },
+    );
   }
 
   // ─── Workouts ────────────────────────────────────────────────────
@@ -573,6 +604,30 @@ class BiomaApi {
     await this.request<{ id: string }>(`/workouts/${id}`, {
       method: "DELETE",
     });
+  }
+
+  // ─── Food lookup (OpenFoodFacts) ────────────────────────────────
+
+  async lookupBarcode(code: string): Promise<FoodProduct | null> {
+    const response = await this.request<FoodProduct | null>(
+      `/foods/barcode/${encodeURIComponent(code)}`,
+      { method: "GET" },
+    );
+    return response.data;
+  }
+
+  async registerBarcodeMeal(input: {
+    barcode: string;
+    servingGrams?: number;
+    mealLabel?: string;
+    consumedAt?: string;
+    notes?: string;
+  }): Promise<MealAnalysisSummary> {
+    const response = await this.request<MealAnalysisSummary>(
+      "/foods/barcode/register",
+      { method: "POST", body: JSON.stringify(input) },
+    );
+    return response.data;
   }
 
   async updateMyProfile(patch: {

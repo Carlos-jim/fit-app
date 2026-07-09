@@ -12,13 +12,15 @@ import { Ionicons } from "@expo/vector-icons";
 import type { FitnessTheme } from "./fitness-ui";
 import type { MealLog } from "../types/api";
 import { CalendarModal } from "./calendar-modal";
+import { getFirstName } from "../utils/format";
 
 const WATER_COLOR = "#3B9EE2";
-const STEPS_COLOR = "#FF8C42";
 const CARBS_COLOR = "#FFB5C2";
 const FAT_COLOR = "#FFE5A0";
 const PROTEIN_COLOR = "#B5D8FF";
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
+
+const PLACEHOLDER = "S/N";
 
 export interface HomeScreenProps {
   theme: FitnessTheme;
@@ -26,9 +28,7 @@ export interface HomeScreenProps {
   fullName: string;
   todayCalories: number;
   todayMealsCount: number;
-  calorieGoal: number;
-  stepsGoal: number;
-  currentSteps: number;
+  calorieGoal: number | null;
   todayMacros: {
     protein: number;
     carbs: number;
@@ -38,7 +38,7 @@ export interface HomeScreenProps {
     protein: number;
     carbs: number;
     fat: number;
-  };
+  } | null;
   lastMeal: MealLog | null;
   topBestMeals: MealLog[];
   topWorstMeals: MealLog[];
@@ -135,8 +135,6 @@ export function HomeScreen(props: HomeScreenProps) {
     todayCalories,
     todayMealsCount,
     calorieGoal,
-    stepsGoal,
-    currentSteps,
     todayMacros,
     macroGoals,
     lastMeal,
@@ -170,24 +168,35 @@ export function HomeScreen(props: HomeScreenProps) {
   const weekDays = useMemo(() => getWeekDays(), []);
   const monthYear = useMemo(() => getMonthYear(), []);
 
-  const calorieProgress = calorieGoal > 0 ? todayCalories / calorieGoal : 0;
-  const stepsProgress = stepsGoal > 0 ? currentSteps / stepsGoal : 0;
+  const calorieProgress =
+    calorieGoal !== null && calorieGoal > 0 ? todayCalories / calorieGoal : 0;
   const waterProgress = waterGoal > 0 ? waterGlasses / waterGoal : 0;
 
-  // Per-meal calorie estimates use 25 % breakfast / 35 % lunch / 30 % dinner
-  // splits of the user's daily target. Replace the previous hardcoded
-  // "456 - 512 kcal" copy that had no relation to the real user.
-  const breakfastKcal = Math.round(calorieGoal * 0.25);
-  const lunchKcal = Math.round(calorieGoal * 0.35);
+  // Per-meal calorie estimates use 25 % breakfast / 35 % lunch of the
+  // user's daily target. When no plan has loaded yet we render "S/N"
+  // instead of fabricating a number from a hardcoded fallback.
+  const breakfastKcal =
+    calorieGoal !== null ? Math.round(calorieGoal * 0.25) : null;
+  const lunchKcal =
+    calorieGoal !== null ? Math.round(calorieGoal * 0.35) : null;
   const formatRange = (kcal: number) => {
     const low = Math.max(0, Math.round(kcal * 0.85));
     const high = Math.round(kcal * 1.15);
     return `${low} - ${high} kcal`;
   };
 
-  const carbsProgress = macroGoals.carbs > 0 ? todayMacros.carbs / macroGoals.carbs : 0;
-  const fatProgress = macroGoals.fat > 0 ? todayMacros.fat / macroGoals.fat : 0;
-  const proteinProgress = macroGoals.protein > 0 ? todayMacros.protein / macroGoals.protein : 0;
+  const carbsProgress =
+    macroGoals !== null && macroGoals.carbs > 0
+      ? todayMacros.carbs / macroGoals.carbs
+      : 0;
+  const fatProgress =
+    macroGoals !== null && macroGoals.fat > 0
+      ? todayMacros.fat / macroGoals.fat
+      : 0;
+  const proteinProgress =
+    macroGoals !== null && macroGoals.protein > 0
+      ? todayMacros.protein / macroGoals.protein
+      : 0;
 
   const totalMacroCalories =
     todayMacros.carbs * 4 + todayMacros.protein * 4 + todayMacros.fat * 9;
@@ -225,7 +234,7 @@ export function HomeScreen(props: HomeScreenProps) {
   const nutritionCardBg = isDark ? "#111B17" : "#FFFFFF";
   const nutritionCardStroke = isDark ? "#1D2A25" : "#E8DED0";
 
-  const firstName = fullName.trim().split(" ")[0] || "Bioma";
+  const firstName = getFirstName(fullName);
 
   const today = new Date();
   const currentDayOfWeek = today.getDay() === 0 ? 6 : today.getDay();
@@ -311,7 +320,9 @@ export function HomeScreen(props: HomeScreenProps) {
         <View style={styles.intakeContentRow}>
           <View style={styles.intakeTextSection}>
             <Text style={[styles.intakePercentage, { color: isDark ? "#FFFFFF" : "#0A2E1F" }]}>
-              {Math.round(calorieProgress * 100)}%
+              {calorieGoal !== null
+                ? `${Math.round(calorieProgress * 100)}%`
+                : PLACEHOLDER}
             </Text>
           </View>
 
@@ -331,7 +342,7 @@ export function HomeScreen(props: HomeScreenProps) {
                   {todayCalories}
                 </Text>
                 <Text style={[styles.intakeRingUnit, { color: isDark ? "rgba(255,255,255,0.7)" : "rgba(10,46,31,0.6)" }]}>
-                  {calorieGoal}
+                  / {calorieGoal ?? PLACEHOLDER}
                 </Text>
               </View>
             </View>
@@ -339,100 +350,52 @@ export function HomeScreen(props: HomeScreenProps) {
         </View>
       </Animated.View>
 
-      {/* ─────────────────── Steps & Water Cards ──────────────── */}
-      <View style={styles.smallCardsRow}>
-        <Animated.View
-          style={[
-            styles.smallCard,
-            {
-              backgroundColor: smallCardBg,
-              borderColor: smallCardStroke,
-              opacity: mainScrollY.interpolate({
-                inputRange: [0, 100, 200],
-                outputRange: [0.7, 0.9, 1],
-                extrapolate: "clamp",
-              }),
-              transform: [
-                {
-                  translateY: mainScrollY.interpolate({
-                    inputRange: [0, 120],
-                    outputRange: [20, 0],
-                    extrapolate: "clamp",
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View style={[styles.smallCardIconWrap, { backgroundColor: `${STEPS_COLOR}18` }]}>
-            <Ionicons name="flame" size={22} color={STEPS_COLOR} />
-          </View>
-          <Text style={[styles.smallCardLabel, { color: mutedText }]}>
-            Pasos para caminar
-          </Text>
-          <Text style={[styles.smallCardValue, { color: strongText }]}>
-            {Math.max(0, stepsGoal - currentSteps).toLocaleString()}{" "}
-            <Text style={[styles.smallCardUnit, { color: mutedText }]}>pasos</Text>
-          </Text>
-          <View style={[styles.smallProgressTrack, { backgroundColor: ringTrackColor }]}>
-            <View
-              style={[
-                styles.smallProgressFill,
-                {
-                  width: `${Math.min(stepsProgress, 1) * 100}%`,
-                  backgroundColor: STEPS_COLOR,
-                },
-              ]}
-            />
-          </View>
-        </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.smallCard,
-            {
-              backgroundColor: smallCardBg,
-              borderColor: smallCardStroke,
-              opacity: mainScrollY.interpolate({
-                inputRange: [0, 100, 200],
-                outputRange: [0.7, 0.9, 1],
-                extrapolate: "clamp",
-              }),
-              transform: [
-                {
-                  translateY: mainScrollY.interpolate({
-                    inputRange: [0, 120],
-                    outputRange: [20, 0],
-                    extrapolate: "clamp",
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View style={[styles.smallCardIconWrap, { backgroundColor: `${WATER_COLOR}18` }]}>
-            <Ionicons name="water" size={22} color={WATER_COLOR} />
-          </View>
-          <Text style={[styles.smallCardLabel, { color: mutedText }]}>
-            Beber Agua
-          </Text>
-          <Text style={[styles.smallCardValue, { color: strongText }]}>
-            {waterGlasses}{" "}
-            <Text style={[styles.smallCardUnit, { color: mutedText }]}>vasos</Text>
-          </Text>
-          <View style={[styles.smallProgressTrack, { backgroundColor: ringTrackColor }]}>
-            <View
-              style={[
-                styles.smallProgressFill,
-                {
-                  width: `${Math.min(waterProgress, 1) * 100}%`,
-                  backgroundColor: WATER_COLOR,
-                },
-              ]}
-            />
-          </View>
-        </Animated.View>
-      </View>
+      {/* ─────────────────── Water Card ─────────────────── */}
+      <Animated.View
+        style={[
+          styles.smallCard,
+          {
+            backgroundColor: smallCardBg,
+            borderColor: smallCardStroke,
+            opacity: mainScrollY.interpolate({
+              inputRange: [0, 100, 200],
+              outputRange: [0.7, 0.9, 1],
+              extrapolate: "clamp",
+            }),
+            transform: [
+              {
+                translateY: mainScrollY.interpolate({
+                  inputRange: [0, 120],
+                  outputRange: [20, 0],
+                  extrapolate: "clamp",
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <View style={[styles.smallCardIconWrap, { backgroundColor: `${WATER_COLOR}18` }]}>
+          <Ionicons name="water" size={22} color={WATER_COLOR} />
+        </View>
+        <Text style={[styles.smallCardLabel, { color: mutedText }]}>
+          Beber Agua
+        </Text>
+        <Text style={[styles.smallCardValue, { color: strongText }]}>
+          {waterGlasses}{" "}
+          <Text style={[styles.smallCardUnit, { color: mutedText }]}>vasos</Text>
+        </Text>
+        <View style={[styles.smallProgressTrack, { backgroundColor: ringTrackColor }]}>
+          <View
+            style={[
+              styles.smallProgressFill,
+              {
+                width: `${Math.min(waterProgress, 1) * 100}%`,
+                backgroundColor: WATER_COLOR,
+              },
+            ]}
+          />
+        </View>
+      </Animated.View>
 
       {/* ─────────────────── Nutrition Info Card ──────────────── */}
       <Animated.View
@@ -492,7 +455,7 @@ export function HomeScreen(props: HomeScreenProps) {
               </View>
             </View>
             <Text style={[styles.macroValue, { color: strongText }]}>
-              {todayMacros.carbs} / {macroGoals.carbs} g
+              {todayMacros.carbs} / {macroGoals !== null ? `${macroGoals.carbs} g` : PLACEHOLDER}
             </Text>
           </View>
 
@@ -519,7 +482,7 @@ export function HomeScreen(props: HomeScreenProps) {
               </View>
             </View>
             <Text style={[styles.macroValue, { color: strongText }]}>
-              {todayMacros.fat} / {macroGoals.fat} g
+              {todayMacros.fat} / {macroGoals !== null ? `${macroGoals.fat} g` : PLACEHOLDER}
             </Text>
           </View>
 
@@ -546,7 +509,7 @@ export function HomeScreen(props: HomeScreenProps) {
               </View>
             </View>
             <Text style={[styles.macroValue, { color: strongText }]}>
-              {todayMacros.protein} / {macroGoals.protein} g
+              {todayMacros.protein} / {macroGoals !== null ? `${macroGoals.protein} g` : PLACEHOLDER}
             </Text>
           </View>
         </View>
@@ -644,13 +607,13 @@ export function HomeScreen(props: HomeScreenProps) {
         >
           <View style={styles.mealHeaderRow}>
             <View style={styles.mealTitleRow}>
-              <Ionicons name="flame" size={18} color={STEPS_COLOR} />
+              <Ionicons name="flame" size={18} color={theme.accent} />
               <Text style={[styles.mealTitle, { color: strongText }]}>
                 Desayuno
               </Text>
             </View>
             <Text style={[styles.mealCalories, { color: mutedText }]}>
-              {formatRange(breakfastKcal)}
+              {breakfastKcal !== null ? formatRange(breakfastKcal) : PLACEHOLDER}
             </Text>
           </View>
           <View style={styles.mealImagesRow}>
@@ -696,13 +659,13 @@ export function HomeScreen(props: HomeScreenProps) {
         >
           <View style={styles.mealHeaderRow}>
             <View style={styles.mealTitleRow}>
-              <Ionicons name="flame" size={18} color={STEPS_COLOR} />
+              <Ionicons name="flame" size={18} color={theme.accent} />
               <Text style={[styles.mealTitle, { color: strongText }]}>
                 Hora del almuerzo
               </Text>
             </View>
             <Text style={[styles.mealCalories, { color: mutedText }]}>
-              {formatRange(lunchKcal)}
+              {lunchKcal !== null ? formatRange(lunchKcal) : PLACEHOLDER}
             </Text>
           </View>
           <View style={styles.mealImagesRow}>
@@ -990,11 +953,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
 
-  // ── Small Cards Row ─────────────────────────────────────────
-  smallCardsRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
+  // ── Small Card ─────────────────────────────────────────
   smallCard: {
     flex: 1,
     borderRadius: 22,

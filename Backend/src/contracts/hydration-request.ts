@@ -13,7 +13,15 @@ export const createHydrationRequestSchema = z.object({
 export const listHydrationQuerySchema = z.object({
   from: z.string().datetime().optional(),
   to: z.string().datetime().optional(),
-  limit: z.coerce.number().int().positive().max(500).optional().default(100),
+  limit: z.coerce.number().int().positive().max(500).optional(),
+});
+
+export const hydrationTodayQuerySchema = z.object({
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/u, "date must be YYYY-MM-DD")
+    .optional(),
+  tz: z.string().min(1).max(64).optional(),
 });
 
 export const deleteHydrationParamsSchema = z.object({

@@ -66,6 +66,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Tests
+        run: npm test -- --ci
+
       - name: E2E smoke (auto-skip if backend unreachable)
         run: |
           (npm run test:e2e || echo "::warning::Playwright tests failed or backend unreachable")

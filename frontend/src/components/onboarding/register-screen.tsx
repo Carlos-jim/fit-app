@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -18,6 +17,7 @@ import * as AuthSession from "expo-auth-session";
 import type { FitnessTheme } from "../fitness-ui";
 import { biomaApi } from "../../services/bioma-api";
 import { env } from "../../config/env";
+import { handleError, showError } from "../../utils/toast";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -82,10 +82,7 @@ export function RegisterScreen({
       onRegisterSuccess(user);
     } catch (err) {
       if (__DEV__) console.error("[Register] Google Error:", err);
-      Alert.alert(
-        "Error de Google",
-        err instanceof Error ? err.message : "No se pudo registrar con Google.",
-      );
+      handleError(err, "Error de Google");
     } finally {
       setLoading(false);
     }
@@ -93,9 +90,9 @@ export function RegisterScreen({
 
   const handleGoogleLogin = async () => {
     if (!env.googleWebClientId) {
-      Alert.alert(
+      showError(
         "OAuth no configurado",
-        "Configura las variables de entorno EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID en el frontend para habilitar Google Sign-In.",
+        "Configura EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID en el frontend para habilitar Google Sign-In.",
       );
       return;
     }
@@ -115,11 +112,11 @@ export function RegisterScreen({
 
   const handleRegister = async () => {
     if (!canSubmit) {
-      Alert.alert("Completa los campos", "Revisa nombre, correo y contrasena.");
+      showError("Completa los campos", "Revisa nombre, correo y contrasena.");
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert("Contrasenas distintas", "Asegurate de que coincidan.");
+      showError("Contrasenas distintas", "Asegurate de que coincidan.");
       return;
     }
 
@@ -137,10 +134,7 @@ export function RegisterScreen({
       onRegisterSuccess(result.user);
     } catch (err) {
       if (__DEV__) console.error("[Register] Email Error:", err);
-      Alert.alert(
-        "No se pudo crear la cuenta",
-        err instanceof Error ? err.message : "Intenta de nuevo.",
-      );
+      handleError(err, "No se pudo crear la cuenta");
     } finally {
       setLoading(false);
     }

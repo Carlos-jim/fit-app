@@ -42,6 +42,14 @@ export const resendVerificationRequestSchema = z.object({
   email: z.string().email("Invalid email"),
 });
 
+export const refreshTokenRequestSchema = z.object({
+  refreshToken: z.string().min(10, "Invalid refresh token"),
+});
+
+export const logoutRequestSchema = z.object({
+  refreshToken: z.string().min(10, "Invalid refresh token"),
+});
+
 export type RegisterRequest = z.infer<typeof registerRequestSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type GoogleLoginRequest = z.infer<typeof googleLoginRequestSchema>;
@@ -49,3 +57,5 @@ export type ForgotPasswordRequest = z.infer<typeof forgotPasswordRequestSchema>;
 export type ResetPasswordRequest = z.infer<typeof resetPasswordRequestSchema>;
 export type VerifyEmailRequest = z.infer<typeof verifyEmailRequestSchema>;
 export type ResendVerificationRequest = z.infer<typeof resendVerificationRequestSchema>;
+export type RefreshTokenRequest = z.infer<typeof refreshTokenRequestSchema>;
+export type LogoutRequest = z.infer<typeof logoutRequestSchema>;

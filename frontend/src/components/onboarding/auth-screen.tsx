@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,6 +16,7 @@ import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
 import type { FitnessTheme } from "../fitness-ui";
 import { biomaApi } from "../../services/bioma-api";
+import { handleError, showError } from "../../utils/toast";
 import { env } from "../../config/env";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -77,10 +77,7 @@ if (__DEV__) console.log("[Auth] Google Client ID:", env.googleWebClientId ? "Co
       onLoginSuccess(user);
     } catch (err) {
       if (__DEV__) console.error("[Auth] Google Login Error:", err);
-      Alert.alert(
-        "Error de Google",
-        err instanceof Error ? err.message : "No se pudo iniciar sesion con Google.",
-      );
+      handleError(err, "Error de Google");
     } finally {
       setLoading(false);
     }
@@ -93,7 +90,7 @@ if (__DEV__) console.log("[Auth] Google Client ID:", env.googleWebClientId ? "Co
 
   const handleEmailLogin = async () => {
     if (!canSubmit) {
-      Alert.alert("Completa los campos", "Ingresa correo y contrasena.");
+      showError("Completa los campos", "Ingresa correo y contrasena.");
       return;
     }
 
@@ -108,10 +105,7 @@ if (__DEV__) console.log("[Auth] Starting Email Login");
       onLoginSuccess(result.user);
     } catch (err) {
       if (__DEV__) console.error("[Auth] Email Login Error:", err);
-      Alert.alert(
-        "No se pudo iniciar sesion",
-        err instanceof Error ? err.message : "Intenta de nuevo.",
-      );
+      handleError(err, "No se pudo iniciar sesion");
     } finally {
       setLoading(false);
     }
@@ -119,9 +113,9 @@ if (__DEV__) console.log("[Auth] Starting Email Login");
 
   const handleGoogleLogin = async () => {
     if (!env.googleWebClientId) {
-      Alert.alert(
+      showError(
         "OAuth no configurado",
-        "Configura las variables de entorno EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID en el frontend para habilitar Google Sign-In.",
+        "Configura EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID en el frontend para habilitar Google Sign-In.",
       );
       return;
     }

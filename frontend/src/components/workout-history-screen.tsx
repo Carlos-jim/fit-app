@@ -18,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { FitnessTheme } from "./fitness-ui";
 import { biomaApi } from "../services/bioma-api";
 import type { Workout, WorkoutType } from "../types/api";
+import { handleError } from "../utils/toast";
 
 type VisualMode = "dark" | "light";
 
@@ -97,17 +98,14 @@ export function WorkoutHistoryScreen({
       {
         text: "Eliminar",
         style: "destructive",
-        onPress: async () => {
-          try {
-            await biomaApi.deleteWorkout(id);
-            await load();
-          } catch (err) {
-            Alert.alert(
-              "No se pudo eliminar",
-              err instanceof Error ? err.message : "Intenta de nuevo.",
-            );
-          }
-        },
+          onPress: async () => {
+            try {
+              await biomaApi.deleteWorkout(id);
+              await load();
+            } catch (err) {
+              handleError(err, "No se pudo eliminar");
+            }
+          },
       },
     ]);
   };

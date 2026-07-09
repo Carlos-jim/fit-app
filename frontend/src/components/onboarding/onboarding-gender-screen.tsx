@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { Alert, View } from "react-native";
+import { View } from "react-native";
 import type { FitnessTheme } from "../fitness-ui";
 import type { Gender } from "../../services/bioma-api";
 import { biomaApi } from "../../services/bioma-api";
+import { handleError } from "../../utils/toast";
 import { NextButton, OnboardingOptionCard, OnboardingShell } from "../onboarding";
 
 const TOTAL_STEPS = 7;
@@ -71,10 +72,7 @@ export function OnboardingGenderScreen({
       await biomaApi.onboardingStep5(selected);
       onNext();
     } catch (err) {
-      Alert.alert(
-        "No se pudo guardar",
-        err instanceof Error ? err.message : "Intenta de nuevo.",
-      );
+      handleError(err, "No se pudo guardar");
     } finally {
       setLoading(false);
     }

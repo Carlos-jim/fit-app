@@ -68,9 +68,34 @@ export class HydrationService {
     return this.prisma.hydrationLog.delete({ where: { id: existing.id } });
   }
 
-  async getDailyTotal(userId: string, day: Date): Promise<DailyHydration> {
-    const start = startOfDay(day);
-    const end = endOfDay(day);
+  /**
+   * Delete the most recent hydration entry for the user. Used by the
+   * app's "−" button so we don't have to fetch a list of entries just
+   * to remove one. Returns the deleted entry (or null if there were
+   * none today).
+   */
+  async deleteLatestEntryForToday(
+    userId: string,
+    day: Date,
+    timeZone?: string,
+  ): Promise<HydrationLog | null> {
+    const start = startOfDay(day, timeZone);
+    const end = endOfDay(day, timeZone);
+    const latest = await this.prisma.hydrationLog.findFirst({
+      where: { userId, recordedAt: { gte: start, lte: end } },
+      orderBy: { recordedAt: "desc" },
+    });
+    if (!latest) return null;
+    return this.prisma.hydrationLog.delete({ where: { id: latest.id } });
+  }
+
+  async getDailyTotal(
+    userId: string,
+    day: Date,
+    timeZone?: string,
+  ): Promise<DailyHydration> {
+    const start = startOfDay(day, timeZone);
+    const end = endOfDay(day, timeZone);
 
     const rows = await this.prisma.hydrationLog.findMany({
       where: {
@@ -82,7 +107,7 @@ export class HydrationService {
 
     const glasses = rows.reduce((sum, row) => sum + row.glasses, 0);
     return {
-      date: start.toISOString().slice(0, 10),
+      date: formatDateKey(day, timeZone),
       glasses,
       target: defaultTarget(),
       entries: rows.length,
@@ -113,16 +138,62 @@ function clampToNow(value?: Date): Date {
   return value.getTime() > now.getTime() ? now : value;
 }
 
-function startOfDay(input: Date): Date {
-  const d = new Date(input);
-  d.setHours(0, 0, 0, 0);
-  return d;
+function startOfDay(input: Date, timeZone?: string): Date {
+  if (!timeZone) {
+    const d = new Date(input);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  // Compute the UTC instant that represents 00:00:00 in the user's
+  // timezone for the given calendar date. Without this the server
+  // (typically UTC) would compute "today" relative to a different
+  // instant than the user's wall clock.
+  const parts = formatInTimeZone(input, timeZone);
+  return new Date(`${parts.yyyy}-${parts.mm}-${parts.dd}T00:00:00Z`);
 }
 
-function endOfDay(input: Date): Date {
-  const d = new Date(input);
-  d.setHours(23, 59, 59, 999);
-  return d;
+function endOfDay(input: Date, timeZone?: string): Date {
+  if (!timeZone) {
+    const d = new Date(input);
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }
+  const parts = formatInTimeZone(input, timeZone);
+  return new Date(`${parts.yyyy}-${parts.mm}-${parts.dd}T23:59:59.999Z`);
+}
+
+function formatDateKey(input: Date, timeZone?: string): string {
+  if (!timeZone) return input.toISOString().slice(0, 10);
+  const parts = formatInTimeZone(input, timeZone);
+  return `${parts.yyyy}-${parts.mm}-${parts.dd}`;
+}
+
+/**
+ * Resolve the wall-clock y/m/d for `input` as seen in `timeZone`.
+ *
+ * Implementation note: we use `Intl.DateTimeFormat` with the timezone
+ * option to extract the parts, which is the only built-in way to do
+ * timezone-aware formatting in Node 22 without pulling in a date
+ * library like `date-fns-tz` / `luxon`.
+ */
+function formatInTimeZone(
+  input: Date,
+  timeZone: string,
+): { yyyy: string; mm: string; dd: string } {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(input);
+  const lookup: Record<string, string> = {};
+  for (const part of parts) lookup[part.type] = part.value;
+  return {
+    yyyy: lookup.year ?? "1970",
+    mm: lookup.month ?? "01",
+    dd: lookup.day ?? "01",
+  };
 }
 
 function defaultTarget(): number {

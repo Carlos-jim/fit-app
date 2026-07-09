@@ -2,6 +2,9 @@
 process.env.NODE_ENV = "test";
 process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
 process.env.GEMINI_API_KEY = "test-key";
+// Pick a primary model distinct from the secondary fallback so the
+// fallback path is reachable in tests.
+process.env.GEMINI_MODEL = "gemini-2.5-flash";
 process.env.SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
 process.env.SUPABASE_STORAGE_BUCKET = "test-bucket";

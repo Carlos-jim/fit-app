@@ -16,6 +16,8 @@ import { type AuthEmailService } from "./auth-email.service.js";
 const SALT_ROUNDS = 10;
 const googleClient = new OAuth2Client();
 
+const log = logger.child("auth-service");
+
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
@@ -128,7 +130,7 @@ export class AuthService {
       }
     }
 
-    return this.createSession(user);
+    return await this.createSession(user);
   }
 
   async loginWithEmail(input: { email: string; password: string }): Promise<AuthResponse> {
@@ -152,7 +154,7 @@ export class AuthService {
       });
     }
 
-    return this.createSession(user);
+    return await this.createSession(user);
   }
 
   async loginWithGoogle(input: { idToken: string }): Promise<AuthResponse> {
@@ -221,7 +223,7 @@ export class AuthService {
       });
     }
 
-    return this.createSession(user);
+    return await this.createSession(user);
   }
 
   async refreshAccessToken(refreshToken: string): Promise<AuthTokens> {
@@ -251,7 +253,7 @@ export class AuthService {
 
     await this.prisma.refreshToken.delete({ where: { id: stored.id } });
 
-    const session = this.createSession(stored.user);
+    const session = await this.createSession(stored.user);
     return session.tokens;
   }
 
@@ -268,7 +270,7 @@ export class AuthService {
     await this.prisma.refreshToken.deleteMany({ where: { userId } });
   }
 
-  private createSession(user: User): AuthResponse {
+  private async createSession(user: User): Promise<AuthResponse> {
     const accessToken = signAccessToken({
       userId: user.id,
       email: user.email,
@@ -280,21 +282,32 @@ export class AuthService {
       tokenId,
     });
 
-    const refreshExpiresInDays = Math.max(
-      1,
-      durationToDays(env.JWT_REFRESH_EXPIRES_IN || "7d"),
+    // Compute the refresh-token expiry in seconds so sub-day durations
+    // (e.g. "1h", "30m") aren't rounded up to a full day the way the
+    // previous `durationToDays` helper did.
+    const expiresAt = new Date(
+      Date.now() + durationToSeconds(env.JWT_REFRESH_EXPIRES_IN || "7d") * 1000,
     );
 
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + refreshExpiresInDays);
-
-    void this.prisma.refreshToken.create({
-      data: {
-        tokenHash: hashToken(refreshToken),
+    try {
+      await this.prisma.refreshToken.create({
+        data: {
+          tokenHash: hashToken(refreshToken),
+          userId: user.id,
+          expiresAt,
+        },
+      });
+    } catch (error) {
+      log.error("Failed to persist refresh token; rolling back session", {
         userId: user.id,
-        expiresAt,
-      },
-    });
+        error,
+      });
+      throw new AppError("Failed to start session. Please try again.", {
+        statusCode: 500,
+        code: "SESSION_PERSIST_FAILED",
+        cause: error,
+      });
+    }
 
     return {
       user: {
@@ -312,23 +325,27 @@ export class AuthService {
   }
 }
 
-function durationToDays(time: string): number {
-  const match = time.match(/^(\d+)\s*([dhms])$/i);
-  if (!match) return 7;
+/**
+ * Parse a duration string like "15m", "1h", "7d", "30s" into seconds.
+ * Falls back to 7 days for malformed input (matches the prior behaviour).
+ */
+function durationToSeconds(time: string): number {
+  const match = /^(\d+)\s*([dhms])$/i.exec(time.trim());
+  if (!match) return 7 * 24 * 60 * 60;
 
   const value = parseInt(match[1]!, 10);
   const unit = match[2]!.toLowerCase();
 
   switch (unit) {
     case "d":
-      return value;
+      return value * 24 * 60 * 60;
     case "h":
-      return value / 24;
+      return value * 60 * 60;
     case "m":
-      return value / (24 * 60);
+      return value * 60;
     case "s":
-      return value / (24 * 60 * 60);
+      return value;
     default:
-      return 7;
+      return 7 * 24 * 60 * 60;
   }
 }

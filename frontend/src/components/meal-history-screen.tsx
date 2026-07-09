@@ -160,8 +160,8 @@ export function MealHistoryScreen({
     setLoading(true);
     setError(null);
     try {
-      const data = await biomaApi.getLogs();
-      setLogs(data);
+      const { logs } = await biomaApi.getLogs({ limit: 200 });
+      setLogs(logs);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "No se pudo cargar el historial.",
@@ -596,7 +596,7 @@ function MealDetailView(props: {
         fiberGrams: meal.fiberGrams,
         sugarGrams: meal.sugarGrams,
         sodiumMg: meal.sodiumMg,
-        ingredients: meal.ingredients as any,
+        ingredients: meal.ingredients,
       });
 
       meal.aiSuggestion = result;

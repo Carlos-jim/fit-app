@@ -1,6 +1,19 @@
 import { AccountDeletionService } from "../src/services/account-deletion.service";
 import { AppError } from "../src/lib/app-error";
 
+// Stub @supabase/supabase-js so the deletion service doesn't try to
+// reach Supabase from the unit test (no env, no network).
+jest.mock("@supabase/supabase-js", () => ({
+  createClient: jest.fn(() => ({
+    storage: {
+      from: jest.fn(() => ({
+        list: jest.fn().mockResolvedValue({ data: [], error: null }),
+        remove: jest.fn().mockResolvedValue({ data: null, error: null }),
+      })),
+    },
+  })),
+}));
+
 function makePrismaMock() {
   return {
     user: { findUnique: jest.fn() },
@@ -12,6 +25,8 @@ function makePrismaMock() {
     bodyMetric: { deleteMany: jest.fn() },
     tip: { deleteMany: jest.fn() },
     log: { deleteMany: jest.fn() },
+    hydrationLog: { deleteMany: jest.fn() },
+    workout: { deleteMany: jest.fn() },
     $transaction: jest.fn(),
   };
 }
@@ -32,6 +47,8 @@ describe("AccountDeletionService.deleteAccount", () => {
         bodyMetric: { deleteMany: jest.fn() },
         tip: { deleteMany: jest.fn() },
         log: { deleteMany: jest.fn() },
+        hydrationLog: { deleteMany: jest.fn() },
+        workout: { deleteMany: jest.fn() },
       };
       return cb(tx);
     });
@@ -62,6 +79,8 @@ describe("AccountDeletionService.deleteAccount", () => {
         bodyMetric: { deleteMany: jest.fn().mockResolvedValue({ count: 5 }) },
         tip: { deleteMany: jest.fn().mockResolvedValue({ count: 7 }) },
         log: { deleteMany: jest.fn().mockResolvedValue({ count: 30 }) },
+        hydrationLog: { deleteMany: jest.fn().mockResolvedValue({ count: 4 }) },
+        workout: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
       };
       return cb(tx);
     });

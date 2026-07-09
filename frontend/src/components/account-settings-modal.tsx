@@ -18,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import type { FitnessTheme } from "./fitness-ui";
 import { biomaApi } from "../services/bioma-api";
+import { handleError, showError, showSuccess } from "../utils/toast";
 
 type VisualMode = "dark" | "light";
 
@@ -80,15 +81,12 @@ export function AccountSettingsModal({
       } catch {
         // User cancelled the share sheet — the export itself succeeded.
       }
-      Alert.alert(
+      showSuccess(
         "Exportación lista",
         "Tus datos están listos. Guárdalos en un lugar seguro.",
       );
     } catch (err) {
-      Alert.alert(
-        "No se pudo exportar",
-        err instanceof Error ? err.message : "Intenta de nuevo.",
-      );
+      handleError(err, "No se pudo exportar");
     } finally {
       setExporting(false);
     }
@@ -96,10 +94,7 @@ export function AccountSettingsModal({
 
   const handleDelete = async () => {
     if (confirmText.trim().toUpperCase() !== "ELIMINAR") {
-      Alert.alert(
-        "Confirmación incorrecta",
-        "Escribe ELIMINAR para confirmar.",
-      );
+      showError("Confirmación incorrecta", "Escribe ELIMINAR para confirmar.");
       return;
     }
     Alert.alert(
@@ -116,10 +111,7 @@ export function AccountSettingsModal({
               await biomaApi.deleteMyAccount();
               onDeleted();
             } catch (err) {
-              Alert.alert(
-                "No se pudo eliminar",
-                err instanceof Error ? err.message : "Intenta de nuevo.",
-              );
+              handleError(err, "No se pudo eliminar");
             } finally {
               setDeleting(false);
             }

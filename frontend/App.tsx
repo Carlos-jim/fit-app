@@ -7,7 +7,6 @@ import {
 } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   Image,
@@ -44,6 +43,8 @@ import {
 } from "@expo-google-fonts/manrope";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import Toast from "react-native-toast-message";
+import { handleError, showError, showInfo, toastConfig } from "./src/utils/toast";
 
 import {
   AppTab,
@@ -79,6 +80,7 @@ import { ProfileScreen } from "./src/components/profile-screen";
 import { WeightHistoryScreen } from "./src/components/weight-history-screen";
 import { WorkoutHistoryScreen } from "./src/components/workout-history-screen";
 import { AccountSettingsModal } from "./src/components/account-settings-modal";
+import { BarcodeProductCard } from "./src/components/scanner/barcode-product-card";
 import { EditProfileModal } from "./src/components/edit-profile-modal";
 import { compressForUpload } from "./src/utils/image-utils";
 import * as Sentry from "@sentry/react-native";
@@ -90,12 +92,23 @@ if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
     tracesSampleRate: __DEV__ ? 1.0 : 0.1,
   });
 }
-import { HealthProviderStatusCard } from "./src/components/health-provider-status-card";
+import { TipsScreen } from "./src/components/tips-screen";
 import { MacroResultCard } from "./src/components/macro-result-card";
 import { MealHistoryScreen } from "./src/components/meal-history-screen";
 import { RecoveryCard } from "./src/components/recovery-card";
 import { env } from "./src/config/env";
 import { biomaApi } from "./src/services/bioma-api";
+import {
+  sessionStore,
+  type PersistedOnboardingStep,
+} from "./src/services/session-store";
+import { useDeepLinks } from "./src/hooks/use-deep-links";
+import {
+  ForgotPasswordScreen,
+  ResetPasswordScreen,
+  VerifyEmailScreen,
+} from "./src/components/auth-flow";
+import { useOnboardingGate } from "./src/hooks/use-onboarding-gate";
 import {
   CIRCADIAN_CITIES,
   createCircadianPlan,
@@ -259,6 +272,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AppContent />
+      <Toast config={toastConfig} topOffset={48} />
     </SafeAreaProvider>
   );
 }
@@ -311,6 +325,9 @@ function AppContent() {
   const [workoutHistoryVisible, setWorkoutHistoryVisible] = useState(false);
   const [profileData, setProfileData] =
     useState<import("./src/types/api").UserProfile | null>(null);
+
+  // Hydration milestone celebration (mounted only while animating)
+  const [celebrationActive, setCelebrationActive] = useState(false);
   const [mealLabel, setMealLabel] = useState("Almuerzo");
   const [mealDescription, setMealDescription] = useState(
     "Me comi una arepa con queso y dos huevos.",
@@ -319,6 +336,10 @@ function AppContent() {
   const [scannerMode, setScannerMode] = useState<ScannerMode>("food");
   const [barcodeResult, setBarcodeResult] =
     useState<BarcodeScanningResult | null>(null);
+  const [barcodeProduct, setBarcodeProduct] = useState<import("./src/types/api").FoodProduct | null>(null);
+  const [barcodeLoading, setBarcodeLoading] = useState(false);
+  const [barcodeError, setBarcodeError] = useState<string | null>(null);
+  const [barcodeServingGrams, setBarcodeServingGrams] = useState("100");
   const [cameraReady, setCameraReady] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [imageAsset, setImageAsset] =
@@ -356,6 +377,8 @@ function AppContent() {
   const ambientPulse = useRef(new Animated.Value(0)).current;
   const nutritionQuickMenuAnim = useRef(new Animated.Value(0)).current;
   const mainScrollY = useRef(new Animated.Value(0)).current;
+
+  const { resolveOnboardingState } = useOnboardingGate();
   const statsMealsExpandAnim = useRef(new Animated.Value(0)).current;
   const cameraRef = useRef<CameraView | null>(null);
   const analysisSourceRef = useRef<"camera" | null>(null);
@@ -395,6 +418,30 @@ function AppContent() {
     | "age"
     | "country"
   >("idle");
+
+  // Tokens extracted from incoming deep links (password reset /
+  // email verification). Kept in component state because the screens
+  // are mount-once and the links may arrive before the user is
+  // authenticated.
+  const [resetToken, setResetToken] = useState<string | null>(null);
+  const [verifyToken, setVerifyToken] = useState<string | null>(null);
+
+  // ─── Deep link handler ──────────────────────────────────────────
+  // `bioma://reset-password?token=…` and `bioma://verify-email?token=…`
+  // routes deep-linked from transactional emails land here. We stash
+  // the token and switch `authFlow` so the matching screen mounts.
+  useDeepLinks((payload) => {
+    if (payload.path.includes("reset-password") && payload.params.token) {
+      setResetToken(payload.params.token);
+      setAuthFlow("reset-password");
+      return;
+    }
+    if (payload.path.includes("verify-email")) {
+      setVerifyToken(payload.params.token ?? null);
+      if (payload.params.email) setEmail(payload.params.email);
+      setAuthFlow("verify-email");
+    }
+  });
 
   // Store onboarding data for passing between screens
   const [onboardingGoal, setOnboardingGoal] = useState<
@@ -591,17 +638,10 @@ function AppContent() {
   );
   const homeTodayMealsCount = homeTodayMeals.length;
 
-  const homeCalorieGoal = useMemo(() => {
-    const base = onboardingWeightKg * 24;
-    switch (onboardingGoal) {
-      case "LOSE_WEIGHT":
-        return Math.round(base * 0.8);
-      case "GAIN_WEIGHT":
-        return Math.round(base * 1.15);
-      default:
-        return Math.round(base);
-    }
-  }, [onboardingGoal, onboardingWeightKg]);
+  const homeCalorieGoal = useMemo(
+    () => nutritionPlan?.dailyCalories ?? null,
+    [nutritionPlan],
+  );
 
   const homeTodayMacros = useMemo(() => {
     const totals = homeTodayMeals.reduce(
@@ -619,16 +659,17 @@ function AppContent() {
     };
   }, [homeTodayMeals]);
 
-  const homeMacroGoals = useMemo(() => {
-    const calories = homeCalorieGoal;
-    return {
-      protein: Math.round((calories * 0.3) / 4),
-      carbs: Math.round((calories * 0.5) / 4),
-      fat: Math.round((calories * 0.2) / 9),
-    };
-  }, [homeCalorieGoal]);
-
-  const homeStepsGoal = 8000;
+  const homeMacroGoals = useMemo(
+    () =>
+      nutritionPlan
+        ? {
+            protein: nutritionPlan.proteinGrams,
+            carbs: nutritionPlan.carbsGrams,
+            fat: nutritionPlan.fatGrams,
+          }
+        : null,
+    [nutritionPlan],
+  );
 
   const homeLastMeal = useMemo(() => {
     if (statsMealLogs.length === 0) return null;
@@ -667,8 +708,6 @@ function AppContent() {
     [homeMealsWithScore],
   );
 
-  const homeStepGoal = 10000;
-  const homeStepProgress = Math.min(wearableSnapshot.steps / homeStepGoal, 1);
   const homeRecoveryAccent =
     recoverySnapshot.state === "high"
       ? theme.accent
@@ -767,18 +806,60 @@ function AppContent() {
     ? "Perfil conectado"
     : "Perfil listo para conectar";
 
-  // ─── Check existing session on startup ───────────────────────────
+  // ─── Rehydrate existing session on startup ───────────────────────
+  // We persist a snapshot (userId + email + onboarding progress) in
+  // AsyncStorage whenever auth state changes. On cold start we read it
+  // back here so the user lands on the appropriate screen instead of
+  // the welcome splash.
+  const [sessionRehydrated, setSessionRehydrated] = useState(false);
   useEffect(() => {
-    if (!fontsLoaded || userId) return;
+    if (!fontsLoaded || sessionRehydrated) return;
+
+    let cancelled = false;
 
     const checkSession = async () => {
-      // Check if there's a stored userId from a previous session
-      // For now, always start at welcome screen
-      // In production, you'd check AsyncStorage for a saved userId
+      try {
+        // Validate that we still have a usable access token. If the
+        // stored tokens have expired (or the user revoked them) the
+        // refresh round-trip will fail and we'll clear the session.
+        const refreshed = await biomaApi.refreshAccessToken();
+        const persisted = await sessionStore.load();
+
+        if (cancelled) return;
+
+        if (refreshed && persisted) {
+          setUserId(persisted.userId);
+          setEmail(persisted.email);
+          setFullName(persisted.fullName);
+          setPlan(persisted.plan);
+          if (persisted.onboardingGoal) setOnboardingGoal(persisted.onboardingGoal);
+          if (persisted.onboardingWeightKg !== null) {
+            setOnboardingWeightKg(persisted.onboardingWeightKg);
+          }
+          if (persisted.onboardingStep) {
+            setOnboardingStep(persisted.onboardingStep);
+            setAuthFlow("onboarding");
+          } else {
+            setAuthFlow("done");
+            setOnboardingStep("idle");
+            setActiveTab("home");
+          }
+        } else {
+          // Either no session or tokens are dead — clean up.
+          await sessionStore.clear();
+        }
+      } catch {
+        await sessionStore.clear();
+      } finally {
+        if (!cancelled) setSessionRehydrated(true);
+      }
     };
 
-    checkSession();
-  }, [fontsLoaded]);
+    void checkSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [fontsLoaded, sessionRehydrated]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1000,6 +1081,19 @@ function AppContent() {
     }
   }, [activeTab, userId]);
 
+  // Trigger the hydration milestone celebration whenever the user
+  // crosses their daily goal. We avoid spamming it if they decrement
+  // and re-increment by gating on a small grace window (handled by the
+  // store's own state machine).
+  const prevGlassesRef = useRef(dailyWaterGlasses);
+  useEffect(() => {
+    const prev = prevGlassesRef.current;
+    prevGlassesRef.current = dailyWaterGlasses;
+    if (prev < waterGoal && dailyWaterGlasses >= waterGoal && waterGoal > 0) {
+      setCelebrationActive(true);
+    }
+  }, [dailyWaterGlasses, waterGoal]);
+
   if (!fontsLoaded) {
     return null;
   }
@@ -1044,7 +1138,7 @@ function AppContent() {
   async function loadStatsMealLogs() {
     try {
       setStatsMealLogsLoading(true);
-      const logs = await biomaApi.getLogs();
+      const { logs } = await biomaApi.getLogs({ limit: 100 });
       setStatsMealLogs(logs);
     } catch {
       setStatsMealLogs([]);
@@ -1147,7 +1241,7 @@ function AppContent() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      Alert.alert(
+      showInfo(
         "Permiso requerido",
         "Bioma necesita acceso a tu galeria para analizar tus comidas.",
       );
@@ -1173,7 +1267,7 @@ function AppContent() {
       const permission = await requestCameraPermission();
 
       if (!permission.granted) {
-        Alert.alert(
+        showInfo(
           "Permiso requerido",
           "Bioma necesita acceso a la camara para escanear tu comida.",
         );
@@ -1182,7 +1276,7 @@ function AppContent() {
     }
 
     if (!cameraReady || !cameraRef.current) {
-      Alert.alert("Camara iniciando", "Espera un momento y vuelve a intentar.");
+      showInfo("Camara iniciando", "Espera un momento y vuelve a intentar.");
       return;
     }
 
@@ -1216,73 +1310,76 @@ function AppContent() {
     }
 
     setBarcodeResult(result);
-    setStatusMessage(`Codigo detectado: ${result.data}`);
+    setBarcodeProduct(null);
+    setBarcodeError(null);
+    setBarcodeServingGrams("100");
+    setStatusMessage(`Código detectado: ${result.data}. Buscando producto…`);
+
+    void (async () => {
+      try {
+        setBarcodeLoading(true);
+        const product = await biomaApi.lookupBarcode(result.data);
+        if (!product) {
+          setBarcodeError(
+            "No encontramos este producto en OpenFoodFacts. Intenta con otro código o registra la comida manualmente.",
+          );
+          setStatusMessage(`Sin resultados para ${result.data}`);
+          return;
+        }
+        setBarcodeProduct(product);
+        setStatusMessage(
+          `Encontrado: ${product.productName}${product.brand ? ` · ${product.brand}` : ""}`,
+        );
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "No se pudo consultar OpenFoodFacts.";
+        setBarcodeError(message);
+        setStatusMessage(message);
+      } finally {
+        setBarcodeLoading(false);
+      }
+    })();
   }
 
-  const connectProfile = async (): Promise<string | null> => {
-    if (!email.trim()) {
-      Alert.alert(
-        "Correo requerido",
-        "Ingresa un correo para crear o recuperar el perfil.",
-      );
-      return null;
+  async function registerBarcodeAsMeal() {
+    if (!barcodeProduct || !barcodeResult) return;
+    const servingGrams = Number(barcodeServingGrams);
+      if (!Number.isFinite(servingGrams) || servingGrams <= 0) {
+      showError("Cantidad inválida", "Indica los gramos a registrar.");
+      return;
     }
-
     try {
-      setBootstrapLoading(true);
-      setStatusMessage("Sincronizando perfil...");
-
-      const profile = await biomaApi.bootstrapUser({
-        email: email.trim(),
-        fullName: fullName.trim() || undefined,
+      setAnalysisLoading(true);
+      setStatusMessage("Guardando producto como comida…");
+      await biomaApi.registerBarcodeMeal({
+        barcode: barcodeProduct.code,
+        servingGrams,
+        mealLabel: mealLabel.trim() || undefined,
+        consumedAt: new Date().toISOString(),
       });
-
-      setUserId(profile.id);
-      if (profile.plan) {
-        setPlan(profile.plan);
-      }
-      setStatusMessage(
-        `Perfil listo para ${profile.fullName ?? profile.email}.`,
-      );
-
-      // Check for existing onboarding session
-      const session = await biomaApi.getOnboardingSession();
-      if (session && !session.completed && session.currentStep > 1) {
-        // Resume from where they left off
-        const stepMap: Record<number, typeof onboardingStep> = {
-          2: "workout",
-          3: "body",
-          4: "targetWeight",
-          5: "gender",
-          6: "age",
-          7: "country",
-        };
-        setOnboardingStep(stepMap[session.currentStep] ?? "goal");
-      } else if (!session) {
-        // New user - start from beginning
-        setOnboardingStep("goal");
-      }
-
-      return profile.id;
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "No se pudo conectar el perfil.";
-      Alert.alert("Error al conectar", message);
-      setStatusMessage(message);
-      return null;
+      setStatusMessage("Producto guardado en tu historial.");
+      // Refresh so the home / stats tabs reflect the new entry.
+      void loadStatsMealLogs();
+      setBarcodeProduct(null);
+      setBarcodeResult(null);
+      setBarcodeServingGrams("100");
+      setActiveTab("nutrition");
+      setNutritionView("history");
+    } catch (err) {
+      handleError(err, "No se pudo guardar");
     } finally {
-      setBootstrapLoading(false);
+      setAnalysisLoading(false);
     }
-  };
+  }
 
-  const handleLogout = async () => {
+const handleLogout = async () => {
     try {
       setBootstrapLoading(true);
       await biomaApi.logout();
     } catch (error) {
-      console.warn("Logout endpoint failed, ignoring", error);
+      if (__DEV__) console.warn("Logout endpoint failed, ignoring", error);
     } finally {
       setUserId(null);
       setFullName("");
@@ -1291,6 +1388,7 @@ function AppContent() {
       setActiveTab("home");
       setBootstrapLoading(false);
       waterReset();
+      await sessionStore.clear();
     }
   };
 
@@ -1312,7 +1410,7 @@ function AppContent() {
       const data = await biomaApi.generateTips(true);
       setTips(data);
     } catch {
-      Alert.alert("Error", "No se pudieron generar los consejos. Intenta más tarde.");
+      showError("Error", "No se pudieron generar los consejos. Intenta más tarde.");
     } finally {
       setTipsLoading(false);
     }
@@ -1332,25 +1430,46 @@ function AppContent() {
     ];
     const currentIndex = stepOrder.indexOf(onboardingStep);
     if (currentIndex > 1) {
-      setOnboardingStep(stepOrder[currentIndex - 1]);
+      const previous = stepOrder[currentIndex - 1]!;
+      setOnboardingStep(previous);
+      void persistOnboardingProgress(previous as PersistedOnboardingStep);
     } else {
       setUserId(null);
       setAuthFlow("welcome");
       setOnboardingStep("idle");
+      void sessionStore.clear();
     }
   };
 
   const handleOnboardingNext = (step: typeof onboardingStep) => {
     setOnboardingStep(step);
+    void persistOnboardingProgress(step as PersistedOnboardingStep);
   };
 
   const handleOnboardingFinish = () => {
     setOnboardingStep("idle");
     setAuthFlow("done");
+    void persistOnboardingProgress(null);
   };
 
   // ─── Auth handlers ───────────────────────────────────────────────
-  const handleAuthSuccess = (user: { id: string; email: string; fullName?: string | null; plan?: string }) => {
+  const persistOnboardingProgress = async (
+    nextStep: PersistedOnboardingStep | null,
+  ) => {
+    if (!userId) return;
+    await sessionStore.save({
+      userId,
+      email,
+      fullName,
+      plan,
+      onboardingStep: nextStep,
+      onboardingGoal,
+      onboardingWeightKg,
+      loggedInAt: Date.now(),
+    });
+  };
+
+  const handleAuthSuccess = async (user: { id: string; email: string; fullName?: string | null; plan?: string }) => {
     setUserId(user.id);
     setEmail(user.email);
     if (user.fullName) {
@@ -1359,8 +1478,57 @@ function AppContent() {
     if (user.plan) {
       setPlan(user.plan);
     }
-    setAuthFlow("onboarding");
-    setOnboardingStep("goal");
+
+    // Resolve onboarding state before routing. Previously the app
+    // unconditionally pushed every freshly-authenticated user into the
+    // onboarding flow, which forced users who had already completed it
+    // to redo all 7 steps on every login.
+    setBootstrapLoading(true);
+    let skipOnboarding = false;
+    try {
+      const decision = await resolveOnboardingState();
+      skipOnboarding = decision.skipOnboarding;
+      if (decision.skipOnboarding) {
+        setAuthFlow("done");
+      } else {
+        setAuthFlow("onboarding");
+        setOnboardingStep("goal");
+      }
+    } catch (err) {
+      // Gate failed (network blip, transient 5xx). Bias toward NOT
+      // sending the user through onboarding again — show a warning
+      // and let them land on home where they can retry.
+      handleError(err, "No se pudo verificar tu perfil");
+      setAuthFlow("done");
+      skipOnboarding = true;
+    } finally {
+      setBootstrapLoading(false);
+    }
+
+    // Persist the resolved session so a cold start of the app skips
+    // the auth splash and lands the user directly on home / onboarding.
+    await sessionStore.save({
+      userId: user.id,
+      email: user.email,
+      fullName: user.fullName ?? "",
+      plan: user.plan ?? "FREE",
+      onboardingStep: skipOnboarding ? null : "goal",
+      onboardingGoal,
+      onboardingWeightKg,
+      loggedInAt: Date.now(),
+    });
+
+    // Pull the server-side nutrition plan so the home screen ring,
+    // macro bars, and per-meal calorie ranges reflect real goals
+    // instead of the local hardcoded fallbacks.
+    try {
+      const plan = await biomaApi.getNutritionPlan();
+      setNutritionPlan(plan);
+    } catch {
+      // Tolerate failure — the home will render "S/N" placeholders
+      // for the macro/macros goals and per-meal calorie ranges until
+      // the next successful fetch.
+    }
   };
 
   const handleWelcomeContinue = () => {
@@ -1464,7 +1632,7 @@ function AppContent() {
 
   const analyzeCurrentMeal = async () => {
     if (!env.apiBaseUrl) {
-      Alert.alert(
+      showInfo(
         "Configura el API",
         "Define EXPO_PUBLIC_API_BASE_URL para conectar la app con tu backend.",
       );
@@ -1472,12 +1640,12 @@ function AppContent() {
     }
 
     if (mealMode === "photo" && !imageAsset) {
-      Alert.alert("Falta la foto", "Selecciona una imagen antes de analizar.");
+      showError("Falta la foto", "Selecciona una imagen antes de analizar.");
       return;
     }
 
     if (mealMode === "text" && mealDescription.trim().length < 5) {
-      Alert.alert(
+      showError(
         "Falta descripcion",
         "Escribe una descripcion mas completa de la comida para estimar macros.",
       );
@@ -1488,9 +1656,15 @@ function AppContent() {
       setAnalysisLoading(true);
       setStatusMessage("Preparando perfil...");
 
-      const resolvedUserId = userId ?? (await connectProfile());
-
-      if (!resolvedUserId) {
+      // Analyzing a meal requires a logged-in user. The auth gate happens
+      // at the route level (`requireAuth`); here we just bail with a
+      // helpful message if state is somehow out of sync.
+      if (!userId) {
+        setAnalysisLoading(false);
+        showInfo(
+          "Inicia sesión",
+          "Necesitas una cuenta activa para analizar comidas.",
+        );
         return;
       }
 
@@ -1542,7 +1716,7 @@ function AppContent() {
         error instanceof Error
           ? error.message
           : "No se pudo completar el analisis.";
-      Alert.alert("Error en el analisis", message);
+      showError("Error en el analisis", message);
       setStatusMessage(message);
     } finally {
       setAnalysisLoading(false);
@@ -1565,18 +1739,25 @@ function AppContent() {
           />
         );
       case "tips":
-        return renderTipsScreen();
+        return (
+      <TipsScreen
+        theme={theme}
+        visualMode={visualMode}
+        tips={tips}
+        tipsLoading={tipsLoading}
+        userId={userId}
+        onGenerate={generateTips}
+      />
+    );
       case "profile":
         return (
           <ProfileScreen
             theme={theme}
             visualMode={visualMode}
             fullName={fullName}
-            setFullName={setFullName}
             email={email}
-            setEmail={setEmail}
             userId={userId}
-            onConnectProfile={connectProfile}
+            plan={plan}
             onLogout={handleLogout}
             bootstrapLoading={bootstrapLoading}
             onToggleMode={() =>
@@ -1591,17 +1772,31 @@ function AppContent() {
                 setProfileData(me.profile);
                 setEditProfileVisible(true);
               } catch {
-                Alert.alert(
+                showError(
                   "No se pudo cargar tu perfil",
                   "Intenta de nuevo en unos segundos.",
                 );
               }
             }}
             onForgotPassword={() => setAuthFlow("forgot-password")}
+            onProfileChanged={async (changes) => {
+              if (changes.fullName !== undefined) setFullName(changes.fullName);
+              if (changes.email !== undefined) setEmail(changes.email);
+              if (userId) {
+                await sessionStore.save({
+                  userId,
+                  email: changes.email ?? email,
+                  fullName: changes.fullName ?? fullName,
+                  plan,
+                  onboardingStep: null,
+                  onboardingGoal,
+                  onboardingWeightKg,
+                  loggedInAt: Date.now(),
+                });
+              }
+            }}
             ambientPulse={ambientPulse}
             mainScrollY={mainScrollY}
-            healthProvider={mockHealthProvider}
-            wellnessCardMode={wellnessCardMode}
           />
         );
       case "home":
@@ -1614,8 +1809,6 @@ function AppContent() {
             todayCalories={homeTodayCalories}
             todayMealsCount={homeTodayMealsCount}
             calorieGoal={homeCalorieGoal}
-            stepsGoal={homeStepGoal}
-            currentSteps={wearableSnapshot.steps}
             todayMacros={homeTodayMacros}
             macroGoals={homeMacroGoals}
             lastMeal={homeLastMeal}
@@ -1748,6 +1941,54 @@ function AppContent() {
         onBack={() => setAuthFlow("welcome")}
         onShowLogin={() => setAuthFlow("login")}
         onToggleMode={toggleVisualMode}
+      />
+    );
+  }
+
+  if (authFlow === "forgot-password") {
+    return (
+      <ForgotPasswordScreen
+        theme={theme}
+        visualMode={visualMode}
+        initialEmail={email}
+        onBack={() => setAuthFlow(userId ? "done" : "login")}
+      />
+    );
+  }
+
+  if (authFlow === "reset-password") {
+    return (
+      <ResetPasswordScreen
+        theme={theme}
+        visualMode={visualMode}
+        token={resetToken ?? ""}
+        onSuccess={() => {
+          setAuthFlow("login");
+          setResetToken(null);
+        }}
+        onCancel={() => {
+          setAuthFlow("login");
+          setResetToken(null);
+        }}
+      />
+    );
+  }
+
+  if (authFlow === "verify-email") {
+    return (
+      <VerifyEmailScreen
+        theme={theme}
+        visualMode={visualMode}
+        token={verifyToken ?? ""}
+        email={email}
+        onSuccess={() => {
+          setAuthFlow(userId ? "done" : "login");
+          setVerifyToken(null);
+        }}
+        onCancel={() => {
+          setAuthFlow(userId ? "done" : "login");
+          setVerifyToken(null);
+        }}
       />
     );
   }
@@ -1957,7 +2198,12 @@ function AppContent() {
         nutritionMenuOpen={nutritionQuickMenuOpen}
         theme={theme}
       />
-      <WaterCelebration isDark={visualMode === "dark"} />
+      {celebrationActive ? (
+        <WaterCelebration
+          isDark={visualMode === "dark"}
+          onComplete={() => setCelebrationActive(false)}
+        />
+      ) : null}
 
       <Modal
         animationType="slide"
@@ -2109,7 +2355,7 @@ function AppContent() {
               <Pressable
                 style={styles.paywallCtaButton}
                 onPress={() => {
-                  Alert.alert(
+                  showInfo(
                     "Próximamente",
                     "La suscripción estará disponible muy pronto.",
                   );
@@ -2652,10 +2898,7 @@ function AppContent() {
         setMenuAnalysis(result);
       } catch (err) {
         console.error("[MenuScan] Error analyzing menu:", err);
-        Alert.alert(
-          "Error",
-          "No se pudo analizar el menu. Intentalo de nuevo.",
-        );
+        showError("Error", "No se pudo analizar el menu. Intentalo de nuevo.");
       } finally {
         setMenuAnalysisLoading(false);
       }
@@ -3364,6 +3607,30 @@ function AppContent() {
             </View>
           </View>
         ) : null}
+
+        {scannerMode === "barcode" && barcodeResult ? (
+          <BarcodeProductCard
+            theme={theme}
+            visualMode={visualMode}
+            barcode={barcodeResult.data}
+            product={barcodeProduct}
+            loading={barcodeLoading}
+            error={barcodeError}
+            registerLoading={analysisLoading}
+            onRegister={(servingGrams: number) => {
+              setBarcodeServingGrams(String(servingGrams));
+              void registerBarcodeAsMeal();
+            }}
+            onDismiss={() => {
+              setBarcodeResult(null);
+              setBarcodeProduct(null);
+              setBarcodeError(null);
+            }}
+            onRetry={() => {
+              if (barcodeResult) handleBarcodeScanned(barcodeResult);
+            }}
+          />
+        ) : null}
       </View>
     );
   }
@@ -3599,181 +3866,6 @@ function AppContent() {
       </SafeAreaView>
     );
   }
-
-  function renderTipsScreen() {
-    const iconMap: Record<string, ComponentProps<typeof Ionicons>["name"]> = {
-      nutrition: "nutrition-outline",
-      fitness: "barbell-outline",
-      heart: "heart-outline",
-      bulb: "bulb-outline",
-      restaurant: "restaurant-outline",
-      water: "water-outline",
-      sleep: "moon-outline",
-      sunny: "sunny-outline",
-    };
-
-    const categoryLabel: Record<string, string> = {
-      nutricion: "Nutrición",
-      habitos: "Hábitos",
-      ejercicio: "Ejercicio",
-      salud_mental: "Bienestar",
-      planificacion: "Planificación",
-    };
-
-    const categoryColor: Record<string, string> = {
-      nutricion: "#00C897",
-      habitos: "#E8FF54",
-      ejercicio: "#76EFE5",
-      salud_mental: "#FF5260",
-      planificacion: "#FFB866",
-    };
-
-    return (
-      <View style={[styles.screen, { backgroundColor: theme.background }]}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.tipsContent}
-        >
-          <View style={styles.tipsHeader}>
-            <Text style={[styles.tipsHeaderEyebrow, { color: theme.accent }]}>
-              Consejos semanales
-            </Text>
-            <Text style={[styles.tipsHeaderTitle, { color: theme.text }]}>
-              Tips personalizados para ti
-            </Text>
-            <Text style={[styles.tipsHeaderSubtitle, { color: theme.muted }]}>
-              Basados en tu perfil y comidas recientes, generados por IA.
-            </Text>
-          </View>
-
-          {tipsLoading ? (
-            <View style={styles.tipsLoading}>
-              <ActivityIndicator color={theme.accent} size="large" />
-              <Text style={[styles.tipsLoadingText, { color: theme.muted }]}>
-                Generando consejos...
-              </Text>
-            </View>
-          ) : tips.length === 0 ? (
-            <View style={styles.tipsEmpty}>
-              <Ionicons
-                name="bulb-outline"
-                size={48}
-                color={theme.muted}
-              />
-              <Text style={[styles.tipsEmptyTitle, { color: theme.text }]}>
-                Sin consejos aún
-              </Text>
-              <Text style={[styles.tipsEmptyText, { color: theme.muted }]}>
-                Completa el onboarding o registra comidas para recibir tips personalizados.
-              </Text>
-              {userId ? (
-                <Pressable
-                  style={[
-                    styles.tipsGenerateButton,
-                    { backgroundColor: theme.accent },
-                  ]}
-                  onPress={generateTips}
-                >
-                  <Text style={styles.tipsGenerateButtonText}>
-                    Generar consejos ahora
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : (
-            <View style={styles.tipsList}>
-              {tips.map((tip, index) => {
-                const iconName = tip.icon
-                  ? iconMap[tip.icon] ?? "bulb-outline"
-                  : "bulb-outline";
-                const catLabel = categoryLabel[tip.category] ?? tip.category;
-                const catColor = categoryColor[tip.category] ?? theme.accent;
-
-                return (
-                  <View
-                    key={tip.id}
-                    style={[
-                      styles.tipCard,
-                      {
-                        borderColor: theme.stroke,
-                        backgroundColor: theme.card,
-                      },
-                    ]}
-                  >
-                    <View style={styles.tipCardHeader}>
-                      <View
-                        style={[
-                          styles.tipCardIconWrap,
-                          { backgroundColor: `${catColor}18` },
-                        ]}
-                      >
-                        <Ionicons
-                          name={iconName}
-                          size={20}
-                          color={catColor}
-                        />
-                      </View>
-                      <View style={styles.tipCardMeta}>
-                        <Text
-                          style={[
-                            styles.tipCardCategory,
-                            { color: catColor },
-                          ]}
-                        >
-                          {catLabel}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.tipCardIndex,
-                            { color: theme.muted },
-                          ]}
-                        >
-                          {index + 1} / {tips.length}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text
-                      style={[styles.tipCardTitle, { color: theme.text }]}
-                    >
-                      {tip.title}
-                    </Text>
-                    <Text
-                      style={[styles.tipCardBody, { color: theme.muted }]}
-                    >
-                      {tip.body}
-                    </Text>
-                  </View>
-                );
-              })}
-
-              <Pressable
-                style={[
-                  styles.tipsRegenerateButton,
-                  { borderColor: theme.stroke },
-                ]}
-                onPress={generateTips}
-              >
-                <Ionicons
-                  name="refresh"
-                  size={18}
-                  color={theme.accent}
-                />
-                <Text
-                  style={[
-                    styles.tipsRegenerateText,
-                    { color: theme.accent },
-                  ]}
-                >
-                  Generar nuevos consejos
-                </Text>
-              </Pressable>
-            </View>
-          )}
-        </ScrollView>
-      </View>
-    );
-  }
-
 }
 
 const styles = StyleSheet.create({
@@ -4764,8 +4856,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   profilePrimaryButtonText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
   },
   profileStatusStrip: {
     borderRadius: 18,
@@ -5570,8 +5660,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   menuScanAnalyzeButtonText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
     color: "#FFFFFF",
   },
   menuScanCaptureButton: {
@@ -5751,8 +5839,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   menuAvoidName: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
     lineHeight: 20,
     flex: 1,
   },
@@ -5795,8 +5881,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   menuScanActionText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
     color: "#FFFFFF",
   },
   menuScanBackToCameraButton: {
@@ -5959,8 +6043,6 @@ const styles = StyleSheet.create({
     textDecorationLine: "line-through",
   },
   paywallPlanOptionPriceNew: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
     color: "#00C897",
   },
   paywallPlanOptionRadio: {
@@ -6010,128 +6092,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "rgba(255,255,255,0.7)",
     textDecorationLine: "underline",
-  },
-  tipsContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 32,
-    gap: 16,
-  },
-  tipsHeader: {
-    gap: 4,
-    marginBottom: 8,
-  },
-  tipsHeaderEyebrow: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-  },
-  tipsHeaderTitle: {
-    fontFamily: "Inter_800ExtraBold",
-    fontSize: 24,
-    lineHeight: 30,
-  },
-  tipsHeaderSubtitle: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  tipsLoading: {
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 48,
-  },
-  tipsLoadingText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-  },
-  tipsEmpty: {
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 48,
-  },
-  tipsEmptyTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 18,
-  },
-  tipsEmptyText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: "center",
-    paddingHorizontal: 16,
-  },
-  tipsGenerateButton: {
-    marginTop: 8,
-    borderRadius: 999,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-  },
-  tipsGenerateButtonText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
-    color: "#FFFFFF",
-  },
-  tipsList: {
-    gap: 12,
-  },
-  tipCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 18,
-    gap: 10,
-  },
-  tipCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  tipCardIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tipCardMeta: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  tipCardCategory: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-  },
-  tipCardIndex: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-  },
-  tipCardTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  tipCardBody: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  tipsRegenerateButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 999,
-    borderWidth: 1,
-    marginTop: 4,
-  },
-  tipsRegenerateText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
   },
 });

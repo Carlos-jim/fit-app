@@ -1,7 +1,9 @@
-import type { ComponentProps } from "react";
+import { useRef, useState, type ComponentProps } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
+  Easing,
   Pressable,
   StyleSheet,
   Text,
@@ -12,7 +14,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 
 import type { FitnessTheme } from "./fitness-ui";
-import { HealthProviderStatusCard } from "./health-provider-status-card";
+import { biomaApi } from "../services/bioma-api";
+import { handleError } from "../utils/toast";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -21,11 +24,9 @@ export interface ProfileScreenProps {
   theme: FitnessTheme;
   visualMode: "dark" | "light";
   fullName: string;
-  setFullName: (v: string) => void;
   email: string;
-  setEmail: (v: string) => void;
   userId: string | null;
-  onConnectProfile: () => Promise<string | null>;
+  plan: string;
   onLogout: () => void;
   bootstrapLoading: boolean;
   onToggleMode: () => void;
@@ -34,11 +35,16 @@ export interface ProfileScreenProps {
   onOpenEditProfile?: () => void;
   onOpenWorkoutHistory?: () => void;
   onForgotPassword?: () => void;
+  /**
+   * Called whenever the local name/email changes are persisted. The
+   * parent uses this to refresh the persisted session snapshot.
+   */
+  onProfileChanged?: (changes: {
+    fullName?: string;
+    email?: string;
+  }) => void | Promise<void>;
   ambientPulse: Animated.Value;
   mainScrollY: Animated.Value;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  healthProvider: any;
-  wellnessCardMode: "day" | "night";
 }
 
 // ─── Component ────────────────────────────────────────────────────
@@ -47,24 +53,84 @@ export function ProfileScreen(props: ProfileScreenProps) {
     theme,
     visualMode,
     fullName,
-    setFullName,
     email,
-    setEmail,
     userId,
-    onConnectProfile,
     onLogout,
     bootstrapLoading,
     onToggleMode,
     ambientPulse,
     mainScrollY,
-    healthProvider,
-    wellnessCardMode,
     onOpenWeightHistory,
     onOpenAccountSettings,
     onOpenEditProfile,
     onOpenWorkoutHistory,
     onForgotPassword,
+    onProfileChanged,
   } = props;
+
+  const [draftName, setDraftName] = useState(fullName);
+  const [draftEmail, setDraftEmail] = useState(email);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  const dirty = draftName.trim() !== fullName.trim() || draftEmail.trim() !== email.trim();
+  const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(draftEmail.trim());
+
+  const persistField = async (
+    field: "fullName" | "email",
+    value: string,
+  ): Promise<boolean> => {
+    try {
+      setSaving(true);
+      if (field === "email") {
+        // The backend currently has no dedicated PATCH for name/email
+        // updates — bootstrap is the supported path for self-service
+        // changes. Calling it rewrites the user row with the latest
+        // values without mutating the password.
+        await biomaApi.bootstrapUser({
+          email: value.trim().toLowerCase(),
+          fullName: draftName.trim(),
+        });
+      } else {
+        await biomaApi.bootstrapUser({
+          email: draftEmail.trim().toLowerCase(),
+          fullName: value.trim(),
+        });
+      }
+      setSavedAt(Date.now());
+      await onProfileChanged?.({
+        fullName: field === "fullName" ? value.trim() : undefined,
+        email: field === "email" ? value.trim() : undefined,
+      });
+      return true;
+    } catch (err) {
+      handleError(err, "No se pudo guardar");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCommit = async () => {
+    if (!dirty || !validEmail) return;
+    setSaving(true);
+    try {
+      // Single round-trip for both fields at once.
+      await biomaApi.bootstrapUser({
+        email: draftEmail.trim().toLowerCase(),
+        fullName: draftName.trim(),
+      });
+      setSavedAt(Date.now());
+      await onProfileChanged?.({
+        fullName: draftName.trim(),
+        email: draftEmail.trim(),
+      });
+    } catch (err) {
+      handleError(err, "No se pudo guardar");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const isDark = visualMode === "dark";
 
@@ -231,9 +297,14 @@ export function ProfileScreen(props: ProfileScreenProps) {
           <InputField
             icon="person-outline"
             label="Nombre completo"
-            value={fullName}
-            onChangeText={setFullName}
+            value={draftName}
+            onChangeText={setDraftName}
             placeholder="Tu nombre"
+            onBlur={() => {
+              if (draftName.trim() && draftName.trim() !== fullName.trim()) {
+                void persistField("fullName", draftName.trim());
+              }
+            }}
             theme={theme}
             inputBg={inputBg}
             strongText={strongText}
@@ -244,16 +315,48 @@ export function ProfileScreen(props: ProfileScreenProps) {
           <InputField
             icon="mail-outline"
             label="Correo electrónico"
-            value={email}
-            onChangeText={setEmail}
+            value={draftEmail}
+            onChangeText={setDraftEmail}
             placeholder="correo@bioma.app"
             keyboardType="email-address"
             autoCapitalize="none"
+            onBlur={() => {
+              if (
+                draftEmail.trim() &&
+                validEmail &&
+                draftEmail.trim() !== email.trim()
+              ) {
+                void persistField("email", draftEmail.trim());
+              }
+            }}
             theme={theme}
             inputBg={inputBg}
             strongText={strongText}
             softText={softText}
           />
+
+          {dirty && validEmail ? (
+            <Pressable
+              onPress={handleCommit}
+              disabled={saving}
+              style={[
+                styles.saveBtn,
+                { backgroundColor: theme.accent, opacity: saving ? 0.6 : 1 },
+              ]}
+            >
+              {saving ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.saveBtnText}>Guardar cambios</Text>
+              )}
+            </Pressable>
+          ) : null}
+
+          {savedAt && !dirty ? (
+            <Text style={[styles.savedHint, { color: mutedText }]}>
+              Cambios guardados
+            </Text>
+          ) : null}
 
           {/* Theme toggle */}
           <View style={styles.toggleRow}>
@@ -271,32 +374,6 @@ export function ProfileScreen(props: ProfileScreenProps) {
             <Switch value={!isDark} onToggle={onToggleMode} accent={theme.accent} />
           </View>
 
-          {/* Primary action */}
-          <Pressable
-            style={[
-              styles.primaryBtn,
-              { backgroundColor: theme.accent },
-              bootstrapLoading && styles.btnDisabled,
-            ]}
-            onPress={onConnectProfile}
-            disabled={bootstrapLoading}
-          >
-            {bootstrapLoading ? (
-              <ActivityIndicator color={isDark ? "#050505" : "#FFFFFF"} />
-            ) : (
-              <>
-                <Ionicons
-                  name={userId ? "sync-outline" : "link-outline"}
-                  size={18}
-                  color={isDark ? "#050505" : "#FFFFFF"}
-                />
-                <Text style={[styles.primaryBtnText, { color: isDark ? "#050505" : "#FFFFFF" }]}>
-                  {userId ? "Actualizar perfil" : "Conectar perfil"}
-                </Text>
-              </>
-            )}
-          </Pressable>
-
           {userId != null ? (
             <View style={styles.idRow}>
               <Ionicons name="id-card-outline" size={14} color={mutedText} />
@@ -308,123 +385,77 @@ export function ProfileScreen(props: ProfileScreenProps) {
         </View>
       </Animated.View>
 
-      {/* ─── Devices Section ─────────────────────────────────────── */}
-      <Animated.View
-        style={{
-          opacity: mainScrollY.interpolate({
-            inputRange: [140, 300],
-            outputRange: [0.56, 1],
-            extrapolate: "clamp",
-          }),
-          transform: [
-            {
-              translateY: mainScrollY.interpolate({
-                inputRange: [140, 300],
-                outputRange: [32, 0],
-                extrapolate: "clamp",
-              }),
-            },
-          ],
-        }}
-      >
-        <View style={[styles.card, { backgroundColor: panelBg, borderColor: panelStroke }]}>
-          <SectionTitle title="Dispositivos" theme={theme} />
-          <HealthProviderStatusCard
-            provider={healthProvider}
-            mode={wellnessCardMode}
-            theme={theme}
-          />
-        </View>
-      </Animated.View>
-
-      {/* ─── Quick links ───────────────────────────────────────── */}
+      {/* ─── Quick actions (collapsible) ───────────────────────── */}
       <View style={styles.quickLinks}>
         {onOpenWeightHistory ? (
-          <Pressable
-            style={[
-              styles.quickLink,
-              { backgroundColor: panelBg, borderColor: panelStroke },
-            ]}
-            onPress={onOpenWeightHistory}
-          >
-            <Ionicons name="fitness-outline" size={18} color={theme.accent} />
-            <Text style={[styles.quickLinkText, { color: strongText }]}>
-              Mi peso y medidas
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={mutedText} />
-          </Pressable>
+          <ProfileAccordionItem
+            icon="fitness-outline"
+            title="Mi peso y medidas"
+            description="Registra y consulta tu peso, cintura, cadera, pecho y porcentaje de grasa para seguir tu progreso."
+            actionLabel="Abrir historial"
+            onAction={onOpenWeightHistory}
+            theme={theme}
+            panelBg={panelBg}
+            panelStroke={panelStroke}
+            strongText={strongText}
+            mutedText={mutedText}
+          />
         ) : null}
         {onForgotPassword ? (
-          <Pressable
-            style={[
-              styles.quickLink,
-              { backgroundColor: panelBg, borderColor: panelStroke },
-            ]}
-            onPress={onForgotPassword}
-          >
-            <Ionicons name="key-outline" size={18} color={theme.accent} />
-            <Text style={[styles.quickLinkText, { color: strongText }]}>
-              Cambiar contraseña
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={mutedText} />
-          </Pressable>
+          <ProfileAccordionItem
+            icon="key-outline"
+            title="Cambiar contraseña"
+            description="Actualiza tu contraseña o solicita un enlace de recuperacion si no puedes entrar."
+            actionLabel="Recuperar acceso"
+            onAction={onForgotPassword}
+            theme={theme}
+            panelBg={panelBg}
+            panelStroke={panelStroke}
+            strongText={strongText}
+            mutedText={mutedText}
+          />
         ) : null}
         {onOpenEditProfile ? (
-          <Pressable
-            style={[
-              styles.quickLink,
-              { backgroundColor: panelBg, borderColor: panelStroke },
-            ]}
-            onPress={onOpenEditProfile}
-          >
-            <Ionicons
-              name="create-outline"
-              size={18}
-              color={theme.accent}
-            />
-            <Text style={[styles.quickLinkText, { color: strongText }]}>
-              Editar perfil físico
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={mutedText} />
-          </Pressable>
+          <ProfileAccordionItem
+            icon="create-outline"
+            title="Editar perfil fisico"
+            description="Modifica tu altura, peso, objetivo, nivel de actividad y pais para recalibrar el plan."
+            actionLabel="Editar perfil"
+            onAction={onOpenEditProfile}
+            theme={theme}
+            panelBg={panelBg}
+            panelStroke={panelStroke}
+            strongText={strongText}
+            mutedText={mutedText}
+          />
         ) : null}
         {onOpenWorkoutHistory ? (
-          <Pressable
-            style={[
-              styles.quickLink,
-              { backgroundColor: panelBg, borderColor: panelStroke },
-            ]}
-            onPress={onOpenWorkoutHistory}
-          >
-            <Ionicons
-              name="barbell-outline"
-              size={18}
-              color={theme.accent}
-            />
-            <Text style={[styles.quickLinkText, { color: strongText }]}>
-              Entrenamientos
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={mutedText} />
-          </Pressable>
+          <ProfileAccordionItem
+            icon="barbell-outline"
+            title="Entrenamientos"
+            description="Consulta, registra o elimina tus sesiones de ejercicio y series por dia."
+            actionLabel="Ver entrenamientos"
+            onAction={onOpenWorkoutHistory}
+            theme={theme}
+            panelBg={panelBg}
+            panelStroke={panelStroke}
+            strongText={strongText}
+            mutedText={mutedText}
+          />
         ) : null}
         {onOpenAccountSettings ? (
-          <Pressable
-            style={[
-              styles.quickLink,
-              { backgroundColor: panelBg, borderColor: panelStroke },
-            ]}
-            onPress={onOpenAccountSettings}
-          >
-            <Ionicons
-              name="shield-checkmark-outline"
-              size={18}
-              color={theme.accent}
-            />
-            <Text style={[styles.quickLinkText, { color: strongText }]}>
-              Privacidad y datos
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={mutedText} />
-          </Pressable>
+          <ProfileAccordionItem
+            icon="shield-checkmark-outline"
+            title="Privacidad y datos"
+            description="Exporta tu informacion o elimina tu cuenta y todos los datos asociados."
+            actionLabel="Configurar cuenta"
+            onAction={onOpenAccountSettings}
+            theme={theme}
+            panelBg={panelBg}
+            panelStroke={panelStroke}
+            strongText={strongText}
+            mutedText={mutedText}
+          />
         ) : null}
       </View>
 
@@ -434,7 +465,16 @@ export function ProfileScreen(props: ProfileScreenProps) {
           styles.logoutBtn,
           { backgroundColor: isDark ? "#2A181C" : "#FFF0F0", borderColor: isDark ? "#3D2228" : "#FFD6D6" },
         ]}
-        onPress={onLogout}
+        onPress={() => {
+          Alert.alert(
+            "Cerrar sesion",
+            "Vamos a cerrar tu sesion en este dispositivo. Puedes volver a entrar cuando quieras.",
+            [
+              { text: "Cancelar", style: "cancel" },
+              { text: "Cerrar sesion", style: "destructive", onPress: onLogout },
+            ],
+          );
+        }}
       >
         <Ionicons name="log-out-outline" size={18} color="#F43F5E" />
         <Text style={[styles.logoutText, { color: "#F43F5E" }]}>
@@ -453,11 +493,139 @@ function SectionTitle({ title, theme }: { title: string; theme: FitnessTheme }) 
   );
 }
 
+function ProfileAccordionItem({
+  icon,
+  title,
+  description,
+  actionLabel,
+  onAction,
+  theme,
+  panelBg,
+  panelStroke,
+  strongText,
+  mutedText,
+}: {
+  icon: IoniconName;
+  title: string;
+  description: string;
+  actionLabel: string;
+  onAction: () => void;
+  theme: FitnessTheme;
+  panelBg: string;
+  panelStroke: string;
+  strongText: string;
+  mutedText: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const progress = useRef(new Animated.Value(0)).current;
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    Animated.timing(progress, {
+      toValue: next ? 1 : 0,
+      duration: 220,
+      easing: next ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const bodyHeight = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 96],
+   });
+  const bodyOpacity = progress.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [0, 0, 1],
+  });
+  const chevronRotate = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "180deg"],
+  });
+
+  return (
+    <View
+      style={[
+        styles.accordionItem,
+        { backgroundColor: panelBg, borderColor: panelStroke },
+      ]}
+    >
+      <Pressable
+        style={styles.accordionHeader}
+        onPress={toggle}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={title}
+      >
+        <View
+          style={[
+            styles.accordionIconWrap,
+            { backgroundColor: `${theme.accent}1A` },
+          ]}
+        >
+          <Ionicons name={icon} size={18} color={theme.accent} />
+        </View>
+        <Text style={[styles.accordionTitle, { color: strongText }]}>
+          {title}
+        </Text>
+        <Animated.View
+          style={[
+            styles.accordionChevron,
+            { transform: [{ rotate: chevronRotate }] },
+          ]}
+        >
+          <Ionicons name="chevron-down" size={16} color={mutedText} />
+        </Animated.View>
+      </Pressable>
+
+      <Animated.View
+        style={[
+          styles.accordionBody,
+          { height: bodyHeight, opacity: bodyOpacity },
+        ]}
+      >
+        <View style={styles.accordionBodyInner}>
+          <View
+            style={[
+              styles.accordionDivider,
+              { backgroundColor: panelStroke },
+            ]}
+          />
+          <Text
+            style={[styles.accordionDescription, { color: mutedText }]}
+          >
+            {description}
+          </Text>
+          <Pressable
+            style={[
+              styles.accordionActionBtn,
+              { backgroundColor: `${theme.accent}1A`, borderColor: theme.accent },
+            ]}
+            onPress={onAction}
+            accessibilityRole="button"
+            accessibilityLabel={actionLabel}
+          >
+            <Text style={[styles.accordionActionText, { color: theme.accent }]}>
+              {actionLabel}
+            </Text>
+            <Ionicons
+              name="arrow-forward"
+              size={13}
+              color={theme.accent}
+            />
+          </Pressable>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
 function InputField({
   icon,
   label,
   value,
   onChangeText,
+  onBlur,
   placeholder,
   keyboardType,
   autoCapitalize,
@@ -470,6 +638,7 @@ function InputField({
   label: string;
   value: string;
   onChangeText: (v: string) => void;
+  onBlur?: () => void;
   placeholder: string;
   keyboardType?: "default" | "email-address";
   autoCapitalize?: "none" | "sentences";
@@ -486,6 +655,7 @@ function InputField({
         <TextInput
           value={value}
           onChangeText={onChangeText}
+          onBlur={onBlur}
           placeholder={placeholder}
           placeholderTextColor={softText}
           keyboardType={keyboardType}
@@ -701,19 +871,6 @@ const styles = StyleSheet.create({
   },
 
   // ── Buttons ───────────────────────────────────────────────────
-  primaryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    minHeight: 52,
-    borderRadius: 16,
-    marginTop: 4,
-  },
-  primaryBtnText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
-  },
   btnDisabled: {
     opacity: 0.6,
   },
@@ -742,22 +899,89 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 15,
   },
+  // ─── Save button + saved hint ─────────────────────────────────
+  saveBtn: {
+    minHeight: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+  },
+  saveBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    color: "#FFFFFF",
+  },
+  savedHint: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    textAlign: "center",
+  },
   quickLinks: {
     gap: 8,
     marginBottom: 12,
   },
-  quickLink: {
+  accordionItem: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  accordionHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderRadius: 16,
-    borderWidth: 1,
   },
-  quickLinkText: {
+  accordionIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  accordionTitle: {
     flex: 1,
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
+  },
+  accordionChevron: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  accordionBody: {
+    overflow: "hidden",
+  },
+  accordionBodyInner: {
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    paddingTop: 2,
+    gap: 12,
+  },
+  accordionDescription: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 19,
+    paddingLeft: 48,
+  },
+  accordionActionBtn: {
+    marginLeft: 48,
+    alignSelf: "flex-start",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  accordionActionText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+  },
+  accordionDivider: {
+    height: 1,
   },
 });

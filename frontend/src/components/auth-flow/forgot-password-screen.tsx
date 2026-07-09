@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import type { FitnessTheme } from "../fitness-ui";
 import { biomaApi } from "../../services/bioma-api";
+import { handleError, showError } from "../../utils/toast";
 
 type VisualMode = "dark" | "light";
 
@@ -45,7 +45,7 @@ export function ForgotPasswordScreen({
 
   const handleSubmit = async () => {
     if (!isValidEmail) {
-      Alert.alert("Correo inválido", "Ingresa un correo válido.");
+      showError("Correo inválido", "Ingresa un correo válido.");
       return;
     }
     try {
@@ -53,10 +53,7 @@ export function ForgotPasswordScreen({
       await biomaApi.forgotPassword(email.trim().toLowerCase());
       setSent(true);
     } catch (err) {
-      Alert.alert(
-        "No se pudo enviar",
-        err instanceof Error ? err.message : "Intenta de nuevo en unos minutos.",
-      );
+      handleError(err, "No se pudo enviar");
     } finally {
       setLoading(false);
     }

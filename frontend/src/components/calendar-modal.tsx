@@ -16,7 +16,7 @@ interface CalendarModalProps {
   onClose: () => void;
   theme: FitnessTheme;
   logs: MealLog[];
-  calorieGoal: number;
+  calorieGoal: number | null;
 }
 
 const DAY_LABELS = ["D", "L", "M", "M", "J", "V", "S"];
@@ -259,10 +259,12 @@ export function CalendarModal({
 
 function getStatus(
   summary: { calories: number; count: number } | undefined,
-  calorieGoal: number,
+  calorieGoal: number | null,
 ): DayStatus {
   if (!summary || summary.count === 0) return "empty";
-  if (calorieGoal > 0 && summary.calories >= calorieGoal) return "complete";
+  if (calorieGoal !== null && calorieGoal > 0 && summary.calories >= calorieGoal) {
+    return "complete";
+  }
   return "progress";
 }
 

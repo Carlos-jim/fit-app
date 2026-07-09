@@ -18,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { FitnessTheme } from "./fitness-ui";
 import type { BodyMetric, BodyMetricType } from "../types/api";
 import { biomaApi } from "../services/bioma-api";
+import { handleError } from "../utils/toast";
 
 type VisualMode = "dark" | "light";
 
@@ -48,6 +49,7 @@ export function WeightHistoryScreen({
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<Range>("30d");
   const [entryOpen, setEntryOpen] = useState(false);
+  const [goalKg, setGoalKg] = useState<number | null>(null);
 
   const dark = theme.background === "#050505";
 
@@ -56,8 +58,15 @@ export function WeightHistoryScreen({
     try {
       setLoading(true);
       setError(null);
-      const data = await biomaApi.listBodyMetrics({ type: "WEIGHT_KG" });
+      const [data, profile] = await Promise.all([
+        biomaApi.listBodyMetrics({ type: "WEIGHT_KG", limit: 500 }),
+        biomaApi.getMeProfile(),
+      ]);
       setMetrics(data);
+      // `desiredWeightKg` comes from the onboarding "target weight"
+      // step; surface it on the chart so the user can see how far
+      // they are from the goal they signed up with.
+      setGoalKg(profile.profile?.desiredWeightKg ?? null);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "No se pudo cargar el historial.",
@@ -79,7 +88,7 @@ export function WeightHistoryScreen({
     return metrics.filter((m) => new Date(m.recordedAt) >= cutoff);
   }, [metrics, range]);
 
-  const stats = useMemo(() => computeStats(filtered), [filtered]);
+  const stats = useMemo(() => computeStats(filtered, goalKg), [filtered, goalKg]);
 
   const handleDelete = (id: string) => {
     Alert.alert("Eliminar registro", "¿Quieres eliminar este peso?", [
@@ -87,17 +96,14 @@ export function WeightHistoryScreen({
       {
         text: "Eliminar",
         style: "destructive",
-        onPress: async () => {
-          try {
-            await biomaApi.deleteBodyMetric(id);
-            await load();
-          } catch (err) {
-            Alert.alert(
-              "No se pudo eliminar",
-              err instanceof Error ? err.message : "Intenta de nuevo.",
-            );
-          }
-        },
+          onPress: async () => {
+            try {
+              await biomaApi.deleteBodyMetric(id);
+              await load();
+            } catch (err) {
+              handleError(err, "No se pudo eliminar");
+            }
+          },
       },
     ]);
   };
@@ -654,7 +660,10 @@ function WeightEntryModal({
   );
 }
 
-function computeStats(metrics: BodyMetric[]) {
+function computeStats(
+  metrics: BodyMetric[],
+  goalKg: number | null = null,
+) {
   if (metrics.length === 0) return null;
   const sorted = [...metrics].sort(
     (a, b) =>
@@ -678,7 +687,7 @@ function computeStats(metrics: BodyMetric[]) {
     average,
     delta,
     deltaLabel,
-    goalKg: null,
+    goalKg,
   };
 }
 
