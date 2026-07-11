@@ -1,168 +1,214 @@
-import { computeTdee, splitMacros } from "../src/services/nutrition-plan.service";
+const mockGenerate = jest.fn();
+const mockCtor = jest.fn().mockImplementation(() => ({
+  models: { generateContent: mockGenerate },
+}));
 
-describe("computeTdee (Mifflin-St Jeor)", () => {
-  it("returns null when essential inputs are missing", () => {
-    expect(
-      computeTdee({
-        weightKg: null,
-        heightCm: 170,
-        age: 30,
-        gender: "MALE",
-        activityLevel: null,
-        workoutFrequency: null,
-        goal: null,
-      }),
-    ).toBeNull();
-    expect(
-      computeTdee({
-        weightKg: 70,
-        heightCm: null,
-        age: 30,
-        gender: "MALE",
-        activityLevel: null,
-        workoutFrequency: null,
-        goal: null,
-      }),
-    ).toBeNull();
-    expect(
-      computeTdee({
-        weightKg: 70,
-        heightCm: 170,
-        age: null,
-        gender: "MALE",
-        activityLevel: null,
-        workoutFrequency: null,
-        goal: null,
-      }),
-    ).toBeNull();
+jest.mock("@google/genai", () => ({
+  GoogleGenAI: mockCtor,
+}));
+
+import { NutritionPlanService } from "../src/services/nutrition-plan.service";
+
+const validGeminiOutput = {
+  dailyCalories: 2200,
+  proteinGrams: 150,
+  carbsGrams: 240,
+  fatGrams: 70,
+  proteinPercentage: 27,
+  carbsPercentage: 44,
+  fatPercentage: 29,
+  bmr: 1700,
+  tdee: 2400,
+  rationale: "Plan moderado para mantener peso con actividad regular.",
+};
+
+const baseProfile = {
+  id: "p1",
+  userId: "u1",
+  goal: "MAINTAIN",
+  weightKg: 75,
+  heightCm: 175,
+  desiredWeightKg: 75,
+  gender: "MALE",
+  age: 30,
+  country: "Venezuela",
+  workoutFrequency: "MEDIUM",
+  activityLevel: "MODERATE",
+  dietaryPrefs: [],
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
+function makePrismaStub(opts: {
+  existing?: unknown | null;
+  upserted?: unknown;
+  profile?: unknown | null;
+}) {
+  const nutritionPlanFindUnique = jest.fn(async () => opts.existing ?? null);
+  const nutritionPlanUpsert = jest.fn(async () => opts.upserted ?? { ...validGeminiOutput });
+  const userProfileFindUnique = jest.fn(async () => opts.profile ?? baseProfile);
+
+  return {
+    prisma: {
+      nutritionPlan: {
+        findUnique: nutritionPlanFindUnique,
+        upsert: nutritionPlanUpsert,
+      },
+      userProfile: {
+        findUnique: userProfileFindUnique,
+      },
+    },
+    nutritionPlanFindUnique,
+    nutritionPlanUpsert,
+    userProfileFindUnique,
+  };
+}
+
+describe("NutritionPlanService (Gemini)", () => {
+  beforeEach(() => {
+    mockGenerate.mockReset();
+    mockCtor.mockClear();
   });
 
-  it("uses female formula when gender is FEMALE", () => {
-    const result = computeTdee({
-      weightKg: 60,
-      heightCm: 165,
-      age: 30,
-      gender: "FEMALE",
-      activityLevel: "MODERATE",
-      workoutFrequency: null,
-      goal: "MAINTAIN",
+  it("calls Gemini and persists the parsed plan on recompute", async () => {
+    mockGenerate.mockResolvedValueOnce({
+      text: JSON.stringify(validGeminiOutput),
+      modelVersion: "gemini-2.5-flash-lite",
     });
-    expect(result).not.toBeNull();
-    // BMR for female: 10*60 + 6.5*165 - 5*30 - 161 = 600 + 1072.5 - 150 - 161 = 1361.5
-    expect(result!.bmr).toBe(1362); // 1361.5 rounded
-    // Maintenance with MODERATE multiplier 1.55
-    expect(result!.maintenanceCalories).toBe(Math.round(1361.5 * 1.55));
-  });
 
-  it("uses male baseline when gender is MALE", () => {
-    const result = computeTdee({
-      weightKg: 80,
-      heightCm: 180,
-      age: 30,
-      gender: "MALE",
-      activityLevel: "SEDENTARY",
-      workoutFrequency: null,
-      goal: "MAINTAIN",
+    const stub = makePrismaStub({
+      profile: baseProfile,
+      upserted: { ...validGeminiOutput, source: "gemini" },
     });
-    // BMR for male: 10*80 + 6.5*180 - 5*30 + 5 = 800 + 1170 - 150 + 5 = 1825
-    expect(result!.bmr).toBe(1825);
+    const svc = new NutritionPlanService(stub.prisma as never);
+
+    const result = await svc.recompute("u1");
+
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
+    expect(stub.userProfileFindUnique).toHaveBeenCalledWith({ where: { userId: "u1" } });
+    expect(stub.nutritionPlanUpsert).toHaveBeenCalledTimes(1);
+    const upsertArg = (
+      stub.nutritionPlanUpsert.mock.calls as unknown as Array<[unknown]>
+    )[0]![0] as {
+      create: { source: string; dailyCalories: number };
+      update: { source: string };
+    };
+    expect(upsertArg.create.source).toBe("gemini");
+    expect(upsertArg.update.source).toBe("gemini");
+    expect(upsertArg.create.dailyCalories).toBe(2200);
+    expect(result).toEqual({ ...validGeminiOutput, source: "gemini" });
   });
 
-  it("applies LOSE_WEIGHT calorie deficit", () => {
-    const result = computeTdee({
-      weightKg: 80,
-      heightCm: 180,
-      age: 30,
-      gender: "MALE",
-      activityLevel: "MODERATE",
-      workoutFrequency: null,
+  it("sends onboarding data (weight, height, goal, activity, country, dietary prefs) in the prompt", async () => {
+    mockGenerate.mockResolvedValueOnce({
+      text: JSON.stringify(validGeminiOutput),
+      modelVersion: "gemini-2.5-flash-lite",
+    });
+
+    const profile = {
+      ...baseProfile,
+      dietaryPrefs: ["vegetariano", "sin lactosa"],
+      country: "Colombia",
       goal: "LOSE_WEIGHT",
+    };
+    const stub = makePrismaStub({ profile });
+    const svc = new NutritionPlanService(stub.prisma as never);
+
+    await svc.recompute("u1");
+
+    const callArg = mockGenerate.mock.calls[0]?.[0];
+    expect(callArg.contents).toContain("vegetariano, sin lactosa");
+    expect(callArg.contents).toContain("Colombia");
+    expect(callArg.contents).toContain("LOSE_WEIGHT");
+    expect(callArg.contents).toContain("75 kg");
+    expect(callArg.contents).toContain("175 cm");
+  });
+
+  it("returns the existing plan without calling Gemini on lazy fetch", async () => {
+    const existing = { ...validGeminiOutput, source: "gemini" };
+    const stub = makePrismaStub({ existing });
+    const svc = new NutritionPlanService(stub.prisma as never);
+
+    const result = await svc.ensurePlanForProfile("u1", baseProfile as never);
+
+    expect(result).toBe(existing);
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
+  it("returns null when the profile is incomplete", async () => {
+    const stub = makePrismaStub({});
+    const svc = new NutritionPlanService(stub.prisma as never);
+
+    const incomplete = {
+      ...baseProfile,
+      weightKg: null,
+      heightCm: null,
+      age: null,
+    };
+    const result = await svc.ensurePlanForProfile("u1", incomplete as never);
+
+    expect(result).toBeNull();
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
+  it("throws GEMINI_UNAVAILABLE when the Gemini client fails", async () => {
+    mockGenerate.mockRejectedValueOnce(new Error("network down"));
+
+    const stub = makePrismaStub({ profile: baseProfile });
+    const svc = new NutritionPlanService(stub.prisma as never);
+
+    await expect(svc.recompute("u1")).rejects.toMatchObject({
+      code: "GEMINI_UNAVAILABLE",
+      statusCode: 503,
     });
-    // Should be 20% under maintenance, but never below 1200
-    expect(result!.targetCalories).toBeLessThan(result!.maintenanceCalories);
-    expect(result!.targetCalories).toBeGreaterThanOrEqual(1200);
+    expect(stub.nutritionPlanUpsert).not.toHaveBeenCalled();
   });
 
-  it("applies GAIN_WEIGHT calorie surplus", () => {
-    const result = computeTdee({
-      weightKg: 80,
-      heightCm: 180,
-      age: 30,
-      gender: "MALE",
-      activityLevel: "MODERATE",
-      workoutFrequency: null,
-      goal: "GAIN_WEIGHT",
+  it("throws GEMINI_INVALID_RESPONSE when Gemini returns non-JSON", async () => {
+    mockGenerate.mockResolvedValueOnce({
+      text: "not-json",
+      modelVersion: "gemini-2.5-flash-lite",
     });
-    expect(result!.targetCalories).toBeGreaterThan(result!.maintenanceCalories);
-  });
 
-  it("falls back to workout frequency when activity level is missing", () => {
-    const result = computeTdee({
-      weightKg: 80,
-      heightCm: 180,
-      age: 30,
-      gender: "MALE",
-      activityLevel: null,
-      workoutFrequency: "HIGH",
-      goal: "MAINTAIN",
+    const stub = makePrismaStub({ profile: baseProfile });
+    const svc = new NutritionPlanService(stub.prisma as never);
+
+    await expect(svc.recompute("u1")).rejects.toMatchObject({
+      code: "GEMINI_INVALID_RESPONSE",
+      statusCode: 502,
     });
-    // HIGH workout frequency maps to ACTIVE (1.725)
-    const activeResult = computeTdee({
-      weightKg: 80,
-      heightCm: 180,
-      age: 30,
-      gender: "MALE",
-      activityLevel: "ACTIVE",
-      workoutFrequency: null,
-      goal: "MAINTAIN",
+    expect(stub.nutritionPlanUpsert).not.toHaveBeenCalled();
+  });
+
+  it("throws GEMINI_SCHEMA_MISMATCH when Gemini JSON fails validation", async () => {
+    mockGenerate.mockResolvedValueOnce({
+      text: JSON.stringify({ dailyCalories: -10 }),
+      modelVersion: "gemini-2.5-flash-lite",
     });
-    expect(result!.maintenanceCalories).toBe(activeResult!.maintenanceCalories);
-  });
 
-  it("enforces a 1200 kcal minimum even for aggressive deficits", () => {
-    const result = computeTdee({
-      weightKg: 50,
-      heightCm: 150,
-      age: 70,
-      gender: "FEMALE",
-      activityLevel: "SEDENTARY",
-      workoutFrequency: null,
-      goal: "LOSE_WEIGHT",
+    const stub = makePrismaStub({ profile: baseProfile });
+    const svc = new NutritionPlanService(stub.prisma as never);
+
+    await expect(svc.recompute("u1")).rejects.toMatchObject({
+      code: "GEMINI_SCHEMA_MISMATCH",
+      statusCode: 502,
     });
-    expect(result!.targetCalories).toBe(1200);
-  });
-});
-
-describe("splitMacros", () => {
-  it("returns percentages that sum to 100", () => {
-    const macros = splitMacros(2000, "MAINTAIN");
-    expect(macros.proteinPercentage + macros.carbsPercentage + macros.fatPercentage).toBe(100);
+    expect(stub.nutritionPlanUpsert).not.toHaveBeenCalled();
   });
 
-  it("adjusts split for LOSE_WEIGHT (higher protein, lower carbs)", () => {
-    const macros = splitMacros(2000, "LOSE_WEIGHT");
-    expect(macros.proteinPercentage).toBe(35);
-    expect(macros.carbsPercentage).toBe(40);
-    expect(macros.fatPercentage).toBe(25);
-  });
+  it("throws GEMINI_SCHEMA_MISMATCH when macro percentages do not sum to 100", async () => {
+    mockGenerate.mockResolvedValueOnce({
+      text: JSON.stringify({ ...validGeminiOutput, fatPercentage: 10 }),
+      modelVersion: "gemini-2.5-flash-lite",
+    });
 
-  it("adjusts split for GAIN_WEIGHT (higher carbs)", () => {
-    const macros = splitMacros(2500, "GAIN_WEIGHT");
-    expect(macros.carbsPercentage).toBe(55);
-  });
+    const stub = makePrismaStub({ profile: baseProfile });
+    const svc = new NutritionPlanService(stub.prisma as never);
 
-  it("rounds grams to integers", () => {
-    const macros = splitMacros(2000, "MAINTAIN");
-    expect(Number.isInteger(macros.proteinGrams)).toBe(true);
-    expect(Number.isInteger(macros.carbsGrams)).toBe(true);
-    expect(Number.isInteger(macros.fatGrams)).toBe(true);
-  });
-
-  it("returns a coherent calorie target when applied to grams", () => {
-    // protein*4 + carbs*4 + fat*9 should be close to the input calories
-    const total = 2000;
-    const macros = splitMacros(total, "MAINTAIN");
-    const back = macros.proteinGrams * 4 + macros.carbsGrams * 4 + macros.fatGrams * 9;
-    expect(Math.abs(back - total)).toBeLessThan(total * 0.02); // within 2%
+    await expect(svc.recompute("u1")).rejects.toMatchObject({
+      code: "GEMINI_SCHEMA_MISMATCH",
+      statusCode: 502,
+    });
+    expect(stub.nutritionPlanUpsert).not.toHaveBeenCalled();
   });
 });

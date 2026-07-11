@@ -1,6 +1,7 @@
 // Set required env vars BEFORE any module imports config/env.
 process.env.NODE_ENV = "test";
 process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
+process.env.LLM_PROVIDER = "gemini";
 process.env.GEMINI_API_KEY = "test-key";
 // Pick a primary model distinct from the secondary fallback so the
 // fallback path is reachable in tests.

@@ -2,7 +2,20 @@ import { z } from "zod";
 
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
-  GEMINI_API_KEY: z.string().min(1, "GEMINI_API_KEY is required"),
+  // LLM provider switch: "ollama" (local) or "gemini" (cloud). Defaults to
+  // "ollama" so local dev works out-of-the-box without a Gemini key.
+  LLM_PROVIDER: z.enum(["ollama", "gemini"]).optional().default("ollama"),
+  // Ollama — OpenAI-compatible endpoint exposed by the local Ollama server.
+  OLLAMA_BASE_URL: z
+    .string()
+    .url()
+    .optional()
+    .default("http://localhost:11434/v1"),
+  OLLAMA_MODEL: z.string().min(1).optional().default("qwen2.5vl:7b"),
+  OLLAMA_FALLBACK_MODEL: z.string().min(1).optional(),
+  // Gemini — only required when LLM_PROVIDER === "gemini". Optional otherwise
+  // so devs without a key can still run the app against a local Ollama.
+  GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().min(1).default("gemini-2.5-flash-lite"),
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
@@ -56,6 +69,12 @@ const envSchema = z.object({
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
+
+if (parsedEnv.success && parsedEnv.data.LLM_PROVIDER === "gemini" && !parsedEnv.data.GEMINI_API_KEY) {
+  throw new Error(
+    "Invalid environment configuration: GEMINI_API_KEY is required when LLM_PROVIDER=gemini",
+  );
+}
 
 if (!parsedEnv.success) {
   const issues = parsedEnv.error.issues

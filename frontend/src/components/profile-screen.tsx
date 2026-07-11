@@ -1,9 +1,9 @@
 import { useRef, useState, type ComponentProps } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { FitnessTheme } from "./fitness-ui";
 import { biomaApi } from "../services/bioma-api";
@@ -72,6 +73,8 @@ export function ProfileScreen(props: ProfileScreenProps) {
   const [draftEmail, setDraftEmail] = useState(email);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [confirmLogoutVisible, setConfirmLogoutVisible] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const dirty = draftName.trim() !== fullName.trim() || draftEmail.trim() !== email.trim();
   const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(draftEmail.trim());
@@ -465,22 +468,92 @@ export function ProfileScreen(props: ProfileScreenProps) {
           styles.logoutBtn,
           { backgroundColor: isDark ? "#2A181C" : "#FFF0F0", borderColor: isDark ? "#3D2228" : "#FFD6D6" },
         ]}
-        onPress={() => {
-          Alert.alert(
-            "Cerrar sesion",
-            "Vamos a cerrar tu sesion en este dispositivo. Puedes volver a entrar cuando quieras.",
-            [
-              { text: "Cancelar", style: "cancel" },
-              { text: "Cerrar sesion", style: "destructive", onPress: onLogout },
-            ],
-          );
-        }}
+        onPress={() => setConfirmLogoutVisible(true)}
       >
         <Ionicons name="log-out-outline" size={18} color="#F43F5E" />
         <Text style={[styles.logoutText, { color: "#F43F5E" }]}>
           Cerrar sesión
         </Text>
       </Pressable>
+
+      <Modal
+        visible={confirmLogoutVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmLogoutVisible(false)}
+      >
+        <View style={styles.logoutModalScrim}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setConfirmLogoutVisible(false)}
+          />
+          <View
+            style={[
+              styles.logoutModalCard,
+              {
+                backgroundColor: isDark ? "#0F1A16" : "#FFFFFF",
+                borderColor: theme.stroke,
+                marginBottom: insets.bottom,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.logoutModalIconWrap,
+                { backgroundColor: isDark ? "rgba(244, 63, 94, 0.18)" : "rgba(244, 63, 94, 0.10)" },
+              ]}
+            >
+              <Ionicons name="log-out-outline" size={22} color="#F43F5E" />
+            </View>
+            <Text style={[styles.logoutModalTitle, { color: theme.text }]}>
+              ¿Cerrar sesión?
+            </Text>
+            <Text style={[styles.logoutModalBody, { color: theme.muted }]}>
+              Vamos a cerrar tu sesión en este dispositivo. Puedes volver a
+              entrar cuando quieras.
+            </Text>
+            <View style={styles.logoutModalActions}>
+              <Pressable
+                style={[
+                  styles.logoutModalBtn,
+                  {
+                    backgroundColor: theme.cardMuted,
+                    borderColor: theme.stroke,
+                  },
+                ]}
+                onPress={() => setConfirmLogoutVisible(false)}
+              >
+                <Text style={[styles.logoutModalBtnText, { color: theme.text }]}>
+                  Cancelar
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.logoutModalBtn,
+                  styles.logoutModalBtnDanger,
+                  {
+                    backgroundColor: isDark ? "#3D2228" : "#FFD6D6",
+                    borderColor: isDark ? "#5C2F38" : "#FCA5A5",
+                  },
+                ]}
+                onPress={() => {
+                  setConfirmLogoutVisible(false);
+                  onLogout();
+                }}
+              >
+                <Text
+                  style={[
+                    styles.logoutModalBtnText,
+                    { color: "#F43F5E" },
+                  ]}
+                >
+                  Cerrar sesión
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -898,6 +971,63 @@ const styles = StyleSheet.create({
   logoutText: {
     fontFamily: "Inter_700Bold",
     fontSize: 15,
+  },
+  logoutModalScrim: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  logoutModalCard: {
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: "center",
+  },
+  logoutModalIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  logoutModalTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  logoutModalBody: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  logoutModalActions: {
+    flexDirection: "row",
+    gap: 10,
+    alignSelf: "stretch",
+  },
+  logoutModalBtn: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  logoutModalBtnDanger: {
+    // color/border applied inline per theme
+  },
+  logoutModalBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
   },
   // ─── Save button + saved hint ─────────────────────────────────
   saveBtn: {

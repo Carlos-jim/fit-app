@@ -1325,7 +1325,10 @@ function handleError(res: Response, error: unknown, context: string): void {
     res.status(error.statusCode).json({
       error: error.code,
       message: error.message,
-      details: !isProduction && error.expose ? (error.cause ?? null) : null,
+      details:
+      !isProduction && (error.expose || error.statusCode >= 500)
+        ? serializeUnknownError(error.cause, context)
+        : null,
     });
     return;
   }
@@ -1336,7 +1339,31 @@ function handleError(res: Response, error: unknown, context: string): void {
   res.status(500).json({
     error: "INTERNAL_SERVER_ERROR",
     message: "Unexpected server error.",
+    details: isProduction ? null : serializeUnknownError(error, context),
   });
+}
+
+function serializeUnknownError(error: unknown, context: string): Record<string, unknown> {
+  if (error instanceof Error) {
+    const out: Record<string, unknown> = {
+      context,
+      name: error.name,
+      message: error.message,
+    };
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string" || typeof code === "number") {
+      out.code = code;
+    }
+    const meta = (error as { meta?: unknown }).meta;
+    if (meta !== undefined) {
+      out.meta = meta;
+    }
+    if (error.stack) {
+      out.stack = error.stack.split("\n").slice(0, 8).join("\n");
+    }
+    return out;
+  }
+  return { context, value: String(error) };
 }
 
 function serializeMealLog(log: {

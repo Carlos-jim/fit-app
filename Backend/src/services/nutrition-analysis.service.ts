@@ -1,5 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
-
 import { env } from "../config/env.js";
 import {
   nutritionAnalysisJsonSchema,
@@ -18,16 +16,11 @@ import {
   type MenuAnalysis,
 } from "../contracts/analyze-menu-request.js";
 import { AppError } from "../lib/app-error.js";
-
-const geminiClient = new GoogleGenAI({
-  apiKey: env.GEMINI_API_KEY,
-  httpOptions: {
-    timeout: 45_000,
-  },
-});
-
-const FALLBACK_GEMINI_MODEL = "gemini-2.5-flash";
-const SECONDARY_FALLBACK_GEMINI_MODEL = "gemini-2.5-flash-lite";
+import {
+  getCandidateModels,
+  llmClient,
+  type LLMMessageContentPart,
+} from "../lib/llm-client.js";
 
 const SYSTEM_PROMPT = [
   "You are the nutrition-analysis engine for a mobile health app used in Venezuela.",
@@ -127,121 +120,59 @@ export class NutritionAnalysisService {
       return this.getMockMenuAnalysis();
     }
 
-    const imagePart = {
-      fileData: {
-        mimeType: "image/jpeg",
-        fileUri: imageUrl,
-      },
-    };
-
+    const imageDataUrl = await this.fetchImageAsDataUrl(imageUrl);
     const prompt = this.buildMenuPrompt();
 
-    const candidateModels = Array.from(
-      new Set([
-        env.GEMINI_MODEL,
-        FALLBACK_GEMINI_MODEL,
-        SECONDARY_FALLBACK_GEMINI_MODEL,
-      ]),
-    );
-
+    const candidateModels = getCandidateModels();
     let lastError: unknown;
 
     for (const modelName of candidateModels) {
       try {
-        const maxAttempts =
-          modelName === SECONDARY_FALLBACK_GEMINI_MODEL ? 1 : 2;
-
-        for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-          try {
-            const response = await geminiClient.models.generateContent({
-              model: modelName,
-              contents: [
-                {
-                  role: "user",
-                  parts: [{ text: prompt }, imagePart],
-                },
+        const response = await llmClient.generate({
+          model: modelName,
+          messages: [
+            { role: "system", content: MENU_ANALYSIS_SYSTEM_PROMPT },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: prompt },
+                { type: "image_url", image_url: { url: imageDataUrl } },
               ],
-              config: {
-                systemInstruction: MENU_ANALYSIS_SYSTEM_PROMPT,
-                responseMimeType: "application/json",
-                responseJsonSchema: menuAnalysisJsonSchema,
-                temperature: 0.3,
-                topP: 0.9,
-                maxOutputTokens: 3072,
-              },
-            });
+            },
+          ],
+          jsonMode: true,
+          temperature: 0.3,
+          maxTokens: 3072,
+        });
 
-            const rawOutput = response.text?.trim();
+        const parsedJson = this.parseJsonResponse(
+          response.text,
+          "menu analysis",
+        );
 
-            if (!rawOutput) {
-              throw new AppError(
-                "Gemini returned an empty response for menu analysis.",
-                {
-                  statusCode: 502,
-                  code: "GEMINI_EMPTY_RESPONSE",
-                },
-              );
-            }
+        const parsed = menuAnalysisSchema.safeParse(parsedJson);
 
-            let parsedJson: unknown;
-
-            try {
-              parsedJson = JSON.parse(this.stripCodeFences(rawOutput));
-            } catch (error) {
-              throw new AppError(
-                "Gemini returned invalid JSON for menu analysis.",
-                {
-                  statusCode: 502,
-                  code: "GEMINI_INVALID_JSON",
-                  cause: error,
-                },
-              );
-            }
-
-            const parsed = menuAnalysisSchema.safeParse(parsedJson);
-
-            if (!parsed.success) {
-              throw new AppError(
-                "Gemini menu analysis response did not match schema.",
-                {
-                  statusCode: 502,
-                  code: "GEMINI_SCHEMA_MISMATCH",
-                  cause: parsed.error.flatten(),
-                },
-              );
-            }
-
-            return parsed.data;
-          } catch (error) {
-            if (error instanceof AppError) {
-              throw error;
-            }
-
-            if (!this.shouldRetrySameModel(error, attempt, maxAttempts)) {
-              throw error;
-            }
-
-            await this.delay(800 * attempt);
-          }
+        if (!parsed.success) {
+          throw new AppError(
+            "LLM menu analysis response did not match schema.",
+            {
+              statusCode: 502,
+              code: "GEMINI_SCHEMA_MISMATCH",
+              cause: parsed.error.flatten(),
+            },
+          );
         }
 
-        throw new Error(
-          `Gemini menu analysis attempts exhausted for model ${modelName}.`,
-        );
+        return parsed.data;
       } catch (error) {
         if (error instanceof AppError) {
           throw error;
         }
-
         lastError = error;
-
-        if (!this.shouldRetryWithFallback(error, modelName)) {
-          break;
-        }
       }
     }
 
-    throw new AppError("Failed to analyze menu image with Gemini.", {
+    throw new AppError("Failed to analyze menu image.", {
       statusCode: 502,
       code: "GEMINI_REQUEST_FAILED",
       cause: lastError,
@@ -253,112 +184,50 @@ export class NutritionAnalysisService {
   ): Promise<MealSuggestion> {
     const prompt = this.buildSuggestionPrompt(input);
 
-    const candidateModels = Array.from(
-      new Set([
-        env.GEMINI_MODEL,
-        FALLBACK_GEMINI_MODEL,
-        SECONDARY_FALLBACK_GEMINI_MODEL,
-      ]),
-    );
-
+    const candidateModels = getCandidateModels();
     let lastError: unknown;
 
     for (const modelName of candidateModels) {
       try {
-        const maxAttempts =
-          modelName === SECONDARY_FALLBACK_GEMINI_MODEL ? 1 : 2;
+        const response = await llmClient.generate({
+          model: modelName,
+          messages: [
+            { role: "system", content: SUGGESTION_SYSTEM_PROMPT },
+            { role: "user", content: prompt },
+          ],
+          jsonMode: true,
+          temperature: 0.4,
+          maxTokens: 2048,
+        });
 
-        for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-          try {
-            const response = await geminiClient.models.generateContent({
-              model: modelName,
-              contents: [
-                {
-                  role: "user",
-                  parts: [{ text: prompt }],
-                },
-              ],
-              config: {
-                systemInstruction: SUGGESTION_SYSTEM_PROMPT,
-                responseMimeType: "application/json",
-                responseJsonSchema: mealSuggestionJsonSchema,
-                temperature: 0.4,
-                topP: 0.9,
-                maxOutputTokens: 2048,
-              },
-            });
+        const parsedJson = this.parseJsonResponse(
+          response.text,
+          "suggestion",
+        );
 
-            const rawOutput = response.text?.trim();
+        const parsed = mealSuggestionSchema.safeParse(parsedJson);
 
-            if (!rawOutput) {
-              throw new AppError(
-                "Gemini returned an empty response for suggestion.",
-                {
-                  statusCode: 502,
-                  code: "GEMINI_EMPTY_RESPONSE",
-                },
-              );
-            }
-
-            let parsedJson: unknown;
-
-            try {
-              parsedJson = JSON.parse(this.stripCodeFences(rawOutput));
-            } catch (error) {
-              throw new AppError(
-                "Gemini returned invalid JSON for suggestion.",
-                {
-                  statusCode: 502,
-                  code: "GEMINI_INVALID_JSON",
-                  cause: error,
-                },
-              );
-            }
-
-            const parsed = mealSuggestionSchema.safeParse(parsedJson);
-
-            if (!parsed.success) {
-              throw new AppError(
-                "Gemini suggestion response did not match schema.",
-                {
-                  statusCode: 502,
-                  code: "GEMINI_SCHEMA_MISMATCH",
-                  cause: parsed.error.flatten(),
-                },
-              );
-            }
-
-            return parsed.data;
-          } catch (error) {
-            if (error instanceof AppError) {
-              throw error;
-            }
-
-            if (!this.shouldRetrySameModel(error, attempt, maxAttempts)) {
-              throw error;
-            }
-
-            await this.delay(800 * attempt);
-          }
+        if (!parsed.success) {
+          throw new AppError(
+            "LLM suggestion response did not match schema.",
+            {
+              statusCode: 502,
+              code: "GEMINI_SCHEMA_MISMATCH",
+              cause: parsed.error.flatten(),
+            },
+          );
         }
 
-        throw new Error(
-          `Gemini suggestion attempts exhausted for model ${modelName}.`,
-        );
+        return parsed.data;
       } catch (error) {
         if (error instanceof AppError) {
           throw error;
         }
-
         lastError = error;
-
-        if (!this.shouldRetryWithFallback(error, modelName)) {
-          break;
-        }
       }
     }
 
-    throw new AppError("Failed to generate meal suggestion with Gemini.", {
+    throw new AppError("Failed to generate meal suggestion.", {
       statusCode: 502,
       code: "GEMINI_REQUEST_FAILED",
       cause: lastError,
@@ -370,14 +239,7 @@ export class NutritionAnalysisService {
     imagePart?: { mimeType: string; data: string };
     errorMessage: string;
   }): Promise<AnalyzeNutritionResult> {
-    const candidateModels = Array.from(
-      new Set([
-        env.GEMINI_MODEL,
-        FALLBACK_GEMINI_MODEL,
-        SECONDARY_FALLBACK_GEMINI_MODEL,
-      ]),
-    );
-
+    const candidateModels = getCandidateModels();
     let lastError: unknown;
 
     for (const modelName of candidateModels) {
@@ -387,12 +249,7 @@ export class NutritionAnalysisService {
         if (error instanceof AppError) {
           throw error;
         }
-
         lastError = error;
-
-        if (!this.shouldRetryWithFallback(error, modelName)) {
-          break;
-        }
       }
     }
 
@@ -411,139 +268,74 @@ export class NutritionAnalysisService {
       errorMessage: string;
     },
   ): Promise<AnalyzeNutritionResult> {
-    const maxAttempts = modelName === SECONDARY_FALLBACK_GEMINI_MODEL ? 1 : 2;
+    const userContent: LLMMessageContentPart[] = [
+      { type: "text", text: params.prompt },
+    ];
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      try {
-        const response = await geminiClient.models.generateContent({
-          model: modelName,
-          contents: [
-            {
-              role: "user",
-              parts: [
-                {
-                  text: params.prompt,
-                },
-                ...(params.imagePart
-                  ? [
-                      {
-                        inlineData: {
-                          mimeType: params.imagePart.mimeType,
-                          data: params.imagePart.data,
-                        },
-                      },
-                    ]
-                  : []),
-              ],
-            },
-          ],
-          config: {
-            systemInstruction: SYSTEM_PROMPT,
-            responseMimeType: "application/json",
-            responseJsonSchema: nutritionAnalysisJsonSchema,
-            temperature: 0.2,
-            topP: 0.9,
-            maxOutputTokens: 2048,
-          },
-        });
-
-        const rawOutput = response.text?.trim();
-
-        if (!rawOutput) {
-          throw new AppError("Gemini returned an empty response.", {
-            statusCode: 502,
-            code: "GEMINI_EMPTY_RESPONSE",
-          });
-        }
-
-        let parsedJson: unknown;
-
-        try {
-          parsedJson = JSON.parse(this.stripCodeFences(rawOutput));
-        } catch (error) {
-          throw new AppError("Gemini returned invalid JSON.", {
-            statusCode: 502,
-            code: "GEMINI_INVALID_JSON",
-            cause: error,
-          });
-        }
-
-        const parsed = nutritionAnalysisSchema.safeParse(parsedJson);
-
-        if (!parsed.success) {
-          throw new AppError(
-            "Gemini response did not match the nutrition schema.",
-            {
-              statusCode: 502,
-              code: "GEMINI_SCHEMA_MISMATCH",
-              cause: parsed.error.flatten(),
-            },
-          );
-        }
-
-        return {
-          parsed: parsed.data,
-          model: response.modelVersion ?? modelName,
-        };
-      } catch (error) {
-        if (error instanceof AppError) {
-          throw error;
-        }
-
-        if (!this.shouldRetrySameModel(error, attempt, maxAttempts)) {
-          throw error;
-        }
-
-        await this.delay(800 * attempt);
-      }
+    if (params.imagePart) {
+      userContent.push({
+        type: "image_url",
+        image_url: {
+          url: `data:${params.imagePart.mimeType};base64,${params.imagePart.data}`,
+        },
+      });
     }
 
-    throw new Error(`Gemini attempts exhausted for model ${modelName}.`);
-  }
-
-  private shouldRetryWithFallback(
-    error: unknown,
-    currentModel: string,
-  ): boolean {
-    if (currentModel === SECONDARY_FALLBACK_GEMINI_MODEL) {
-      return false;
-    }
-
-    const status =
-      typeof error === "object" &&
-      error !== null &&
-      "status" in error &&
-      typeof (error as { status?: unknown }).status === "number"
-        ? (error as { status: number }).status
-        : null;
-
-    return status === 404 || status === 503;
-  }
-
-  private shouldRetrySameModel(
-    error: unknown,
-    attempt: number,
-    maxAttempts: number,
-  ): boolean {
-    if (attempt >= maxAttempts) {
-      return false;
-    }
-
-    const status =
-      typeof error === "object" &&
-      error !== null &&
-      "status" in error &&
-      typeof (error as { status?: unknown }).status === "number"
-        ? (error as { status: number }).status
-        : null;
-
-    return status === 503;
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => {
-      setTimeout(resolve, ms);
+    const response = await llmClient.generate({
+      model: modelName,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userContent },
+      ],
+      jsonMode: true,
+      temperature: 0.2,
+      maxTokens: 2048,
     });
+
+    const parsedJson = this.parseJsonResponse(response.text, "nutrition analysis");
+
+    const parsed = nutritionAnalysisSchema.safeParse(parsedJson);
+
+    if (!parsed.success) {
+      throw new AppError(
+        "LLM response did not match the nutrition schema.",
+        {
+          statusCode: 502,
+          code: "GEMINI_SCHEMA_MISMATCH",
+          cause: parsed.error.flatten(),
+        },
+      );
+    }
+
+    return {
+      parsed: parsed.data,
+      model: response.model,
+    };
+  }
+
+  private parseJsonResponse(raw: string, context: string): unknown {
+    try {
+      return JSON.parse(this.stripCodeFences(raw));
+    } catch (error) {
+      throw new AppError(`LLM returned invalid JSON for ${context}.`, {
+        statusCode: 502,
+        code: "GEMINI_INVALID_JSON",
+        cause: error,
+      });
+    }
+  }
+
+  private async fetchImageAsDataUrl(imageUrl: string): Promise<string> {
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new AppError(`Failed to fetch image: ${response.status}`, {
+        statusCode: 502,
+        code: "IMAGE_FETCH_FAILED",
+      });
+    }
+    const contentType = response.headers.get("content-type") ?? "image/jpeg";
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return `data:${contentType};base64,${buffer.toString("base64")}`;
   }
 
   private parseImageDataUrl(dataUrl: string): {

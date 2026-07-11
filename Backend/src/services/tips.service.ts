@@ -1,5 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
-
 import { env } from "../config/env.js";
 import {
   tipsResponseJsonSchema,
@@ -7,17 +5,10 @@ import {
   type TipsResponse,
 } from "../contracts/generate-tips-request.js";
 import { AppError } from "../lib/app-error.js";
+import { getCandidateModels, llmClient } from "../lib/llm-client.js";
 import { logger } from "../lib/logger.js";
 
 const log = logger.child("tips-service");
-
-const geminiClient = new GoogleGenAI({
-  apiKey: env.GEMINI_API_KEY,
-  httpOptions: { timeout: 45_000 },
-});
-
-const FALLBACK_GEMINI_MODEL = "gemini-2.5-flash";
-const SECONDARY_FALLBACK_GEMINI_MODEL = "gemini-2.5-flash-lite";
 
 const TIPS_SYSTEM_PROMPT = [
   "You are a warm, knowledgeable Latin American nutrition and wellness coach AI for a mobile health app.",
@@ -55,14 +46,7 @@ export class TipsService {
   }): Promise<TipsResponse> {
     const prompt = this.buildTipsPrompt(params);
 
-    const candidateModels = Array.from(
-      new Set([
-        env.GEMINI_MODEL,
-        FALLBACK_GEMINI_MODEL,
-        SECONDARY_FALLBACK_GEMINI_MODEL,
-      ]),
-    );
-
+    const candidateModels = getCandidateModels();
     let lastError: unknown;
 
     log.debug("Starting tips generation", {
@@ -72,118 +56,60 @@ export class TipsService {
 
     for (const modelName of candidateModels) {
       try {
-        const maxAttempts =
-          modelName === SECONDARY_FALLBACK_GEMINI_MODEL ? 1 : 2;
+        log.debug("Trying model", { model: modelName });
 
-        for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-          try {
-            log.debug("Trying model", {
-              model: modelName,
-              attempt,
-              maxAttempts,
-            });
+        const response = await llmClient.generate({
+          model: modelName,
+          messages: [
+            { role: "system", content: TIPS_SYSTEM_PROMPT },
+            { role: "user", content: prompt },
+          ],
+          jsonMode: true,
+          temperature: 0.6,
+          maxTokens: 4096,
+        });
 
-            const response = await geminiClient.models.generateContent({
-              model: modelName,
-              contents: [
-                {
-                  role: "user",
-                  parts: [{ text: prompt }],
-                },
-              ],
-              config: {
-                systemInstruction: TIPS_SYSTEM_PROMPT,
-                responseMimeType: "application/json",
-                responseJsonSchema: tipsResponseJsonSchema,
-                temperature: 0.6,
-                topP: 0.9,
-                maxOutputTokens: 4096,
-              },
-            });
+        log.debug("LLM response received", { model: response.model });
 
-            log.debug("Gemini response received", {
-              model: response.modelVersion,
-            });
-
-            const rawOutput = response.text?.trim();
-
-            if (!rawOutput) {
-              log.error("Gemini returned empty response");
-              throw new AppError(
-                "Gemini returned an empty response for tips generation.",
-                {
-                  statusCode: 502,
-                  code: "GEMINI_EMPTY_RESPONSE",
-                },
-              );
-            }
-
-            log.debug("Gemini raw output length", { length: rawOutput.length });
-
-            let parsedJson: unknown;
-
-            try {
-              parsedJson = JSON.parse(this.stripCodeFences(rawOutput));
-            } catch (error) {
-              log.error("JSON parse failed", { error });
-              throw new AppError(
-                "Gemini returned invalid JSON for tips generation.",
-                {
-                  statusCode: 502,
-                  code: "GEMINI_INVALID_JSON",
-                  cause: error,
-                },
-              );
-            }
-
-            const parsed = tipsResponseSchema.safeParse(parsedJson);
-
-            if (!parsed.success) {
-              log.error("Schema validation failed", {
-                issues: parsed.error.flatten(),
-              });
-              throw new AppError(
-                "Gemini tips response did not match schema.",
-                {
-                  statusCode: 502,
-                  code: "GEMINI_SCHEMA_MISMATCH",
-                  cause: parsed.error.flatten(),
-                },
-              );
-            }
-
-            log.info("Generated tips", { count: parsed.data.tips.length });
-            return parsed.data;
-          } catch (error) {
-            log.error("Model error", { model: modelName, attempt, error });
-
-            if (error instanceof AppError) {
-              throw error;
-            }
-
-            if (!this.shouldRetrySameModel(error, attempt, maxAttempts)) {
-              throw error;
-            }
-
-            await this.delay(800 * attempt);
-          }
+        let parsedJson: unknown;
+        try {
+          parsedJson = JSON.parse(this.stripCodeFences(response.text));
+        } catch (error) {
+          log.error("JSON parse failed", { error });
+          throw new AppError(
+            "LLM returned invalid JSON for tips generation.",
+            {
+              statusCode: 502,
+              code: "GEMINI_INVALID_JSON",
+              cause: error,
+            },
+          );
         }
 
-        throw new Error(
-          `Gemini tips attempts exhausted for model ${modelName}.`,
-        );
-      } catch (error) {
-        log.error("Model failed", { model: modelName, error });
+        const parsed = tipsResponseSchema.safeParse(parsedJson);
 
+        if (!parsed.success) {
+          log.error("Schema validation failed", {
+            issues: parsed.error.flatten(),
+          });
+          throw new AppError(
+            "LLM tips response did not match schema.",
+            {
+              statusCode: 502,
+              code: "GEMINI_SCHEMA_MISMATCH",
+              cause: parsed.error.flatten(),
+            },
+          );
+        }
+
+        log.info("Generated tips", { count: parsed.data.tips.length });
+        return parsed.data;
+      } catch (error) {
         if (error instanceof AppError) {
           throw error;
         }
-
+        log.error("Model failed", { model: modelName, error });
         lastError = error;
-
-        if (!this.shouldRetryWithFallback(error, modelName)) {
-          break;
-        }
       }
     }
 
@@ -196,11 +122,11 @@ export class TipsService {
       (lastError as { status?: number }).status === 429;
 
     if (isRateLimited) {
-      log.warn("Gemini rate limited (429) — returning fallback tips");
+      log.warn("LLM rate limited (429) — returning fallback tips");
       return this.getMockTips();
     }
 
-    throw new AppError("Failed to generate tips with Gemini.", {
+    throw new AppError("Failed to generate tips.", {
       statusCode: 502,
       code: "GEMINI_REQUEST_FAILED",
       cause: lastError,
@@ -315,51 +241,6 @@ export class TipsService {
     lines.push("Usa un tono cercano, motivador y sin juzgar.");
 
     return lines.join("\n");
-  }
-
-  private shouldRetryWithFallback(
-    error: unknown,
-    currentModel: string,
-  ): boolean {
-    if (currentModel === SECONDARY_FALLBACK_GEMINI_MODEL) {
-      return false;
-    }
-
-    const status =
-      typeof error === "object" &&
-      error !== null &&
-      "status" in error &&
-      typeof (error as { status?: unknown }).status === "number"
-        ? (error as { status: number }).status
-        : null;
-
-    return status === 404 || status === 503;
-  }
-
-  private shouldRetrySameModel(
-    error: unknown,
-    attempt: number,
-    maxAttempts: number,
-  ): boolean {
-    if (attempt >= maxAttempts) {
-      return false;
-    }
-
-    const status =
-      typeof error === "object" &&
-      error !== null &&
-      "status" in error &&
-      typeof (error as { status?: unknown }).status === "number"
-        ? (error as { status: number }).status
-        : null;
-
-    return status === 503;
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => {
-      setTimeout(resolve, ms);
-    });
   }
 
   private stripCodeFences(value: string): string {
